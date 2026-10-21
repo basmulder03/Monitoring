@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { JSDOM } = require("jsdom");
 
-function open({ url = "http://controller/", scopeResponses = {} } = {}) {
+function open({ url = "http://controller/", scopeResponses = {}, topology = { nodes: [], edges: [] } } = {}) {
   const dir = process.env.MONITORING_UI_DIR;
   const html = fs.readFileSync(path.join(dir, "index.html"), "utf8");
   const script = fs.readFileSync(path.join(dir, "app.js"), "utf8");
@@ -19,6 +19,7 @@ function open({ url = "http://controller/", scopeResponses = {} } = {}) {
     addEventListener(type, listener) { this.listeners[type] = listener; }
   };
   window.fetch = async (address) => {
+    if (address === "/api/topology") return { status: 200, json: async () => topology };
     const name = decodeURIComponent(address.replace("/api/scopes/", ""));
     const body = scopeResponses[name];
     return body ? { status: 200, json: async () => body } : { status: 404, json: async () => ({}) };

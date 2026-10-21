@@ -14,6 +14,8 @@
   let lastSeen = Date.now();
   let previousHealth = new Map();
   let scopeRequest = 0;
+  let selectedNode = null;
+  const layouts = new Map();
 
   function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -339,12 +341,203 @@
     app.replaceChildren(content);
   }
 
+  // ----- Dependencies -----------------------------------------------------------------------------------------------
+
+  const NODE_WIDTH = 190;
+  const NODE_HEIGHT = 52;
+  const COLUMN_GAP = 110;
+  const ROW_GAP = 28;
+  const MARGIN = 20;
+  const SVG_NS = "http://www.w3.org/2000/svg";
+
+  function svgEl(tag, attributes, text) {
+    const node = document.createElementNS(SVG_NS, tag);
+    for (const [name, value] of Object.entries(attributes || {})) node.setAttribute(name, value);
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  // Places each node in a column after everything that calls it. The result depends only on which nodes and edges exist,
+  // so the picture stays where it is while the numbers change, and only moves when the topology does.
+  function layout(graph) {
+    const signature = graph.nodes.map((n) => n.id).join("|") + "#" + graph.edges.map((e) => e.from + ">" + e.to).join("|");
+    const known = layouts.get("current");
+    if (known && known.signature === signature) return known.positions;
+
+    const rank = new Map(graph.nodes.map((n) => [n.id, 0]));
+    // Longest path from the callers; the limit stops a cycle (two services calling each other) from looping for ever.
+    for (let pass = 0; pass < graph.nodes.length; pass++) {
+      let changed = false;
+      for (const edge of graph.edges) {
+        if (edge.from === edge.to) continue;
+        if (rank.get(edge.to) < rank.get(edge.from) + 1 && rank.get(edge.from) + 1 < graph.nodes.length) {
+          rank.set(edge.to, rank.get(edge.from) + 1);
+          changed = true;
+        }
+      }
+      if (!changed) break;
+    }
+
+    const columns = new Map();
+    for (const node of graph.nodes) {
+      const column = rank.get(node.id);
+      if (!columns.has(column)) columns.set(column, []);
+      columns.get(column).push(node);
+    }
+
+    const positions = new Map();
+    let height = 0;
+    let width = 0;
+    for (const [column, nodes] of [...columns.entries()].sort((a, b) => a[0] - b[0])) {
+      nodes.sort((a, b) => a.id.localeCompare(b.id));
+      nodes.forEach((node, row) => {
+        positions.set(node.id, { x: MARGIN + column * (NODE_WIDTH + COLUMN_GAP), y: MARGIN + row * (NODE_HEIGHT + ROW_GAP) });
+      });
+      height = Math.max(height, MARGIN * 2 + nodes.length * (NODE_HEIGHT + ROW_GAP) - ROW_GAP);
+      width = MARGIN * 2 + (column + 1) * (NODE_WIDTH + COLUMN_GAP) - COLUMN_GAP;
+    }
+
+    positions.size_ = { width, height };
+    layouts.set("current", { signature, positions });
+    return positions;
+  }
+
+  const KIND_TEXT = { Service: "Service", Database: "Database", Queue: "Queue", External: "External system" };
+
+  function renderGraph(graph) {
+    const positions = layout(graph);
+    const size = positions.size_;
+    const maxCalls = Math.max(1, ...graph.edges.map((e) => e.calls));
+    const connected = (id) => graph.edges.some((e) => (e.from === selectedNode && e.to === id) || (e.to === selectedNode && e.from === id));
+
+    const svg = svgEl("svg", { class: "graph", viewBox: "0 0 " + size.width + " " + size.height, role: "group", "aria-label": "Dependency graph" });
+    svg.appendChild(svgEl("title", {}, "Dependency graph"));
+    const defs = svgEl("defs");
+    const marker = svgEl("marker", { id: "arrow", viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto-start-reverse" });
+    marker.appendChild(svgEl("path", { d: "M0 0 L10 5 L0 10 z", class: "arrow" }));
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+
+    for (const edge of graph.edges) {
+      const from = positions.get(edge.from);
+      const to = positions.get(edge.to);
+      const x1 = from.x + NODE_WIDTH;
+      const y1 = from.y + NODE_HEIGHT / 2;
+      const x2 = to.x;
+      const y2 = to.y + NODE_HEIGHT / 2;
+      const bend = Math.max(40, Math.abs(x2 - x1) / 2);
+      const failing = edge.errors > 0;
+      const dim = selectedNode !== null && edge.from !== selectedNode && edge.to !== selectedNode;
+      const group = svgEl("g", { class: "edge" + (failing ? " failing" : "") + (dim ? " dim" : "") });
+      const path = svgEl("path", {
+        d: "M" + x1 + " " + y1 + " C" + (x1 + bend) + " " + y1 + " " + (x2 - bend) + " " + y2 + " " + x2 + " " + y2,
+        "stroke-width": String(1.5 + 5 * Math.log10(1 + edge.calls) / Math.log10(1 + maxCalls)),
+        "marker-end": "url(#arrow)",
+        fill: "none",
+      });
+      path.appendChild(svgEl("title", {}, edgeText(edge, graph)));
+      group.appendChild(path);
+      if (failing) group.appendChild(svgEl("text", { x: String((x1 + x2) / 2), y: String((y1 + y2) / 2 - 6), class: "edge-label", "text-anchor": "middle" }, plural(edge.errors, "error", "errors")));
+      svg.appendChild(group);
+    }
+
+    for (const node of graph.nodes) {
+      const at = positions.get(node.id);
+      const dim = selectedNode !== null && node.id !== selectedNode && !connected(node.id);
+      const health = node.health ? " — " + (LABELS[node.health] || "Unknown") : "";
+      const group = svgEl("g", {
+        class: "node " + node.kind.toLowerCase() + (node.health ? " " + node.health.toLowerCase() : "") + (node.id === selectedNode ? " selected" : "") + (dim ? " dim" : ""),
+        transform: "translate(" + at.x + " " + at.y + ")",
+        tabindex: "0",
+        role: "button",
+        "aria-pressed": node.id === selectedNode ? "true" : "false",
+        "aria-label": node.name + ", " + KIND_TEXT[node.kind] + health,
+      });
+      group.appendChild(svgEl("rect", { width: String(NODE_WIDTH), height: String(NODE_HEIGHT), rx: "6" }));
+      group.appendChild(svgEl("text", { x: "10", y: "22", class: "node-name" }, fit(node.name, 24)));
+      group.appendChild(svgEl("text", { x: "10", y: "40", class: "node-kind" }, KIND_TEXT[node.kind] + health));
+      const select = () => { selectedNode = selectedNode === node.id ? null : node.id; render(); };
+      group.addEventListener("click", select);
+      group.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); }
+      });
+      svg.appendChild(group);
+    }
+
+    return svg;
+  }
+
+  function fit(text, max) {
+    return text.length <= max ? text : text.slice(0, max - 1) + "…";
+  }
+
+  function nameOf(id, graph) {
+    const node = graph.nodes.find((n) => n.id === id);
+    return node ? (node.scope ? node.scope + "/" + node.name : node.name) : id;
+  }
+
+  function edgeText(edge, graph) {
+    const average = edge.calls > 0 ? Math.round(edge.durationSumMs / edge.calls) : 0;
+    return nameOf(edge.from, graph) + " → " + nameOf(edge.to, graph) + " (" + edge.type + "): " +
+      plural(edge.calls, "call", "calls") + ", " + plural(edge.errors, "error", "errors") + ", " + average + " ms on average";
+  }
+
+  function renderDependencies(graph) {
+    const root = el("div");
+    root.appendChild(el("h2", "", "Dependencies"));
+    if (graph.nodes.length === 0) {
+      root.appendChild(el("p", "muted", "No calls between services have been reported yet."));
+      return root;
+    }
+
+    const frame = el("div", "graph-frame");
+    frame.appendChild(renderGraph(graph));
+    root.appendChild(frame);
+
+    // The same facts as text, for screen readers and for anyone who wants the numbers.
+    const table = el("table", "instances");
+    const head = el("tr");
+    for (const title of ["From", "To", "Type", "Calls", "Errors", "Average"]) head.appendChild(el("th", "", title));
+    table.appendChild(head);
+    for (const edge of graph.edges) {
+      const row = el("tr");
+      row.appendChild(el("td", "", nameOf(edge.from, graph)));
+      row.appendChild(el("td", "", nameOf(edge.to, graph)));
+      row.appendChild(el("td", "", edge.type));
+      row.appendChild(el("td", "", String(edge.calls)));
+      row.appendChild(el("td", "", String(edge.errors)));
+      row.appendChild(el("td", "", (edge.calls > 0 ? Math.round(edge.durationSumMs / edge.calls) : 0) + " ms"));
+      table.appendChild(row);
+    }
+    root.appendChild(table);
+    return root;
+  }
+
+  let dependenciesRequest = 0;
+
+  async function showDependencies() {
+    const request = ++dependenciesRequest;
+    try {
+      const response = await fetch("/api/topology");
+      if (request !== dependenciesRequest) return;
+      show(renderDependencies(await response.json()));
+    } catch (error) {
+      if (request === dependenciesRequest) show(el("p", "muted", "The dependencies could not be loaded."));
+    }
+  }
+
   function routeScopeName() {
     const match = /^#\/scopes\/(.+)$/.exec(location.hash);
     return match ? decodeURIComponent(match[1]) : null;
   }
 
   async function render() {
+    markNavigation();
+    if (location.hash === "#/dependencies") {
+      await showDependencies();
+      return;
+    }
+
     const scopeName = routeScopeName();
     if (scopeName === null) {
       show(renderOverview());
@@ -392,6 +585,13 @@
     if (seconds * 1000 >= STALE_AFTER_MS) {
       stale.textContent = "The data is " + seconds + " seconds old. The connection to the controller may be lost.";
       stale.hidden = false;
+    }
+  }
+
+  function markNavigation() {
+    for (const link of document.querySelectorAll("nav a")) {
+      const current = link.getAttribute("href") === "#/dependencies" ? location.hash === "#/dependencies" : location.hash !== "#/dependencies";
+      if (current) link.setAttribute("aria-current", "page"); else link.removeAttribute("aria-current");
     }
   }
 
