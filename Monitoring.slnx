@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Monitoring.Agent/Monitoring.Agent.csproj" />
     <Project Path="src/Monitoring.Client/Monitoring.Client.csproj" />
+    <Project Path="src/Monitoring.Common/Monitoring.Common.csproj" />
     <Project Path="src/Monitoring.Controller/Monitoring.Controller.csproj" />
     <Project Path="src/Monitoring.Hosting/Monitoring.Hosting.csproj" />
     <Project Path="src/Monitoring.Protocol/Monitoring.Protocol.csproj" />
@@ -11,6 +12,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Monitoring.Agent.Tests/Monitoring.Agent.Tests.csproj" />
     <Project Path="tests/Monitoring.Client.Tests/Monitoring.Client.Tests.csproj" />
+    <Project Path="tests/Monitoring.Common.Tests/Monitoring.Common.Tests.csproj" />
     <Project Path="tests/Monitoring.Component.Tests/Monitoring.Component.Tests.csproj" />
     <Project Path="tests/Monitoring.Controller.Tests/Monitoring.Controller.Tests.csproj" />
     <Project Path="tests/Monitoring.Hosting.Tests/Monitoring.Hosting.Tests.csproj" />

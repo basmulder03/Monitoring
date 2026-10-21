@@ -1,10 +1,10 @@
-using Monitoring.Agent.Features.ControllerLink;
+using Monitoring.Common;
 using Shouldly;
 using Xunit;
 
-namespace Monitoring.Agent.Tests.Features.ControllerLink;
+namespace Monitoring.Common.Tests;
 
-public class ControllerAddressTests
+public class HostPortTests
 {
     [Theory]
     [InlineData("controller.example:9440", "controller.example", 9440)]
@@ -16,7 +16,7 @@ public class ControllerAddressTests
         // Arrange: the address comes from the test data
 
         // Act
-        var parsed = ControllerAddress.TryParse(text, out var host, out var port);
+        var parsed = HostPort.TryParse(text, out var host, out var port);
 
         // Assert
         parsed.ShouldBeTrue();
@@ -41,7 +41,7 @@ public class ControllerAddressTests
         // Arrange: the address comes from the test data
 
         // Act
-        var parsed = ControllerAddress.TryParse(text, out _, out _);
+        var parsed = HostPort.TryParse(text, out _, out _);
 
         // Assert
         parsed.ShouldBeFalse();

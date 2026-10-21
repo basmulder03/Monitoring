@@ -1,3 +1,4 @@
+using Monitoring.Common;
 using System.Net.Sockets;
 
 namespace Monitoring.Agent.Features.ControllerLink;
@@ -13,7 +14,7 @@ internal static class TcpConnector
     /// <exception cref="SocketException">The replica cannot be reached.</exception>
     public static async ValueTask<Stream> ConnectAsync(string address, CancellationToken ct)
     {
-        if (!ControllerAddress.TryParse(address, out var host, out var port))
+        if (!HostPort.TryParse(address, out var host, out var port))
         {
             throw new ArgumentException($"'{address}' is not a host:port address.", nameof(address));
         }

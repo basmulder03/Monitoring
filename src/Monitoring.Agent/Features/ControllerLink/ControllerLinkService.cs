@@ -1,3 +1,4 @@
+using Monitoring.Common;
 using Microsoft.Extensions.Logging;
 using Monitoring.Protocol.Messages;
 
@@ -65,7 +66,7 @@ internal sealed class ControllerLinkService(
         var desired = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var address in config.ControllerReplicas)
         {
-            if (ControllerAddress.TryParse(address, out _, out _))
+            if (HostPort.TryParse(address, out _, out _))
             {
                 desired.Add(address.Trim());
             }

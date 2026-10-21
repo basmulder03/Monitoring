@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Monitoring.Agent.Features.ScopeState;
-using Monitoring.Agent.Shared;
+using Monitoring.Common;
 using Monitoring.Protocol.Instances;
 
 namespace Monitoring.Agent.Features.Discovery.Kubernetes;

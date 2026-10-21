@@ -1,7 +1,7 @@
-namespace Monitoring.Agent.Features.ControllerLink;
+namespace Monitoring.Common;
 
-/// <summary>A controller replica's address as <c>host:port</c>.</summary>
-internal static class ControllerAddress
+/// <summary>An address written as <c>host:port</c>, such as that of a controller replica or an agent.</summary>
+public static class HostPort
 {
     /// <summary>Splits an address into host and port.</summary>
     /// <param name="address">Text such as <c>controller.example:9440</c> or <c>[::1]:9440</c>.</param>

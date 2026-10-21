@@ -1,3 +1,4 @@
+using Monitoring.Common;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -49,7 +50,7 @@ public static class ControllerLinkSlice
             throw new ArgumentException("At least one controller address is required.", nameof(options));
         }
 
-        foreach (var address in options.ControllerAddresses.Where(a => !ControllerAddress.TryParse(a, out _, out _)))
+        foreach (var address in options.ControllerAddresses.Where(a => !HostPort.TryParse(a, out _, out _)))
         {
             throw new ArgumentException($"'{address}' is not a host:port address.", nameof(options));
         }
