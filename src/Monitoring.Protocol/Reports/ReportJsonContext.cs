@@ -9,4 +9,5 @@ namespace Monitoring.Protocol.Reports;
     UseStringEnumConverter = true)]
 [JsonSerializable(typeof(InstanceDescription))]
 [JsonSerializable(typeof(HealthReport))]
+[JsonSerializable(typeof(MetricsReport))]
 public sealed partial class ReportJsonContext : JsonSerializerContext;

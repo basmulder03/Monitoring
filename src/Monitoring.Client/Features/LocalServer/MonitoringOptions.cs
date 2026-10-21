@@ -27,4 +27,13 @@ public sealed class MonitoringOptions
 
     /// <summary>How long the health checks may take together before the application counts as Unhealthy.</summary>
     public TimeSpan HealthTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Instrument names left out of the metrics, each an exact name or a prefix ending in <c>*</c>.
+    /// Used to keep noisy or sensitive instruments away from the monitoring system.
+    /// </summary>
+    public List<string> MetricsDeny { get; set; } = [];
+
+    /// <summary>The most series kept; more would grow the memory of the application, so further series are ignored.</summary>
+    public int MaxMetricSeries { get; set; } = 1000;
 }

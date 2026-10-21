@@ -36,6 +36,41 @@ public class ReportPayloadTests
     }
 
     [Fact]
+    public void ReadMetrics_restores_every_series_with_its_labels()
+    {
+        // Arrange
+        var report = new MetricsReport([
+            new MetricSeries("orders.placed", new Dictionary<string, string> { ["channel"] = "web" }, 12.5),
+            new MetricSeries("orders.queued", new Dictionary<string, string>(), 3),
+        ]);
+
+        // Act
+        var read = ReportPayload.ReadMetrics(ReportPayload.Write(report));
+
+        // Assert
+        read!.Series.Count.ShouldBe(2);
+        read.Series[0].Name.ShouldBe("orders.placed");
+        read.Series[0].Labels["channel"].ShouldBe("web");
+        read.Series[0].Value.ShouldBe(12.5);
+        read.Series[1].Labels.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("not json")]
+    public void ReadMetrics_returns_nothing_for_a_payload_that_is_not_a_report(string? json)
+    {
+        // Arrange (nothing to prepare)
+
+        // Act
+        var read = ReportPayload.ReadMetrics(json);
+
+        // Assert
+        read.ShouldBeNull();
+    }
+
+    [Fact]
     public void ReadHealth_restores_the_result_of_every_check()
     {
         // Arrange
