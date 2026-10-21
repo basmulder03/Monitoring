@@ -118,6 +118,7 @@ public class ControllerCompositionTests
             .With("Controller:Alerting:StartupGrace", "00:01:00")
             .With("Controller:Alerting:InstanceUnhealthyWait", "00:00:45")
             .With("Controller:Alerting:ServiceDownWait", "00:00:05")
+            .With("Controller:Alerting:ScopeUnknownWait", "00:03:00")
             .With("Controller:Alerting:EvaluationInterval", "00:00:02")
             .Build();
 
@@ -128,6 +129,7 @@ public class ControllerCompositionTests
         options.StartupGrace.ShouldBe(TimeSpan.FromMinutes(1));
         options.InstanceUnhealthyWait.ShouldBe(TimeSpan.FromSeconds(45));
         options.ServiceDownWait.ShouldBe(TimeSpan.FromSeconds(5));
+        options.ScopeUnknownWait.ShouldBe(TimeSpan.FromMinutes(3));
         options.EvaluationInterval.ShouldBe(TimeSpan.FromSeconds(2));
     }
 

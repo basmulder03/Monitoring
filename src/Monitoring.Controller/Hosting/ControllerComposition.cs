@@ -53,6 +53,7 @@ internal static class ControllerComposition
                 options.StartupGrace = alerting.Duration("StartupGrace", options.StartupGrace);
                 options.InstanceUnhealthyWait = alerting.Duration("InstanceUnhealthyWait", options.InstanceUnhealthyWait);
                 options.ServiceDownWait = alerting.Duration("ServiceDownWait", options.ServiceDownWait);
+                options.ScopeUnknownWait = alerting.Duration("ScopeUnknownWait", options.ScopeUnknownWait);
                 options.EvaluationInterval = alerting.Duration("EvaluationInterval", options.EvaluationInterval);
             })
             .AddDashboard(options =>

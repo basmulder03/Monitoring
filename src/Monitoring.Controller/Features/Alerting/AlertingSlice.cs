@@ -7,7 +7,7 @@ namespace Monitoring.Controller.Features.Alerting;
 public static class AlertingSlice
 {
     /// <summary>
-    /// Adds the default rules, the evaluator and the background service that runs it. It reads from the registry, so <c>AddRegistry</c> must be called as well.
+    /// Adds the default rules, the evaluator and the background service that runs it. It reads from the registry and the liveness tracking, so <c>AddRegistry</c> and <c>AddLiveness</c> must be called as well.
     /// </summary>
     /// <param name="services">The service collection to extend.</param>
     /// <param name="configure">Optionally changes the <see cref="AlertingOptions"/>.</param>
@@ -20,6 +20,7 @@ public static class AlertingSlice
         ArgumentOutOfRangeException.ThrowIfLessThan(options.StartupGrace, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.InstanceUnhealthyWait, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.ServiceDownWait, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.ScopeUnknownWait, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.EvaluationInterval, TimeSpan.Zero);
 
         services.AddLogging();
@@ -27,6 +28,7 @@ public static class AlertingSlice
         services.AddSingleton(options);
         services.AddSingleton<IAlertRule, InstanceUnhealthyRule>();
         services.AddSingleton<IAlertRule, ServiceDownRule>();
+        services.AddSingleton<IAlertRule, ScopeUnknownRule>();
         services.AddSingleton<AlertEvaluator>();
         services.AddSingleton<IAlertEvaluator>(provider => provider.GetRequiredService<AlertEvaluator>());
         services.AddSingleton<IAlertState>(provider => provider.GetRequiredService<AlertEvaluator>());
