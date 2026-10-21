@@ -80,6 +80,53 @@ Without transport security the token travels in clear text. Use it only on a net
 | `Agent:ConfigReplyTimeout` | `00:00:10` | How long to wait for the controller's answer to the hello |
 | `Agent:SnapshotInterval` | `00:05:00` | How often a full snapshot is sent to repair drift |
 
+### Discovery
+
+The agent learns which instances exist from the platform it runs on. `Agent:Discovery:Kind` is `none` (the default) or `kubernetes`.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Agent:Discovery:Kind` | `none` | Where instances come from: `none` or `kubernetes` |
+| `Agent:Discovery:Kubernetes:Namespace` | namespace of the pod | The namespace whose pods become instances |
+| `Agent:Discovery:Kubernetes:ApiServer` | in-cluster address | Address of the API server, for example `https://10.0.0.1:443` |
+| `Agent:Discovery:Kubernetes:TokenFile` | in-cluster token file | File with the service account token, read again for every request because Kubernetes rotates it |
+| `Agent:Discovery:Kubernetes:Token` | none | A fixed token instead of a token file; meant for development |
+| `Agent:Discovery:Kubernetes:CaFile` | in-cluster certificate authority | PEM file with the certificate authority that signed the API server's certificate |
+| `Agent:Discovery:Kubernetes:ResyncInterval` | `00:01:00` | How long a watch stays open before the pods are listed again in full, which repairs a missed event |
+| `Agent:Discovery:Kubernetes:RetryMinDelay` | `00:00:01` | Shortest wait before retrying after a failure |
+| `Agent:Discovery:Kubernetes:RetryMaxDelay` | `00:00:30` | Longest wait; repeated failures grow the wait up to this |
+
+Inside a cluster none of the Kubernetes settings are needed: the namespace, the API server address, the token and the certificate authority come from the pod's service account.
+The API server is always contacted directly, never through a proxy set in the environment.
+
+The agent needs a namespace-scoped role that can read pods, and nothing else:
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: monitoring-agent
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+```
+
+How a pod becomes an instance:
+
+| Pod | Instance |
+| --- | --- |
+| Name | Instance id |
+| Label `app.kubernetes.io/name`, else `app`, else the owning workload (a Deployment's ReplicaSet is shown as the Deployment), else the pod name | Service name |
+| Pending | Starting |
+| Running | Running |
+| Being deleted, or Failed | Terminating |
+| Succeeded (a finished job) | Not shown |
+| All containers ready | Healthy |
+| Running but not ready | Degraded |
+| A container stuck in `CrashLoopBackOff`, an image pull error, a configuration error, or exited with an error | Unhealthy |
+| Pending without a problem, or phase Unknown | Unknown |
+
 ```json
 {
   "Agent": {
