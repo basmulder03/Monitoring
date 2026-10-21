@@ -34,16 +34,18 @@ internal sealed class OverviewStream(DashboardModel model, DashboardOptions opti
                 if (json != last)
                 {
                     last = json;
+
+                    // Taken before writing: the page counts the silence from when the decision was made.
+                    silentSince = time.GetTimestamp();
                     await response.WriteAsync($"event: overview\ndata: {json}\n\n", ct).ConfigureAwait(false);
                     await response.Body.FlushAsync(ct).ConfigureAwait(false);
-                    silentSince = time.GetTimestamp();
                 }
                 else if (time.GetElapsedTime(silentSince) >= options.KeepAliveInterval)
                 {
+                    silentSince = time.GetTimestamp();
                     // A real event rather than a comment, because a page cannot see comments and uses it to know the link is alive.
                     await response.WriteAsync("event: keep-alive\ndata: {}\n\n", ct).ConfigureAwait(false);
                     await response.Body.FlushAsync(ct).ConfigureAwait(false);
-                    silentSince = time.GetTimestamp();
                 }
             }
             while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false));
