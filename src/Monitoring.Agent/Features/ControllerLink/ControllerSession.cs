@@ -1,3 +1,4 @@
+using Monitoring.Agent.Features.Configuration;
 using Microsoft.Extensions.Logging;
 using Monitoring.Agent.Features.ScopeState;
 using Monitoring.Protocol.Framing;
@@ -16,11 +17,13 @@ namespace Monitoring.Agent.Features.ControllerLink;
 /// and only the read loop reads from it after the handshake, so neither needs synchronization.
 /// </remarks>
 /// <param name="store">The scope state this session sends.</param>
+/// <param name="configuration">Says which configuration the agent uses, which every heartbeat reports.</param>
 /// <param name="options">Identity, token, intervals and limits.</param>
 /// <param name="time">Clock for the timeouts and timers.</param>
 /// <param name="logger">Receives the reasons a session ended.</param>
 internal sealed class ControllerSession(
     IScopeStateStore store,
+    IAgentConfiguration configuration,
     ControllerLinkOptions options,
     TimeProvider time,
     ILogger<ControllerSession> logger)
@@ -158,7 +161,7 @@ internal sealed class ControllerSession(
                 else if (ready == nextHeartbeat)
                 {
                     nextHeartbeat = null;
-                    await FrameCodec.WriteAsync(stream, new Heartbeat(++heartbeats, HealthState.Healthy), options.MaxFrameBytes, ct).ConfigureAwait(false);
+                    await FrameCodec.WriteAsync(stream, new Heartbeat(++heartbeats, HealthState.Healthy, configuration.Current.Version), options.MaxFrameBytes, ct).ConfigureAwait(false);
                 }
                 else
                 {

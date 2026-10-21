@@ -112,6 +112,7 @@ public class OverviewStreamTests
             builder.Services.AddSingleton<IAgentLiveness>(new FakeAgentLiveness());
             builder.Services.AddSingleton<IHealthRollup, HealthRollup>();
             builder.Services.AddSingleton<IAlertState>(new NoAlerts());
+            builder.Services.AddSingleton<Monitoring.Controller.Features.Configuration.IAppliedConfigurations>(new Monitoring.Controller.Features.Configuration.AppliedConfigurations(new Monitoring.Controller.Features.Configuration.EffectiveConfiguration(Microsoft.Extensions.Logging.Abstractions.NullLogger<Monitoring.Controller.Features.Configuration.EffectiveConfiguration>.Instance)));
             builder.Services.AddDashboard();
 
             var app = builder.Build();

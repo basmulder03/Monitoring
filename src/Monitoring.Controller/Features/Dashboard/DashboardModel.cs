@@ -1,4 +1,5 @@
 using Monitoring.Controller.Features.Alerting;
+using Monitoring.Controller.Features.Configuration;
 using Monitoring.Controller.Features.Health;
 using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Registry;
@@ -12,9 +13,15 @@ namespace Monitoring.Controller.Features.Dashboard;
 /// <param name="health">The health roll-up per service and scope.</param>
 /// <param name="alerts">The alerts that are firing.</param>
 /// <param name="liveness">Tells whether each scope's agent is alive.</param>
+/// <param name="configurations">Tells whether each scope's agent uses the configuration it should.</param>
 /// <param name="options">Provides the label names to group by.</param>
 internal sealed class DashboardModel(
-    IScopeRegistry registry, IHealthRollup health, IAlertState alerts, IAgentLiveness liveness, DashboardOptions options)
+    IScopeRegistry registry,
+    IHealthRollup health,
+    IAlertState alerts,
+    IAgentLiveness liveness,
+    IAppliedConfigurations configurations,
+    DashboardOptions options)
 {
     /// <summary>Builds the overview: a summary per scope and the alerts that are firing.</summary>
     /// <returns>The overview.</returns>
@@ -65,7 +72,14 @@ internal sealed class DashboardModel(
             services,
             new Dictionary<string, string>(registry.GetScopeLabels(scopeName)),
             agent.IsLive,
-            agent.IsLive ? null : agent.LastSeen);
+            agent.IsLive ? null : agent.LastSeen,
+            ConfigurationOf(scopeName));
+    }
+
+    private ScopeConfiguration ConfigurationOf(string scopeName)
+    {
+        var status = configurations.StatusOf(scopeName, registry.GetScopeLabels(scopeName));
+        return new ScopeConfiguration(status.Applied, status.Expected, status.InSync);
     }
 
     private ScopeSummary Summarize(string scopeName)
@@ -80,7 +94,8 @@ internal sealed class DashboardModel(
             live.Count(instance => instance.Health != HealthState.Healthy),
             new Dictionary<string, string>(registry.GetScopeLabels(scopeName)),
             agent.IsLive,
-            agent.IsLive ? null : agent.LastSeen);
+            agent.IsLive ? null : agent.LastSeen,
+            ConfigurationOf(scopeName).InSync);
     }
 
     private static bool IsLive(InstanceInfo instance) =>

@@ -89,7 +89,7 @@ export function mount(address = "/", configure: (services: FakeServices) => void
 }
 
 export function scope(name: string, health: ScopeSummary["health"], labels: Record<string, string> = {}, extra: Partial<ScopeSummary> = {}): ScopeSummary {
-  return { name, health, services: 1, instances: 2, problems: health === "Healthy" ? 0 : 1, labels, agentConnected: true, lastSeen: null, ...extra };
+  return { name, health, services: 1, instances: 2, problems: health === "Healthy" ? 0 : 1, labels, agentConnected: true, lastSeen: null, configurationInSync: true, ...extra };
 }
 
 export function overview(scopes: ScopeSummary[], groupBy: string[] = ["environment", "datacenter"], alerts: AlertSummary[] = []): Overview {

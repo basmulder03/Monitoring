@@ -12,7 +12,8 @@ const instance = (extra: Partial<InstanceDetail> = {}): InstanceDetail => ({
 });
 
 const detail = (extra: Partial<ScopeDetail> = {}): ScopeDetail => ({
-  name: "shop", health: "Healthy", labels: {}, agentConnected: true, lastSeen: null, services: [], ...extra,
+  name: "shop", health: "Healthy", labels: {}, agentConnected: true, lastSeen: null, services: [],
+  configuration: { applied: null, expected: "v1", inSync: true }, ...extra,
 });
 
 const withService = (inst: InstanceDetail, health: ScopeDetail["health"] = "Degraded"): ScopeDetail =>
@@ -33,6 +34,16 @@ describe("the scope view", () => {
     const page = await openScope({ ...gone, agentConnected: false, lastSeen: new Date(Date.parse("2026-10-21T12:00:00Z") - 120000).toISOString() });
     expect(page.main.textContent).toContain("The agent of this scope is not connected (last heard 2 min ago)");
     expect(page.main.textContent).toContain("orders-1");
+  });
+
+  it("says when the agent uses another configuration than it should", async () => {
+    const page = await openScope(detail({ configuration: { applied: "v1-15-10", expected: "v2-30-10", inSync: false } }));
+    expect(page.main.textContent).toContain("uses configuration v1-15-10, but v2-30-10 is expected");
+  });
+
+  it("says nothing about the configuration when the agent is in step", async () => {
+    const page = await openScope(detail());
+    expect(page.main.textContent).not.toContain("is expected");
   });
 
   it("shows no banner when the agent is connected, and shows the labels of the scope", async () => {

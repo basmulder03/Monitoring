@@ -42,6 +42,12 @@ export function ScopeView({ name, refresh, now }: ScopeViewProps) {
           state it last reported.
         </p>
       )}
+      {!scope.configuration.inSync && (
+        <p class="notice">
+          The agent of this scope uses configuration {scope.configuration.applied}, but {scope.configuration.expected} is expected. A recent change may
+          not have reached it yet.
+        </p>
+      )}
       {labels && <p class="muted">{labels}</p>}
       {scope.services.length === 0 && <p class="muted">This scope has no services.</p>}
       {scope.services.map((service) => (

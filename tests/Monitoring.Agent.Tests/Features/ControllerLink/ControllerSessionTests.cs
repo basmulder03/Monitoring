@@ -1,6 +1,7 @@
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
+using Monitoring.Agent.Features.Configuration;
 using Monitoring.Agent.Features.ControllerLink;
 using Monitoring.Agent.Features.ScopeState;
 using Monitoring.Protocol.Framing;
@@ -117,8 +118,25 @@ public class ControllerSessionTests
         var second = await controller.ReceiveAsync();
 
         // Assert
-        first.ShouldBe(new Heartbeat(1, HealthState.Healthy));
-        second.ShouldBe(new Heartbeat(2, HealthState.Healthy));
+        first.ShouldBe(new Heartbeat(1, HealthState.Healthy, "built-in"));
+        second.ShouldBe(new Heartbeat(2, HealthState.Healthy, "built-in"));
+    }
+
+    [Fact]
+    public async Task RunAsync_says_in_each_heartbeat_which_configuration_the_agent_uses()
+    {
+        // Arrange
+        var fixture = new SessionFixture();
+        var controller = fixture.Start();
+        await controller.AcceptAsync(new Config("v", [], HeartbeatSeconds: 5));
+        fixture.Configuration.Apply(new Config("v9", [], PullSeconds: 20));
+
+        // Act
+        fixture.Clock.Advance(TimeSpan.FromSeconds(5));
+        var heartbeat = await controller.ReceiveAsync();
+
+        // Assert
+        heartbeat.ShouldBeOfType<Heartbeat>().ConfigVersion.ShouldBe("v9");
     }
 
     [Fact]
@@ -333,6 +351,8 @@ public class ControllerSessionTests
 
         public FakeTimeProvider Clock { get; } = new();
 
+        public AgentConfiguration Configuration { get; } = new(NullLogger<AgentConfiguration>.Instance);
+
         public List<Config> Configs { get; } = [];
 
         public IScopeStateStore Store => _store!;
@@ -384,7 +404,7 @@ public class ControllerSessionTests
         public FakeController Start()
         {
             _store ??= new StoreBuilder().WithInstances(_instanceIds).Build();
-            var session = new ControllerSession(_store, _options, Clock, NullLogger<ControllerSession>.Instance);
+            var session = new ControllerSession(_store, Configuration, _options, Clock, NullLogger<ControllerSession>.Instance);
             var (server, client) = DuplexStream.CreatePair();
             Result = RunAsync(session, server);
             return new FakeController(client);

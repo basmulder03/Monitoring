@@ -72,6 +72,26 @@ public class AgentConnectionHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_notes_the_configuration_version_an_agent_says_it_uses_and_forgets_it_when_the_agent_leaves()
+    {
+        // Arrange
+        var fixture = new HandlerFixture().WithToken(Token, Scope);
+        var session = await fixture.Build().HandshakeAsync(Token);
+
+        // Act
+        await session.SendAsync(new Heartbeat(1, HealthState.Healthy, "v7"));
+        await session.SendAsync(new Snapshot(0, Scope, []));
+        await session.ReceiveAsync();
+        var whileConnected = session.Applied.StatusOf(Scope, new Dictionary<string, string>()).Applied;
+        session.Disconnect();
+        await session.Handling;
+
+        // Assert
+        whileConnected.ShouldBe("v7");
+        session.Applied.StatusOf(Scope, new Dictionary<string, string>()).Applied.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task HandleAsync_keeps_serving_state_after_it_pushed_a_new_config()
     {
         // Arrange
@@ -510,12 +530,15 @@ public class AgentConnectionHandlerTests
         private readonly Dictionary<string, string> _scopeByToken = [];
         private readonly AgentLinkOptions _options = new();
         private readonly LivenessOptions _livenessOptions = new();
+        private AppliedConfigurations? _applied;
 
         public FakeTimeProvider Clock { get; } = new();
 
         public FakeAgentLiveness Liveness { get; } = new();
 
         public EffectiveConfiguration Configuration { get; } = new(NullLogger<EffectiveConfiguration>.Instance);
+
+        public AppliedConfigurations Applied => _applied ??= new AppliedConfigurations(Configuration);
 
         public HandlerFixture WithHeartbeat(TimeSpan interval, int missed)
         {
@@ -547,13 +570,13 @@ public class AgentConnectionHandlerTests
         {
             var registry = new ScopeRegistry(new RegistryOptions(), Clock);
             var handler = new AgentConnectionHandler(
-                new FakeAuthenticator(_scopeByToken), registry, Liveness, _livenessOptions, Configuration, _options, Clock, NullLogger<AgentConnectionHandler>.Instance);
+                new FakeAuthenticator(_scopeByToken), registry, Liveness, _livenessOptions, Configuration, Applied, _options, Clock, NullLogger<AgentConnectionHandler>.Instance);
             var (server, client) = DuplexStream.CreatePair();
             var shutdown = new CancellationTokenSource();
 
             // Starts running on this thread up to its first await, so its hello timer exists when this returns.
             var handling = ServeAsync(handler, server, shutdown.Token);
-            return new Session(client, registry, handling, shutdown, Liveness, Clock, Configuration);
+            return new Session(client, registry, handling, shutdown, Liveness, Clock, Configuration, Applied);
         }
 
         public static Hello Hello(string? token, int version = ProtocolVersion.Current) =>
@@ -588,9 +611,11 @@ public class AgentConnectionHandlerTests
 
     /// <summary>The agent's end of a connection being served by the handler under test.</summary>
     private sealed class Session(
-        DuplexStream client, ScopeRegistry registry, Task handling, CancellationTokenSource shutdown, FakeAgentLiveness liveness, FakeTimeProvider clock, EffectiveConfiguration configuration)
+        DuplexStream client, ScopeRegistry registry, Task handling, CancellationTokenSource shutdown, FakeAgentLiveness liveness, FakeTimeProvider clock, EffectiveConfiguration configuration, AppliedConfigurations applied)
     {
         public EffectiveConfiguration Configuration { get; } = configuration;
+
+        public AppliedConfigurations Applied { get; } = applied;
 
         public FakeAgentLiveness Liveness { get; } = liveness;
 

@@ -8,7 +8,7 @@ public static class DashboardSlice
 {
     /// <summary>
     /// Adds what the dashboard reads from. It needs the registry, the health roll-up and the alerting state, so
-    /// <c>AddRegistry</c>, <c>AddLiveness</c>, <c>AddHealth</c>, <c>AddAlerting</c> and <c>AddTopology</c> must be called as well; <c>MapDashboard</c> adds the endpoints.
+    /// <c>AddRegistry</c>, <c>AddLiveness</c>, <c>AddHealth</c>, <c>AddAlerting</c>, <c>AddConfiguration</c> and <c>AddTopology</c> must be called as well; <c>MapDashboard</c> adds the endpoints.
     /// </summary>
     /// <param name="services">The service collection to extend.</param>
     /// <param name="configure">Optionally changes the <see cref="DashboardOptions"/>.</param>

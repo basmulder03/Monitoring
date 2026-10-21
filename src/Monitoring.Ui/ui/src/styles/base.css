@@ -29,6 +29,7 @@ a { color: inherit; }
 .icon { width: 1.25em; height: 1.25em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 .icon-button { background: transparent; color: var(--fg); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.5rem; cursor: pointer; display: inline-flex; }
 
+.notice { margin: 0.5rem 0; padding: 0.5rem 0.75rem; background: var(--surface); border-left: 0.4rem solid var(--degraded); border-radius: 0.25rem; }
 .banner { margin: 0; padding: 0.75rem 1rem; background: var(--surface); border-bottom: 2px solid var(--unhealthy); font-weight: 600; }
 
 main { padding: 1rem; max-width: 90rem; margin: 0 auto; }

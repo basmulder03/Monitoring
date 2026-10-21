@@ -113,6 +113,12 @@ describe("the overview", () => {
     expect(main.textContent).toContain("Unknown");
   });
 
+  it("says on the tile when the configuration of a scope is not yet up to date", () => {
+    const { services, main } = mount();
+    services.send(overview([scope("alpha", "Healthy", {}, { configurationInSync: false })], []));
+    expect(main.textContent).toContain("Configuration not yet up to date");
+  });
+
   it("says nothing about the agent of a scope whose agent is connected", () => {
     const { services, main } = mount();
     services.send(overview([scope("alpha", "Healthy")], []));

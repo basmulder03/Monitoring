@@ -1,3 +1,5 @@
+using Monitoring.Controller.Features.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using Monitoring.Controller.Features.Alerting;
 using Monitoring.Controller.Features.Dashboard;
 using Monitoring.Controller.Features.Health;
@@ -373,7 +375,9 @@ public class DashboardModelTests
             return this;
         }
 
-        public DashboardModel Build() => new(_registry, new HealthRollup(_registry, _liveness), new FixedAlerts(_alerts), _liveness, _options);
+        public DashboardModel Build() => new(_registry, new HealthRollup(_registry, _liveness), new FixedAlerts(_alerts), _liveness, Applied, _options);
+
+        public AppliedConfigurations Applied { get; } = new(new EffectiveConfiguration(NullLogger<EffectiveConfiguration>.Instance));
     }
 
     /// <summary>Alert state that returns the alerts it was given.</summary>

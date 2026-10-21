@@ -18,6 +18,7 @@ export function Tiles({ scopes, now }: { scopes: readonly ScopeSummary[]; now: n
               {plural(scope.services, "service", "services")}, {plural(scope.instances, "instance", "instances")}
               {scope.problems > 0 ? `, ${scope.problems} not healthy` : ""}
             </span>
+            {!scope.configurationInSync && <span class="muted">Configuration not yet up to date</span>}
             {!scope.agentConnected && (
               // Said in words as well as shown grey: the counts above are the last known, not current.
               <span class="disconnected">

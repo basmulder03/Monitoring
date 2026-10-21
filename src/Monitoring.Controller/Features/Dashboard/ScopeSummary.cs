@@ -11,6 +11,7 @@ namespace Monitoring.Controller.Features.Dashboard;
 /// <param name="Labels">Labels of the scope, such as its environment, which the page groups and filters by.</param>
 /// <param name="AgentConnected">Whether the scope's agent is alive. When not, <paramref name="Health"/> is Unknown and the counts are the last known.</param>
 /// <param name="LastSeen">When the agent was last heard from; only set while it is not connected, so that it stays fixed and does not make every heartbeat a change.</param>
+/// <param name="ConfigurationInSync"><see langword="false"/> when the agent of the scope says it uses another configuration than it should.</param>
 public sealed record ScopeSummary(
     string Name,
     HealthState Health,
@@ -19,4 +20,5 @@ public sealed record ScopeSummary(
     int Problems,
     IReadOnlyDictionary<string, string> Labels,
     bool AgentConnected,
-    DateTimeOffset? LastSeen);
+    DateTimeOffset? LastSeen,
+    bool ConfigurationInSync);

@@ -23,6 +23,7 @@ namespace Monitoring.Controller.Features.AgentLink;
 /// <param name="liveness">Told when the agent connects, is heard from and goes away.</param>
 /// <param name="livenessOptions">Provides the heartbeat interval agents are told to use and how long silence is tolerated.</param>
 /// <param name="configuration">Decides the rest of the settings each agent is told to use, and says when they change.</param>
+/// <param name="applied">Told which configuration each agent says it uses.</param>
 /// <param name="options">Timeouts, limits and the configuration handed to agents.</param>
 /// <param name="time">Clock for the hello timeout.</param>
 /// <param name="logger">Receives the reasons a connection was refused or ended.</param>
@@ -32,6 +33,7 @@ internal sealed class AgentConnectionHandler(
     IAgentLiveness liveness,
     LivenessOptions livenessOptions,
     IEffectiveConfiguration configuration,
+    IAppliedConfigurations applied,
     AgentLinkOptions options,
     TimeProvider time,
     ILogger<AgentConnectionHandler> logger)
@@ -86,6 +88,7 @@ internal sealed class AgentConnectionHandler(
             if (registered is not null)
             {
                 liveness.Disconnected(registered.ScopeName, connection);
+                applied.Disconnected(registered.ScopeName, connection);
                 logger.LogInformation("Agent for scope '{Scope}' disconnected", registered.ScopeName);
             }
         }
@@ -220,8 +223,13 @@ internal sealed class AgentConnectionHandler(
                 await AcknowledgeAsync(stream, registry.ApplyDelta(identity.ScopeName, delta), ct).ConfigureAwait(false);
                 return true;
 
-            case Heartbeat:
-                // Hearing from the agent is all a heartbeat is for; that was recorded above.
+            case Heartbeat heartbeat:
+                // Hearing from the agent was recorded above; what it says about its configuration is kept for the drift display.
+                if (heartbeat.ConfigVersion is { } version)
+                {
+                    applied.Report(identity.ScopeName, connection, version);
+                }
+
                 return true;
 
             case Goodbye:

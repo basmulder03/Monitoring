@@ -66,6 +66,12 @@ export interface Overview {
   groupBy: string[];
 }
 
+export interface ScopeConfiguration {
+  applied: string | null;
+  expected: string;
+  inSync: boolean;
+}
+
 export interface ScopeDetail {
   name: string;
   health: HealthState;
@@ -73,6 +79,7 @@ export interface ScopeDetail {
   labels: Record<string, string>;
   agentConnected: boolean;
   lastSeen: string | null;
+  configuration: ScopeConfiguration;
 }
 
 export interface ScopeSummary {
@@ -84,6 +91,7 @@ export interface ScopeSummary {
   labels: Record<string, string>;
   agentConnected: boolean;
   lastSeen: string | null;
+  configurationInSync: boolean;
 }
 
 export interface ServiceDetail {

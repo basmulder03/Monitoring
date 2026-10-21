@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Monitoring.Controller.Features.Alerting;
+using Monitoring.Controller.Features.Configuration;
 using Monitoring.Controller.Features.Dashboard;
 using Monitoring.Controller.Features.Health;
 using Monitoring.Controller.Features.Liveness;
@@ -221,6 +222,7 @@ public class DashboardEndpointsTests
             builder.Services.AddSingleton<IHealthRollup, HealthRollup>();
             builder.Services.AddSingleton<IAlertState>(new NoAlerts());
             builder.Services.AddSingleton<ITopology>(new FixedTopology());
+            builder.Services.AddSingleton<IAppliedConfigurations>(new AppliedConfigurations(new EffectiveConfiguration(Microsoft.Extensions.Logging.Abstractions.NullLogger<EffectiveConfiguration>.Instance)));
             builder.Services.AddDashboard();
 
             var app = builder.Build();

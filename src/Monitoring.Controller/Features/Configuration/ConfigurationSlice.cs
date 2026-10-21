@@ -22,6 +22,7 @@ public static class ConfigurationSlice
         services.AddSingleton(options);
         services.AddSingleton<EffectiveConfiguration>();
         services.AddSingleton<IEffectiveConfiguration>(provider => provider.GetRequiredService<EffectiveConfiguration>());
+        services.AddSingleton<IAppliedConfigurations, AppliedConfigurations>();
         services.AddHostedService<ConfigurationReloadService>();
         return services;
     }
