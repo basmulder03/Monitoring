@@ -200,7 +200,7 @@ The controller serves the dashboard itself, so there is nothing else to install.
 | Path | Shows |
 | --- | --- |
 | `/` | A tile per scope with its status as an icon and a word, unhealthiest first, and the alerts that are firing. Select a tile for its services and pods |
-| `/tv` | The same for a wall display: type scales with the screen and the cursor is hidden |
+| `/tv` | The same for a wall display: type scales with the screen, the cursor is hidden, and the page needs no input, see below |
 | `/?filter=environment:prod` | Shows only scopes with that label value; repeat `filter` for several labels. It works on `/tv` too, so a wall display can stay on one environment. When the scopes have several values of the outermost label, a selector in the page switches between them |
 | `/?theme=dark` or `?theme=light` | Forces a theme; otherwise the page follows the system setting, and the button in the corner switches it |
 | `/api/overview` | The overview as JSON |
@@ -214,6 +214,21 @@ The controller serves the dashboard itself, so there is nothing else to install.
 | `/api/events` | The overview as Server-Sent Events: the current one at once, then one per change, plus a keep-alive event while nothing changes |
 
 The page has no login yet; reach it only over a network you trust.
+
+### Wall display
+
+Open `/tv` on a screen that nobody touches. It goes through the views on a timer, and when a scope turns Unhealthy it stops and shows that scope, with its failing services open, until the problem is gone or the focus time has passed. The warning about data that is old (no update for 15 seconds) stays, so a frozen screen never shows stale green.
+
+| Address setting | Default | Meaning |
+| --- | --- | --- |
+| `rotate` | `60` | Seconds each view stays; `0` keeps the first view and only reacts to failures |
+| `views` | `overview,dependencies` | The views to go through, in order: `overview`, `dependencies`, `packages` |
+| `focus` | `300` | Seconds a failing scope is kept on screen. After that the rotation goes on and that scope is not shown again until it has recovered, so one lasting problem does not hold the screen |
+| `drift` | off | `drift=1` moves the page a few pixels over twenty minutes and back, against burn-in; it is off for people who prefer reduced motion |
+| `theme` | system | `dark` or `light` |
+| `filter` | all | `filter=environment:prod` keeps the screen on one environment |
+
+For example `/tv?filter=environment:prod&rotate=45&views=overview,dependencies&theme=dark&drift=1`. Only a scope that is Unhealthy takes over the screen; a Degraded one is visible in the rotation.
 
 ## Agent
 

@@ -12,7 +12,7 @@ export class FakeServices implements Services {
   vulnerabilities: VulnerabilityReport = { findings: [], advisories: 0, loadedAt: null };
   streams = 0;
   private handlers: { onOverview(overview: Overview): void; onKeepAlive(): void } | null = null;
-  private readonly timers: (() => void)[] = [];
+  private readonly timers: { period: number; due: number; callback: () => void }[] = [];
   private readonly settings = new Map<string, string>();
 
   async getJson<T>(path: string) {
@@ -33,10 +33,11 @@ export class FakeServices implements Services {
 
   now = () => this.time;
 
-  every(_milliseconds: number, callback: () => void) {
-    this.timers.push(callback);
+  every(milliseconds: number, callback: () => void) {
+    const timer = { period: milliseconds, due: this.time + milliseconds, callback };
+    this.timers.push(timer);
     return () => {
-      this.timers.splice(this.timers.indexOf(callback), 1);
+      this.timers.splice(this.timers.indexOf(timer), 1);
     };
   }
 
@@ -55,10 +56,20 @@ export class FakeServices implements Services {
     act(() => this.handlers!.onKeepAlive());
   }
 
-  /** Lets time pass and runs every timer once, as the real ones would have. */
+  /** Lets time pass and runs each timer as often as its period fits in, as the real ones would have. */
   advance(milliseconds: number) {
-    this.time += milliseconds;
-    act(() => this.timers.forEach((timer) => timer()));
+    const end = this.time + milliseconds;
+    act(() => {
+      for (;;) {
+        const next = this.timers.filter((timer) => timer.due <= end).sort((a, b) => a.due - b.due)[0];
+        if (next === undefined) break;
+        this.time = next.due;
+        next.due += next.period;
+        next.callback();
+      }
+
+      this.time = end;
+    });
   }
 }
 

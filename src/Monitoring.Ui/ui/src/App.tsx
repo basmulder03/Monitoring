@@ -6,6 +6,7 @@ import { useClock } from "./state/useClock";
 import { useOverview } from "./state/useOverview";
 import { useRoute } from "./state/useRoute";
 import { useThemeSwitch } from "./state/useTheme";
+import { useWallDisplay } from "./state/useWallDisplay";
 import { DependenciesView } from "./views/dependencies/DependenciesView";
 import { PackagesView } from "./views/packages/PackagesView";
 import { OverviewView } from "./views/overview/OverviewView";
@@ -16,6 +17,7 @@ export function App() {
   const route = useRoute();
   const switchTheme = useThemeSwitch();
   const { overview, lastHeard, announcement } = useOverview();
+  useWallDisplay(overview);
   const seconds = useClock(1000);
   const halfMinutes = useClock(30000);
 

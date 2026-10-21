@@ -3,6 +3,16 @@ body.tv { cursor: none; font-size: clamp(1.25rem, 2.2vw, 3rem); }
 body.tv .tiles { grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr)); }
 body.tv #theme-toggle { display: none; }
 
+/* Against burn-in on a screen that is on all day: the whole page moves a few pixels over ten minutes and back. */
+@media (prefers-reduced-motion: no-preference) {
+  body.drift main { animation: drift 1200s ease-in-out infinite alternate; }
+}
+
+@keyframes drift {
+  from { transform: translate(0, 0); }
+  to { transform: translate(12px, 8px); }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .tile { transition: transform 0.1s; }
   .tile:hover { transform: translateY(-1px); }
