@@ -95,6 +95,106 @@ public class TokenAgentAuthenticatorTests
         identity.ShouldBeNull();
     }
 
+    [Theory]
+    [InlineData("shop")]
+    [InlineData("billing")]
+    [InlineData("orders platform")]
+    public async Task AuthenticateAsync_lets_an_enrollment_token_register_any_announced_scope(string scope)
+    {
+        // Arrange
+        var authenticator = new AuthenticatorFixture().WithToken(AgentTokenEntry.AnyScope, "enroll").Build();
+
+        // Act
+        var identity = await authenticator.AuthenticateAsync(AuthenticatorFixture.HelloWith("enroll", scope), TestContext.Current.CancellationToken);
+
+        // Assert
+        identity.ShouldBe(new AgentIdentity(scope));
+    }
+
+    [Fact]
+    public async Task AuthenticateAsync_trims_the_announced_scope()
+    {
+        // Arrange
+        var authenticator = new AuthenticatorFixture().WithToken(AgentTokenEntry.AnyScope, "enroll").Build();
+
+        // Act
+        var identity = await authenticator.AuthenticateAsync(AuthenticatorFixture.HelloWith("enroll", "  shop "), TestContext.Current.CancellationToken);
+
+        // Assert
+        identity.ShouldBe(new AgentIdentity("shop"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("*")]
+    [InlineData("bad\nname")]
+    public async Task AuthenticateAsync_rejects_an_enrollment_token_without_a_usable_scope_name(string? scope)
+    {
+        // Arrange
+        var authenticator = new AuthenticatorFixture().WithToken(AgentTokenEntry.AnyScope, "enroll").Build();
+
+        // Act
+        var identity = await authenticator.AuthenticateAsync(AuthenticatorFixture.HelloWith("enroll", scope), TestContext.Current.CancellationToken);
+
+        // Assert
+        identity.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task AuthenticateAsync_rejects_an_announced_scope_name_that_is_too_long()
+    {
+        // Arrange
+        var authenticator = new AuthenticatorFixture().WithToken(AgentTokenEntry.AnyScope, "enroll").Build();
+        var tooLong = new string('x', TokenAgentAuthenticator.MaxScopeNameLength + 1);
+
+        // Act
+        var identity = await authenticator.AuthenticateAsync(AuthenticatorFixture.HelloWith("enroll", tooLong), TestContext.Current.CancellationToken);
+
+        // Assert
+        identity.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task AuthenticateAsync_accepts_a_bound_token_announcing_its_own_scope()
+    {
+        // Arrange
+        var authenticator = new AuthenticatorFixture().WithToken("shop", "secret-1").Build();
+
+        // Act
+        var identity = await authenticator.AuthenticateAsync(AuthenticatorFixture.HelloWith("secret-1", "shop"), TestContext.Current.CancellationToken);
+
+        // Assert
+        identity.ShouldBe(new AgentIdentity("shop"));
+    }
+
+    [Fact]
+    public async Task AuthenticateAsync_rejects_a_bound_token_announcing_another_scope()
+    {
+        // Arrange
+        var authenticator = new AuthenticatorFixture().WithToken("shop", "secret-1").Build();
+
+        // Act
+        var identity = await authenticator.AuthenticateAsync(AuthenticatorFixture.HelloWith("secret-1", "billing"), TestContext.Current.CancellationToken);
+
+        // Assert
+        identity.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task AuthenticateAsync_uses_the_bound_scope_when_the_token_is_also_configured_as_enrollment_for_another_agent_group()
+    {
+        // Arrange: the same secret is bound to "shop" and an enrollment token; the agent announces "shop"
+        var authenticator = new AuthenticatorFixture().WithToken("billing", "shared").WithToken(AgentTokenEntry.AnyScope, "shared").Build();
+
+        // Act
+        var identity = await authenticator.AuthenticateAsync(AuthenticatorFixture.HelloWith("shared", "shop"), TestContext.Current.CancellationToken);
+
+        // Assert: the bound entry refuses "shop", the enrollment entry accepts it
+        identity.ShouldBe(new AgentIdentity("shop"));
+    }
+
     [Fact]
     public void Constructor_rejects_a_hash_that_is_not_hexadecimal()
     {
@@ -123,7 +223,7 @@ public class TokenAgentAuthenticatorTests
 
         public TokenAgentAuthenticator Build() => new(_options);
 
-        public static Hello HelloWith(string? token) =>
-            new(1, "pod-1", "orders", null, new Dictionary<string, string>(), token);
+        public static Hello HelloWith(string? token, string? scope = null) =>
+            new(1, "pod-1", "orders", null, new Dictionary<string, string>(), token, scope);
     }
 }
