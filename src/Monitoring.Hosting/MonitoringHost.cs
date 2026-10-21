@@ -21,18 +21,20 @@ public static class MonitoringHost
     public const int StartupFailure = 1;
 
     /// <summary>
-    /// Creates a host builder with the standard configuration sources, from lowest to highest priority: the JSON file,
-    /// environment variables starting with <c>MONITORING_</c>, the command line, and finally the given overrides.
+    /// Adds the standard configuration sources and console logging to a host builder, whatever kind of host it builds.
+    /// From lowest to highest priority the sources are: the JSON file, environment variables starting with <c>MONITORING_</c>,
+    /// the command line, and finally the given overrides.
     /// </summary>
+    /// <param name="builder">The builder to set up.</param>
     /// <param name="args">Command line arguments, such as <c>--Controller:Listen:Port=9441</c>.</param>
     /// <param name="overrides">Settings that win over every other source; meant for tests.</param>
     /// <param name="configFile">The configuration file; defaults to the file named by <see cref="ConfigFileVariable"/>, else <see cref="DefaultConfigFile"/>.</param>
-    /// <returns>The builder, with logging to the console already set up.</returns>
-    public static HostApplicationBuilder CreateBuilder(
-        string[] args, IEnumerable<KeyValuePair<string, string?>>? overrides = null, string? configFile = null)
+    public static void Configure(
+        IHostApplicationBuilder builder,
+        string[] args,
+        IEnumerable<KeyValuePair<string, string?>>? overrides = null,
+        string? configFile = null)
     {
-        var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings { Args = args });
-
         var file = configFile
             ?? (Environment.GetEnvironmentVariable(ConfigFileVariable) is { Length: > 0 } named ? named : DefaultConfigFile);
         builder.Configuration.AddJsonFile(Path.GetFullPath(file), optional: true, reloadOnChange: false);
@@ -43,13 +45,26 @@ public static class MonitoringHost
             builder.Configuration.AddInMemoryCollection(overrides);
         }
 
+        // A builder may come with console logging of its own; one console logger is enough.
+        builder.Logging.ClearProviders();
         builder.Logging.AddConfiguration(builder.Configuration.GetSection("Logging"));
         builder.Logging.AddSimpleConsole(options =>
         {
             options.SingleLine = true;
             options.TimestampFormat = "HH:mm:ss ";
         });
+    }
 
+    /// <summary>Creates a plain host builder (no web server) set up with <see cref="Configure"/>.</summary>
+    /// <param name="args">Command line arguments, such as <c>--Agent:ScopeName=shop</c>.</param>
+    /// <param name="overrides">Settings that win over every other source; meant for tests.</param>
+    /// <param name="configFile">The configuration file; defaults to the file named by <see cref="ConfigFileVariable"/>, else <see cref="DefaultConfigFile"/>.</param>
+    /// <returns>The builder, with logging to the console already set up.</returns>
+    public static HostApplicationBuilder CreateBuilder(
+        string[] args, IEnumerable<KeyValuePair<string, string?>>? overrides = null, string? configFile = null)
+    {
+        var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings { Args = args });
+        Configure(builder, args, overrides, configFile);
         return builder;
     }
 
@@ -57,13 +72,22 @@ public static class MonitoringHost
     /// <param name="args">Command line arguments.</param>
     /// <param name="compose">Adds the executable's services, reading its settings.</param>
     /// <returns>0 after a normal stop, <see cref="ConfigurationError"/> for a configuration problem, or <see cref="StartupFailure"/> when it could not start.</returns>
-    public static async Task<int> RunAsync(string[] args, Action<HostApplicationBuilder, SettingsReader> compose)
-    {
-        try
+    public static Task<int> RunAsync(string[] args, Action<HostApplicationBuilder, SettingsReader> compose) =>
+        RunAsync(() =>
         {
             var builder = CreateBuilder(args);
             compose(builder, new SettingsReader(builder.Configuration));
-            using var host = builder.Build();
+            return builder.Build();
+        });
+
+    /// <summary>Builds a host and runs it until it is told to stop, turning start-up problems into exit codes.</summary>
+    /// <param name="build">Creates the host; may throw <see cref="ConfigurationException"/> or <see cref="ArgumentException"/> for a bad configuration.</param>
+    /// <returns>0 after a normal stop, <see cref="ConfigurationError"/> for a configuration problem, or <see cref="StartupFailure"/> when it could not start.</returns>
+    public static async Task<int> RunAsync(Func<IHost> build)
+    {
+        try
+        {
+            using var host = build();
             await host.RunAsync().ConfigureAwait(false);
             return 0;
         }

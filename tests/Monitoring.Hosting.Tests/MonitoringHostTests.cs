@@ -97,6 +97,51 @@ public class MonitoringHostTests
     }
 
     [Fact]
+    public void Configure_gives_any_host_builder_the_standard_sources()
+    {
+        // Arrange
+        var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
+        var overrides = new Dictionary<string, string?> { ["Hosting:Test:Configured"] = "yes" };
+
+        // Act
+        MonitoringHost.Configure(builder, [], overrides, NoFile());
+
+        // Assert
+        builder.Configuration["Hosting:Test:Configured"].ShouldBe("yes");
+    }
+
+    [Fact]
+    public async Task RunAsync_with_a_host_factory_returns_zero_after_a_normal_stop()
+    {
+        // Arrange
+        IHost Build()
+        {
+            var builder = MonitoringHost.CreateBuilder([], configFile: NoFile());
+            builder.Services.AddHostedService<StopImmediately>();
+            return builder.Build();
+        }
+
+        // Act
+        var exitCode = await MonitoringHost.RunAsync(Build);
+
+        // Assert
+        exitCode.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task RunAsync_with_a_host_factory_reports_a_configuration_problem_with_its_own_exit_code()
+    {
+        // Arrange
+        IHost Build() => throw new ConfigurationException("Setting 'X' is required.");
+
+        // Act
+        var exitCode = await MonitoringHost.RunAsync(Build);
+
+        // Assert
+        exitCode.ShouldBe(MonitoringHost.ConfigurationError);
+    }
+
+    [Fact]
     public async Task RunAsync_returns_zero_after_the_host_stopped_normally()
     {
         // Arrange
