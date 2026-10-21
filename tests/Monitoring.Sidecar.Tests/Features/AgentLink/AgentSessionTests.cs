@@ -129,8 +129,42 @@ public class AgentSessionTests
         report.Checks.Single().Name.ShouldBe("cache");
     }
 
+    [Fact]
+    public async Task RunAsync_answers_a_metrics_pull_with_what_the_application_reports()
+    {
+        // Arrange
+        var fixture = new SessionFixture();
+        fixture.Link.Metrics = new MetricsReport([new MetricSeries("orders.placed", new Dictionary<string, string>(), 4)]);
+        var agent = fixture.Start();
+        await agent.AcceptAsync();
+
+        // Act
+        await agent.SendAsync(new Pull(44, PullKind.Metrics, 0));
+        var reply = await agent.ReceiveAsync();
+
+        // Assert
+        var result = reply.ShouldBeOfType<PullResult>();
+        result.RequestId.ShouldBe(44);
+        ReportPayload.ReadMetrics(result.PayloadJson)!.Series.Single().Value.ShouldBe(4);
+    }
+
+    [Fact]
+    public async Task RunAsync_answers_a_metrics_pull_with_nothing_when_the_application_cannot_be_reached()
+    {
+        // Arrange
+        var fixture = new SessionFixture();
+        var agent = fixture.Start();
+        await agent.AcceptAsync();
+
+        // Act
+        await agent.SendAsync(new Pull(45, PullKind.Metrics, 0));
+        var reply = await agent.ReceiveAsync();
+
+        // Assert
+        reply.ShouldBeOfType<PullResult>().PayloadJson.ShouldBeNull();
+    }
+
     [Theory]
-    [InlineData(PullKind.Metrics)]
     [InlineData(PullKind.Spans)]
     [InlineData(PullKind.Edges)]
     public async Task RunAsync_answers_kinds_of_data_it_does_not_provide_yet_with_nothing(PullKind kind)
@@ -296,6 +330,8 @@ public class AgentSessionTests
 
         public FakeProbeResults Probe { get; } = new();
 
+        public FakeLibraryLink Link { get; } = new();
+
         public Task<SessionResult> Result { get; private set; } = Task.FromException<SessionResult>(new InvalidOperationException("Not started."));
 
         public SessionFixture WithInstance(string id)
@@ -314,7 +350,7 @@ public class AgentSessionTests
 
         public FakeAgent Start()
         {
-            var session = new AgentSession(Probe, _options, Clock, NullLogger<AgentSession>.Instance);
+            var session = new AgentSession(Probe, Link, _options, Clock, NullLogger<AgentSession>.Instance);
             var (server, client) = DuplexStream.CreatePair();
             Result = RunAsync(session, server);
             return new FakeAgent(client);

@@ -25,6 +25,9 @@ internal sealed class FakeApplication : IAsyncDisposable
     /// <summary>What the application says about its health.</summary>
     public HealthReport Health { get; set; } = new(HealthState.Healthy, []);
 
+    /// <summary>What the application says about its metrics.</summary>
+    public MetricsReport Metrics { get; set; } = new([]);
+
     /// <summary>When set, the application reads questions but never answers them.</summary>
     public bool Silent { get; set; }
 
@@ -106,6 +109,7 @@ internal sealed class FakeApplication : IAsyncDisposable
                 {
                     PullKind.Info => ReportPayload.Write(Description),
                     PullKind.Health => ReportPayload.Write(Health),
+                    PullKind.Metrics => ReportPayload.Write(Metrics),
                     _ => null,
                 };
                 await FrameCodec.WriteAsync(stream, new PullResult(pull.RequestId, pull.Kind, pull.Cursor, payload), ct: _stop.Token);

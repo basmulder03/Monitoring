@@ -165,7 +165,7 @@ public class SidecarServiceTests
         {
             Service = new SidecarService(
                 Probe,
-                new AgentSession(Probe, _options, Clock, NullLogger<AgentSession>.Instance),
+                new AgentSession(Probe, new FakeLibraryLink(), _options, Clock, NullLogger<AgentSession>.Instance),
                 ConnectAsync,
                 _options,
                 Clock,

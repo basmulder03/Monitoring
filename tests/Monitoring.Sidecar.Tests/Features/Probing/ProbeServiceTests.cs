@@ -266,5 +266,7 @@ public class ProbeServiceTests
             Interlocked.Increment(ref _healthCalls);
             return Task.FromResult<HealthReport?>(Unreachable ? null : Health);
         }
+
+        public Task<MetricsReport?> GetMetricsAsync(CancellationToken ct) => Task.FromResult<MetricsReport?>(null);
     }
 }

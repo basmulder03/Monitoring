@@ -43,6 +43,21 @@ public class SocketLibraryLinkTests
     }
 
     [Fact]
+    public async Task GetMetricsAsync_returns_the_metrics_of_the_application()
+    {
+        // Arrange
+        await using var app = new FakeApplication { Metrics = new MetricsReport([new MetricSeries("orders.placed", new Dictionary<string, string>(), 9)]) }.Start();
+        using var link = LinkTo(app);
+
+        // Act
+        var metrics = await link.GetMetricsAsync(Ct);
+
+        // Assert
+        metrics!.Series.Single().Name.ShouldBe("orders.placed");
+        metrics.Series.Single().Value.ShouldBe(9);
+    }
+
+    [Fact]
     public async Task The_link_asks_several_questions_over_one_connection()
     {
         // Arrange

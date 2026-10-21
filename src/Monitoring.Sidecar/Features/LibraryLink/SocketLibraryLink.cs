@@ -28,6 +28,10 @@ internal sealed class SocketLibraryLink(LibraryLinkOptions options, TimeProvider
     public async Task<HealthReport?> GetHealthAsync(CancellationToken ct) =>
         ReportPayload.ReadHealth(await AskAsync(PullKind.Health, ct).ConfigureAwait(false));
 
+    /// <inheritdoc />
+    public async Task<MetricsReport?> GetMetricsAsync(CancellationToken ct) =>
+        ReportPayload.ReadMetrics(await AskAsync(PullKind.Metrics, ct).ConfigureAwait(false));
+
     /// <summary>Closes the connection to the application.</summary>
     public void Dispose()
     {

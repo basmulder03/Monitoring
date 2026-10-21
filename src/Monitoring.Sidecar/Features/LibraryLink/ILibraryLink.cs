@@ -14,4 +14,9 @@ public interface ILibraryLink
     /// <param name="ct">Cancels the question.</param>
     /// <returns>The report, or <see langword="null"/> when the application cannot be reached or does not answer.</returns>
     Task<HealthReport?> GetHealthAsync(CancellationToken ct);
+
+    /// <summary>Asks the application for the latest value of its metrics.</summary>
+    /// <param name="ct">Cancels the question.</param>
+    /// <returns>The report, or <see langword="null"/> when the application cannot be reached or does not answer.</returns>
+    Task<MetricsReport?> GetMetricsAsync(CancellationToken ct);
 }

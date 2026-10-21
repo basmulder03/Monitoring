@@ -3,6 +3,7 @@ using Monitoring.Protocol.Framing;
 using Monitoring.Protocol.Messages;
 using Monitoring.Protocol.Reports;
 using Monitoring.Protocol.Versioning;
+using Monitoring.Sidecar.Features.LibraryLink;
 using Monitoring.Sidecar.Features.Probing;
 
 namespace Monitoring.Sidecar.Features.AgentLink;
@@ -13,10 +14,12 @@ namespace Monitoring.Sidecar.Features.AgentLink;
 /// </summary>
 /// <remarks>Works on any <see cref="Stream"/> so it can be tested without sockets. Heartbeats and answers are written under a lock.</remarks>
 /// <param name="probe">The latest picture of the application.</param>
+/// <param name="link">Asks the application for data the probe does not keep, such as its metrics.</param>
 /// <param name="options">Identity, labels and limits.</param>
 /// <param name="time">Clock for the timeouts and the heartbeat.</param>
 /// <param name="logger">Receives why a session ended.</param>
-internal sealed class AgentSession(IProbeResults probe, AgentLinkOptions options, TimeProvider time, ILogger<AgentSession> logger)
+internal sealed class AgentSession(
+    IProbeResults probe, ILibraryLink link, AgentLinkOptions options, TimeProvider time, ILogger<AgentSession> logger)
 {
     private static readonly TimeSpan GoodbyeTimeout = TimeSpan.FromSeconds(1);
 
@@ -146,7 +149,7 @@ internal sealed class AgentSession(IProbeResults probe, AgentLinkOptions options
             switch (message)
             {
                 case Pull pull:
-                    await WriteAsync(stream, Answer(pull), ct).ConfigureAwait(false);
+                    await WriteAsync(stream, await AnswerAsync(pull, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
                     break;
 
                 case Config config:
@@ -160,13 +163,14 @@ internal sealed class AgentSession(IProbeResults probe, AgentLinkOptions options
         }
     }
 
-    private PullResult Answer(Pull pull)
+    private async Task<PullResult> AnswerAsync(Pull pull, CancellationToken ct)
     {
         var status = probe.Current;
         var payload = pull.Kind switch
         {
             PullKind.Info when status.Description is { } description => ReportPayload.Write(description),
             PullKind.Health => ReportPayload.Write(status.Health),
+            PullKind.Metrics => await link.GetMetricsAsync(ct).ConfigureAwait(false) is { } metrics ? ReportPayload.Write(metrics) : null,
             _ => null,
         };
 
