@@ -18,7 +18,7 @@ public sealed class AgentLinkOptions
     public int MaxFrameBytes { get; set; } = FrameCodec.DefaultMaxFrameBytes;
 
     /// <summary>
-    /// The individual address of every controller replica, handed to agents so they connect to all of them.
+    /// The individual address of every controller replica as <c>host:port</c>, handed to agents so they connect to all of them.
     /// </summary>
     public List<string> ControllerReplicas { get; set; } = [];
 
