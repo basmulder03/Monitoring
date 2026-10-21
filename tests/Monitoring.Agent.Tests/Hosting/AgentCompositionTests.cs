@@ -92,10 +92,14 @@ public class AgentCompositionTests
 
         // Assert
         options.ControllerAddresses.ShouldBe(["c1:9440", "c2:9440"]);
-        (options.AgentId, options.AgentVersion, options.Token).ShouldBe(("agent-7", "1.2.3", "secret"));
+        options.AgentId.ShouldBe("agent-7");
+        options.AgentVersion.ShouldBe("1.2.3");
+        options.Token.ShouldBe("secret");
         options.Labels.ShouldBe(new Dictionary<string, string> { ["env"] = "prod", ["site"] = "a" });
-        (options.ReconnectMinDelay, options.ReconnectMaxDelay, options.ConfigReplyTimeout, options.SnapshotInterval)
-            .ShouldBe((TimeSpan.FromSeconds(2), TimeSpan.FromMinutes(1), TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(10)));
+        options.ReconnectMinDelay.ShouldBe(TimeSpan.FromSeconds(2));
+        options.ReconnectMaxDelay.ShouldBe(TimeSpan.FromMinutes(1));
+        options.ConfigReplyTimeout.ShouldBe(TimeSpan.FromSeconds(5));
+        options.SnapshotInterval.ShouldBe(TimeSpan.FromMinutes(10));
     }
 
     [Fact]
@@ -131,7 +135,8 @@ public class AgentCompositionTests
 
         // Assert
         var message = hello.ShouldBeOfType<Hello>();
-        (message.InstanceId, message.Token).ShouldBe(("agent-7", "secret"));
+        message.InstanceId.ShouldBe("agent-7");
+        message.Token.ShouldBe("secret");
         message.Labels.ShouldBe(new Dictionary<string, string> { ["env"] = "prod" });
         await host.StopAsync(TestContext.Current.CancellationToken);
     }

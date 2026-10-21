@@ -139,7 +139,9 @@ public class HttpKubernetesApiTests
 
         // Assert
         var podEvent = events.Single();
-        (podEvent.Type.ToString(), podEvent.Pod!.Metadata.Name, podEvent.ResourceVersion).ShouldBe((expected, "orders-1", "55"));
+        podEvent.Type.ToString().ShouldBe(expected);
+        podEvent.Pod!.Metadata.Name.ShouldBe("orders-1");
+        podEvent.ResourceVersion.ShouldBe("55");
     }
 
     [Fact]
@@ -197,9 +199,8 @@ public class HttpKubernetesApiTests
 
         // Assert
         var exception = await watch.ShouldThrowAsync<KubernetesApiException>();
-        (exception.StatusCode, exception.Message).ShouldSatisfyAllConditions(
-            r => r.StatusCode.ShouldBe(500),
-            r => r.Message.ShouldContain("broken"));
+        exception.StatusCode.ShouldBe(500);
+        exception.Message.ShouldContain("broken");
     }
 
     [Fact]

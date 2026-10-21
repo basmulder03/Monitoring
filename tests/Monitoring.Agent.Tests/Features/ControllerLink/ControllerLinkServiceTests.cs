@@ -148,7 +148,8 @@ public class ControllerLinkServiceTests
 
         // Assert
         await fixture.Completion.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        (fixture.IsCancelled("a:9440"), fixture.IsCancelled("b:9440")).ShouldBe((true, true));
+        fixture.IsCancelled("a:9440").ShouldBeTrue();
+        fixture.IsCancelled("b:9440").ShouldBeTrue();
     }
 
     /// <summary>Builds the service over a fake per-replica connection loop that records what the service asks of it.</summary>

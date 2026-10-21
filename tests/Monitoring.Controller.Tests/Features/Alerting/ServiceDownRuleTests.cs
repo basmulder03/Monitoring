@@ -90,6 +90,7 @@ public class ServiceDownRuleTests
         var rule = new ServiceDownRule(new FakeScopeRegistry(), options);
 
         // Assert
-        (rule.Severity, rule.Wait).ShouldBe((AlertSeverity.Critical, TimeSpan.FromMinutes(1)));
+        rule.Severity.ShouldBe(AlertSeverity.Critical);
+        rule.Wait.ShouldBe(TimeSpan.FromMinutes(1));
     }
 }

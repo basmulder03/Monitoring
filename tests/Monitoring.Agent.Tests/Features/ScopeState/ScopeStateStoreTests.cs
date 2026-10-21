@@ -140,7 +140,8 @@ public class ScopeStateStoreTests
         var second = store.CreateSnapshot();
 
         // Assert
-        (first.Sequence, second.Sequence).ShouldBe((1L, 1L));
+        first.Sequence.ShouldBe(1);
+        second.Sequence.ShouldBe(1);
     }
 
     [Fact]

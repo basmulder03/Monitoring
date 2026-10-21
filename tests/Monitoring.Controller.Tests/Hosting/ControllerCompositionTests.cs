@@ -103,7 +103,8 @@ public class ControllerCompositionTests
         var options = host.Services.GetRequiredService<RegistryOptions>();
 
         // Assert
-        (options.GoneRetention, options.PurgeInterval).ShouldBe((TimeSpan.FromMinutes(20), TimeSpan.FromSeconds(10)));
+        options.GoneRetention.ShouldBe(TimeSpan.FromMinutes(20));
+        options.PurgeInterval.ShouldBe(TimeSpan.FromSeconds(10));
     }
 
     [Fact]
@@ -121,8 +122,10 @@ public class ControllerCompositionTests
         var options = host.Services.GetRequiredService<AlertingOptions>();
 
         // Assert
-        (options.StartupGrace, options.InstanceUnhealthyWait, options.ServiceDownWait, options.EvaluationInterval)
-            .ShouldBe((TimeSpan.FromMinutes(1), TimeSpan.FromSeconds(45), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(2)));
+        options.StartupGrace.ShouldBe(TimeSpan.FromMinutes(1));
+        options.InstanceUnhealthyWait.ShouldBe(TimeSpan.FromSeconds(45));
+        options.ServiceDownWait.ShouldBe(TimeSpan.FromSeconds(5));
+        options.EvaluationInterval.ShouldBe(TimeSpan.FromSeconds(2));
     }
 
     [Fact]
@@ -156,7 +159,8 @@ public class ControllerCompositionTests
         var options = host.Services.GetRequiredService<AgentLinkOptions>();
 
         // Assert
-        (options.ListenAddress, options.Port).ShouldBe(("0.0.0.0", 9440));
+        options.ListenAddress.ShouldBe("0.0.0.0");
+        options.Port.ShouldBe(9440);
     }
 
     [Fact]

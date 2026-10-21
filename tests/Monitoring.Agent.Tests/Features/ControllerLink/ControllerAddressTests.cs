@@ -20,7 +20,8 @@ public class ControllerAddressTests
 
         // Assert
         parsed.ShouldBeTrue();
-        (host, port).ShouldBe((expectedHost, expectedPort));
+        host.ShouldBe(expectedHost);
+        port.ShouldBe(expectedPort);
     }
 
     [Theory]

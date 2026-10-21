@@ -77,7 +77,8 @@ public class ControllerSessionTests
 
         // Assert
         var delta = message.ShouldBeOfType<Delta>();
-        (delta.Sequence, delta.Upserted.Single().Id).ShouldBe((1L, "pod-1"));
+        delta.Sequence.ShouldBe(1);
+        delta.Upserted.Single().Id.ShouldBe("pod-1");
     }
 
     [Fact]
@@ -137,7 +138,8 @@ public class ControllerSessionTests
 
         // Assert
         var snapshot = message.ShouldBeOfType<Snapshot>();
-        (snapshot.Sequence, snapshot.Instances.Single().Id).ShouldBe((1L, "pod-1"));
+        snapshot.Sequence.ShouldBe(1);
+        snapshot.Instances.Single().Id.ShouldBe("pod-1");
     }
 
     [Fact]
