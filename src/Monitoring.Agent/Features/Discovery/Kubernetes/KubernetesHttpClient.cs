@@ -12,7 +12,9 @@ internal static class KubernetesHttpClient
     /// <exception cref="InvalidOperationException">The CA file holds no certificate.</exception>
     public static HttpClient Create(KubernetesConnection connection)
     {
-        var inner = new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(5) };
+        // The API server is reached directly. A proxy configured through the environment is meant for traffic that
+        // leaves the cluster, and sending the agent's calls through it makes them fail.
+        var inner = new SocketsHttpHandler { UseProxy = false, PooledConnectionLifetime = TimeSpan.FromMinutes(5) };
         if (connection.CaFile is { } caFile)
         {
             var authorities = new X509Certificate2Collection();
