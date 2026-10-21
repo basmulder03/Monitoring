@@ -115,6 +115,169 @@ public class ScopeStateStoreTests
     }
 
     [Fact]
+    public void Report_does_not_make_an_instance_exist_that_the_platform_does_not_know()
+    {
+        // Arrange
+        var store = new StoreFixture().Build();
+
+        // Act
+        store.Report("pod-1", StoreFixture.Reported("orders"));
+
+        // Assert
+        store.CreateSnapshot().Instances.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Report_is_kept_until_the_platform_reports_the_instance_and_then_shown_with_it()
+    {
+        // Arrange
+        var store = new StoreFixture().Build();
+        store.Report("pod-1", StoreFixture.Reported("orders", "1.2.3"));
+
+        // Act
+        store.Upsert(StoreFixture.Instance("pod-1"));
+
+        // Assert
+        var shown = store.CreateSnapshot().Instances.Single();
+        shown.ServiceName.ShouldBe("orders");
+        shown.Version.ShouldBe("1.2.3");
+    }
+
+    [Fact]
+    public void Report_publishes_the_instance_as_the_platform_and_the_application_show_it_together()
+    {
+        // Arrange
+        var store = new StoreFixture().WithInstances("pod-1").Build();
+        store.Publish();
+        using var subscription = store.Subscribe();
+
+        // Act
+        store.Report("pod-1", StoreFixture.Reported("orders", "1.2.3", HealthState.Degraded, new HealthCheckResult("cache", HealthState.Degraded, "cold")));
+        store.Publish();
+
+        // Assert
+        var shown = StoreFixture.Next(subscription).Upserted.Single();
+        shown.Health.ShouldBe(HealthState.Degraded);
+        shown.Checks!.Single().Name.ShouldBe("cache");
+    }
+
+    [Fact]
+    public void Report_publishes_nothing_when_the_application_says_what_it_said_before()
+    {
+        // Arrange
+        var store = new StoreFixture().WithInstances("pod-1").Build();
+        store.Report("pod-1", StoreFixture.Reported("orders", "1.2.3"));
+        store.Publish();
+        using var subscription = store.Subscribe();
+
+        // Act: a heartbeat restates the same
+        store.Report("pod-1", StoreFixture.Reported("orders", "1.2.3"));
+        store.Publish();
+
+        // Assert
+        subscription.Deltas.TryRead(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Upsert_publishes_nothing_when_the_platform_restates_what_is_already_shown()
+    {
+        // Arrange
+        var store = new StoreFixture().WithInstances("pod-1").Build();
+        store.Report("pod-1", StoreFixture.Reported("orders", "1.2.3"));
+        store.Publish();
+        using var subscription = store.Subscribe();
+
+        // Act: a re-list of the pods
+        store.Upsert(StoreFixture.Instance("pod-1"));
+        store.Publish();
+
+        // Assert
+        subscription.Deltas.TryRead(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Upsert_keeps_what_the_application_reported_when_the_platform_view_changes()
+    {
+        // Arrange
+        var store = new StoreFixture().WithInstances("pod-1").Build();
+        store.Report("pod-1", StoreFixture.Reported("orders", "1.2.3"));
+
+        // Act
+        store.Upsert(StoreFixture.Instance("pod-1", HealthState.Degraded));
+
+        // Assert
+        var shown = store.CreateSnapshot().Instances.Single();
+        shown.Health.ShouldBe(HealthState.Degraded);
+        shown.Version.ShouldBe("1.2.3");
+    }
+
+    [Fact]
+    public void LoseSidecar_shows_the_instance_as_unhealthy_until_the_application_reports_again()
+    {
+        // Arrange
+        var store = new StoreFixture().WithInstances("pod-1").Build();
+        store.Report("pod-1", StoreFixture.Reported("orders"));
+
+        // Act
+        store.LoseSidecar("pod-1");
+        var lost = store.CreateSnapshot().Instances.Single();
+        store.Report("pod-1", StoreFixture.Reported("orders"));
+        var back = store.CreateSnapshot().Instances.Single();
+
+        // Assert
+        lost.Health.ShouldBe(HealthState.Unhealthy);
+        back.Health.ShouldBe(HealthState.Healthy);
+    }
+
+    [Fact]
+    public void LoseSidecar_ignores_an_instance_whose_application_never_reported()
+    {
+        // Arrange
+        var store = new StoreFixture().WithInstances("pod-1").Build();
+        store.Publish();
+        using var subscription = store.Subscribe();
+
+        // Act
+        store.LoseSidecar("pod-1");
+        store.Publish();
+
+        // Assert: an instance without a sidecar is unmonitored, not broken
+        subscription.Deltas.TryRead(out _).ShouldBeFalse();
+        store.CreateSnapshot().Instances.Single().Health.ShouldBe(HealthState.Healthy);
+    }
+
+    [Fact]
+    public void ForgetReport_returns_the_instance_to_what_the_platform_says()
+    {
+        // Arrange
+        var store = new StoreFixture().WithInstances("pod-1").Build();
+        store.Report("pod-1", StoreFixture.Reported("orders", "1.2.3", HealthState.Unhealthy));
+
+        // Act
+        store.ForgetReport("pod-1");
+
+        // Assert
+        var shown = store.CreateSnapshot().Instances.Single();
+        shown.Health.ShouldBe(HealthState.Healthy);
+        shown.Version.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Remove_also_forgets_what_the_application_reported()
+    {
+        // Arrange
+        var store = new StoreFixture().WithInstances("pod-1").Build();
+        store.Report("pod-1", StoreFixture.Reported("orders", "1.2.3"));
+        store.Remove("pod-1");
+
+        // Act
+        store.Upsert(StoreFixture.Instance("pod-1"));
+
+        // Assert: a new pod with the same name does not inherit the report of the old one
+        store.CreateSnapshot().Instances.Single().Version.ShouldBeNull();
+    }
+
+    [Fact]
     public void CreateSnapshot_lists_every_instance_ordered_by_id_under_the_scope_name()
     {
         // Arrange
@@ -290,6 +453,9 @@ public class ScopeStateStoreTests
 
             return store;
         }
+
+        public static ApplicationReport Reported(string service, string? version = null, HealthState health = HealthState.Healthy, params HealthCheckResult[] checks) =>
+            new(service, version, health, checks);
 
         public static InstanceInfo Instance(string id, HealthState health = HealthState.Healthy) =>
             new(id, "orders", InstanceLifecycle.Running, health, new Dictionary<string, string>());

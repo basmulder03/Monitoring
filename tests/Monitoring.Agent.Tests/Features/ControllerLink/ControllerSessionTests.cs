@@ -486,6 +486,12 @@ public class ControllerSessionTests
 
         public void Remove(string id) => throw new NotSupportedException();
 
+        public void Report(string id, ApplicationReport report) => throw new NotSupportedException();
+
+        public void LoseSidecar(string id) => throw new NotSupportedException();
+
+        public void ForgetReport(string id) => throw new NotSupportedException();
+
         public void Publish() => throw new NotSupportedException();
 
         public Snapshot CreateSnapshot() => new(0, ScopeName, []);

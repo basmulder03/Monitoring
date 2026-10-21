@@ -17,13 +17,35 @@ public interface IScopeStateStore
     /// <summary>The scope this agent reports as.</summary>
     string ScopeName { get; }
 
-    /// <summary>Adds an instance or replaces the instance with the same id. Takes effect for controllers at the next <see cref="Publish"/>.</summary>
+    /// <summary>
+    /// Adds an instance as the platform sees it, or replaces the one with the same id. If the application has reported about itself,
+    /// the shown instance combines both. Takes effect for controllers at the next <see cref="Publish"/>, and only when it changes what is shown.
+    /// </summary>
     /// <param name="instance">The instance as it is now.</param>
     void Upsert(InstanceInfo instance);
 
-    /// <summary>Removes an instance, which controllers then show as Gone. Unknown ids are ignored.</summary>
+    /// <summary>Removes an instance and what its application reported, which controllers then show as Gone. Unknown ids are ignored.</summary>
     /// <param name="id">Id of the instance that no longer exists.</param>
     void Remove(string id);
+
+    /// <summary>
+    /// Records what the application of an instance says about itself. It adds detail to an instance the platform knows about;
+    /// it never makes an instance exist, so a report for an unknown instance is kept until the platform reports it.
+    /// </summary>
+    /// <param name="id">Id of the instance, which is the pod name.</param>
+    /// <param name="report">What the application reports.</param>
+    void Report(string id, ApplicationReport report);
+
+    /// <summary>
+    /// Records that the sidecar of an instance is no longer connected. The instance is shown as Unhealthy until it reports again,
+    /// because nothing can be said about its application.
+    /// </summary>
+    /// <param name="id">Id of the instance.</param>
+    void LoseSidecar(string id);
+
+    /// <summary>Forgets what the application of an instance reported, for example when its sidecar said goodbye on purpose.</summary>
+    /// <param name="id">Id of the instance.</param>
+    void ForgetReport(string id);
 
     /// <summary>Sends everything changed since the previous call as one delta to every subscriber; does nothing when nothing changed.</summary>
     void Publish();

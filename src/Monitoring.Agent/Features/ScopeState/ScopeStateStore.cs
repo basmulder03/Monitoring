@@ -9,6 +9,10 @@ namespace Monitoring.Agent.Features.ScopeState;
 internal sealed class ScopeStateStore(ScopeStateOptions options) : IScopeStateStore
 {
     private readonly Lock _gate = new();
+    private readonly Dictionary<string, InstanceInfo> _platform = [];
+    private readonly Dictionary<string, Application> _applications = [];
+
+    /// <summary>The instances as shown: the platform's view combined with the application's report.</summary>
     private readonly Dictionary<string, InstanceInfo> _instances = [];
     private readonly Dictionary<string, InstanceInfo> _pendingUpserts = [];
     private readonly HashSet<string> _pendingRemoved = [];
@@ -23,9 +27,8 @@ internal sealed class ScopeStateStore(ScopeStateOptions options) : IScopeStateSt
     {
         lock (_gate)
         {
-            _instances[instance.Id] = instance;
-            _pendingUpserts[instance.Id] = instance;
-            _pendingRemoved.Remove(instance.Id);
+            _platform[instance.Id] = instance;
+            Recompute(instance.Id);
         }
     }
 
@@ -34,16 +37,75 @@ internal sealed class ScopeStateStore(ScopeStateOptions options) : IScopeStateSt
     {
         lock (_gate)
         {
-            if (!_instances.Remove(id))
+            _platform.Remove(id);
+            _applications.Remove(id);
+            Recompute(id);
+        }
+    }
+
+    /// <inheritdoc />
+    public void Report(string id, ApplicationReport report)
+    {
+        lock (_gate)
+        {
+            _applications[id] = new Application(report, SidecarLost: false);
+            Recompute(id);
+        }
+    }
+
+    /// <inheritdoc />
+    public void LoseSidecar(string id)
+    {
+        lock (_gate)
+        {
+            if (_applications.TryGetValue(id, out var application))
             {
-                return;
+                _applications[id] = application with { SidecarLost = true };
+                Recompute(id);
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public void ForgetReport(string id)
+    {
+        lock (_gate)
+        {
+            if (_applications.Remove(id))
+            {
+                Recompute(id);
+            }
+        }
+    }
+
+    /// <summary>Works out the instance to show and records the change, if what is shown changed. The caller holds the lock.</summary>
+    private void Recompute(string id)
+    {
+        if (!_platform.TryGetValue(id, out var platform))
+        {
+            if (_instances.Remove(id))
+            {
+                // An instance added and removed within one batch is still reported as removed: harmless if the
+                // controller never saw it, and required if an earlier snapshot already contained it.
+                _pendingUpserts.Remove(id);
+                _pendingRemoved.Add(id);
             }
 
-            // An instance added and removed within one batch is still reported as removed: harmless if the
-            // controller never saw it, and required if an earlier snapshot already contained it.
-            _pendingUpserts.Remove(id);
-            _pendingRemoved.Add(id);
+            return;
         }
+
+        _applications.TryGetValue(id, out var application);
+        var shown = InstanceMerger.Merge(platform, application?.Report, application?.SidecarLost ?? false);
+
+        // Heartbeats and re-lists restate what is already known; only a real change is worth telling the controllers.
+        if (_instances.TryGetValue(id, out var current) && InstanceEquality.AreEqual(current, shown))
+        {
+            return;
+        }
+
+        _instances[id] = shown;
+        _pendingUpserts[id] = shown;
+        _pendingRemoved.Remove(id);
     }
 
     /// <inheritdoc />
@@ -119,6 +181,9 @@ internal sealed class ScopeStateStore(ScopeStateOptions options) : IScopeStateSt
 
         subscriber.Channel.Writer.TryComplete();
     }
+
+    /// <summary>What an application reported, and whether its sidecar has since gone away.</summary>
+    private sealed record Application(ApplicationReport Report, bool SidecarLost);
 
     /// <summary>One controller connection's delta queue.</summary>
     private sealed record Subscriber(Channel<Delta> Channel);
