@@ -607,6 +607,16 @@ Code is documented in two layers: C# XML documentation (csdoc) for what a member
 - Comments are kept in step with the code: a change that makes a comment wrong updates or removes it in the same commit.
 - The build enforces the baseline: XML documentation generation is on and missing-documentation warnings for public members (CS1591) are errors in the library and protocol projects. Review checks the quality of the text.
 
+**Commits**
+
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/), so the history is readable and the changelog and semantic version can be generated from it.
+
+- Format: `<type>(<optional scope>): <description>`, with an optional body that explains why, and footers such as `BREAKING CHANGE:`.
+- Types: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `chore`. A breaking change adds `!` after the type or scope, or a `BREAKING CHANGE:` footer.
+- Scope is the slice or project, for example `feat(controller-alerting): ...` or `fix(protocol): ...`.
+- The description is imperative, lower case, without a final period, and short enough to read in one line.
+- One commit per functional slice: a commit contains one coherent change together with its tests and documentation, and the build and tests are green at every commit. Unrelated changes, such as a refactor found along the way, get their own commit.
+
 ## Testing strategy
 
 Behavior is specified in Gherkin and verified end to end against a real multi-platform environment started by .NET Aspire, while xUnit v3 unit tests cover the logic in isolation. The Gherkin feature files double as the functional requirements.
