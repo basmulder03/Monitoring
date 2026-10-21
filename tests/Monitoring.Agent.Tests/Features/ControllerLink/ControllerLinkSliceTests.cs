@@ -130,4 +130,20 @@ public class ControllerLinkSliceTests
         // Assert
         add.ShouldThrow<ArgumentOutOfRangeException>();
     }
+
+    [Fact]
+    public void AddControllerLink_registers_the_link_service_as_a_hosted_service()
+    {
+        // Arrange
+        using var provider = new ServiceCollection()
+            .AddScopeState(o => o.ScopeName = "shop")
+            .AddControllerLink(Valid)
+            .BuildServiceProvider();
+
+        // Act
+        var hosted = provider.GetServices<Microsoft.Extensions.Hosting.IHostedService>();
+
+        // Assert
+        hosted.ShouldContain(service => service.GetType().Name == "ControllerLinkHostedService");
+    }
 }

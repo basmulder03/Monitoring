@@ -7,7 +7,7 @@ namespace Monitoring.Agent.Features.ControllerLink;
 /// <summary>Registers the controller link slice.</summary>
 public static class ControllerLinkSlice
 {
-    /// <summary>Adds the link to the controller replicas. It sends the scope state, so <c>AddScopeState</c> must be called as well.</summary>
+    /// <summary>Adds the link to the controller replicas and the background service that runs it. It sends the scope state, so <c>AddScopeState</c> must be called as well.</summary>
     /// <param name="services">The service collection to extend.</param>
     /// <param name="configure">Sets the <see cref="ControllerLinkOptions"/>; at least one controller address and a token are required.</param>
     /// <returns>The same collection, for chaining.</returns>
@@ -38,6 +38,7 @@ public static class ControllerLinkSlice
             provider.GetRequiredService<ILogger<ControllerConnection>>()));
         services.AddSingleton<RunReplicaAsync>(provider => provider.GetRequiredService<ControllerConnection>().RunAsync);
         services.AddSingleton<IControllerLink, ControllerLinkService>();
+        services.AddHostedService<ControllerLinkHostedService>();
         return services;
     }
 
