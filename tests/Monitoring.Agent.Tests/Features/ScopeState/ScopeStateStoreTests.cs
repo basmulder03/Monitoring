@@ -129,6 +129,34 @@ public class ScopeStateStoreTests
     }
 
     [Fact]
+    public void CreateSnapshot_carries_the_labels_of_the_scope()
+    {
+        // Arrange
+        var store = new StoreFixture().WithLabel("environment", "prod").WithLabel("datacenter", "a").Build();
+
+        // Act
+        var snapshot = store.CreateSnapshot();
+
+        // Assert
+        snapshot.Labels!["environment"].ShouldBe("prod");
+        snapshot.Labels["datacenter"].ShouldBe("a");
+        snapshot.Labels.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void Subscribe_starts_from_a_snapshot_that_carries_the_labels_of_the_scope()
+    {
+        // Arrange
+        var store = new StoreFixture().WithLabel("environment", "prod").Build();
+
+        // Act
+        using var subscription = store.Subscribe();
+
+        // Assert
+        subscription.Initial.Labels.ShouldBe(new Dictionary<string, string> { ["environment"] = "prod" });
+    }
+
+    [Fact]
     public void CreateSnapshot_carries_the_current_sequence_without_consuming_one()
     {
         // Arrange
@@ -230,6 +258,12 @@ public class ScopeStateStoreTests
         public StoreFixture WithScope(string name)
         {
             _options.ScopeName = name;
+            return this;
+        }
+
+        public StoreFixture WithLabel(string key, string value)
+        {
+            _options.Labels[key] = value;
             return this;
         }
 

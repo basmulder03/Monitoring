@@ -14,4 +14,10 @@ public sealed class ScopeStateOptions
     /// A cut-off connection reconnects and starts again from a fresh snapshot.
     /// </summary>
     public int SubscriberBuffer { get; set; } = 1000;
+
+    /// <summary>
+    /// Free-form labels of the scope, such as <c>environment</c> and <c>datacenter</c>. They are sent with every snapshot
+    /// and are what the dashboard groups and filters scopes by.
+    /// </summary>
+    public Dictionary<string, string> Labels { get; set; } = [];
 }

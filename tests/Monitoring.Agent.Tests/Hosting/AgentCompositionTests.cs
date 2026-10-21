@@ -179,6 +179,21 @@ public class AgentCompositionTests
     }
 
     [Fact]
+    public void CreateHost_labels_the_scope_with_the_agent_labels()
+    {
+        // Arrange
+        using var host = new AgentSettings().Valid().With("Agent:Labels:environment", "prod").With("Agent:Labels:datacenter", "a").Build();
+
+        // Act
+        var snapshot = host.Services.GetRequiredService<IScopeStateStore>().CreateSnapshot();
+
+        // Assert
+        snapshot.Labels!["environment"].ShouldBe("prod");
+        snapshot.Labels["datacenter"].ShouldBe("a");
+        snapshot.Labels.Count.ShouldBe(2);
+    }
+
+    [Fact]
     public void CreateHost_rejects_a_controller_address_that_is_not_host_and_port()
     {
         // Arrange

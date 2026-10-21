@@ -33,7 +33,11 @@ internal static class AgentComposition
         }
 
         builder.Services
-            .AddScopeState(options => options.ScopeName = scopeName)
+            .AddScopeState(options =>
+            {
+                options.ScopeName = scopeName;
+                options.Labels = new Dictionary<string, string>(agent.Map("Labels"));
+            })
             .AddControllerLink(options =>
             {
                 options.ControllerAddresses = [.. controllers];

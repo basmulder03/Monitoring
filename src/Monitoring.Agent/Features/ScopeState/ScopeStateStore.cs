@@ -104,7 +104,11 @@ internal sealed class ScopeStateStore(ScopeStateOptions options) : IScopeStateSt
     }
 
     private Snapshot SnapshotLocked() =>
-        new(_sequence, options.ScopeName, [.. _instances.Values.OrderBy(i => i.Id, StringComparer.Ordinal)]);
+        new(
+            _sequence,
+            options.ScopeName,
+            [.. _instances.Values.OrderBy(i => i.Id, StringComparer.Ordinal)],
+            new Dictionary<string, string>(options.Labels));
 
     private void Unsubscribe(Subscriber subscriber)
     {
