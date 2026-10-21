@@ -10,4 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Monitoring.Ui/Monitoring.Ui.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="Script/*.js" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

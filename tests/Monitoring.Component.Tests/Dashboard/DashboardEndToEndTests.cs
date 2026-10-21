@@ -31,6 +31,26 @@ public class DashboardEndToEndTests
     }
 
     [Fact]
+    public async Task The_overview_gives_each_scope_the_labels_of_its_agent()
+    {
+        // Arrange
+        await using var cluster = new FakeKubernetesApiServer().WithPod("orders-1").Start();
+        await using var controller = new ControllerHost().AcceptingEnrollment(Token).Start();
+        await using var agent = new AgentHost("shop", Token).ConnectingTo(controller).DiscoveringIn(cluster)
+            .With("Agent:Labels:environment", "prod").With("Agent:Labels:datacenter", "a").Start();
+        using var http = Web();
+
+        // Act / Assert
+        await Eventually.AssertAsync(() =>
+        {
+            using var overview = GetJson(http, $"{controller.WebAddress}/api/overview");
+            var labels = overview.RootElement.GetProperty("scopes")[0].GetProperty("labels");
+            labels.GetProperty("environment").GetString().ShouldBe("prod");
+            labels.GetProperty("datacenter").GetString().ShouldBe("a");
+        });
+    }
+
+    [Fact]
     public async Task The_scope_view_lists_the_service_and_its_pods()
     {
         // Arrange

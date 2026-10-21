@@ -78,6 +78,11 @@ a { color: inherit; }
 main { padding: 1rem; max-width: 90rem; margin: 0 auto; }
 main:focus { outline: none; }
 h2 { margin: 1.5rem 0 0.75rem; font-size: 1.1rem; }
+h3, h4 { margin: 1rem 0 0.5rem; font-size: 1rem; }
+.group { margin: 0 0 1rem; }
+.group .group { margin-left: 0.5rem; padding-left: 0.75rem; border-left: 2px solid var(--border); }
+.filter { margin: 0 0 1rem; }
+.filter select { font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--border); border-radius: 0.4rem; padding: 0.25rem 0.5rem; }
 
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 0.75rem; list-style: none; margin: 0; padding: 0; }
 .tile {

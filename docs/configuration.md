@@ -35,6 +35,7 @@ Logging is controlled by the usual `Logging:LogLevel` settings, for example `MON
 | `Controller:Web:Address` | `0.0.0.0` | IP address the dashboard's web server listens on |
 | `Controller:Web:Port` | `8080` | TCP port of the dashboard and its API; plain HTTP, so keep it on a network you trust |
 | `Controller:Dashboard:PushInterval` | `00:00:01` | How often open pages are checked for changes to push; bursts of changes become one update |
+| `Controller:Dashboard:GroupBy` | `environment,datacenter` | The scope labels the page groups scopes by, outermost first. Scopes without a label are listed last under "not set". `none` turns grouping off |
 | `Controller:Dashboard:KeepAliveInterval` | `00:00:05` | How long a stream may stay silent before a keep-alive event is sent. Keep it well below 15 seconds, after which a page warns that its data is old |
 | `Controller:Registry:GoneRetention` | `00:10:00` | How long a removed instance stays visible as Gone |
 | `Controller:Registry:PurgeInterval` | `00:01:00` | How often expired Gone instances are dropped |
@@ -77,6 +78,7 @@ The controller serves the dashboard itself, so there is nothing else to install.
 | --- | --- |
 | `/` | A tile per scope with its status as an icon and a word, unhealthiest first, and the alerts that are firing. Select a tile for its services and pods |
 | `/tv` | The same for a wall display: type scales with the screen and the cursor is hidden |
+| `/?filter=environment:prod` | Shows only scopes with that label value; repeat `filter` for several labels. It works on `/tv` too, so a wall display can stay on one environment. When the scopes have several values of the outermost label, a selector in the page switches between them |
 | `/?theme=dark` or `?theme=light` | Forces a theme; otherwise the page follows the system setting, and the button in the corner switches it |
 | `/api/overview` | The overview as JSON |
 | `/api/scopes/<name>` | One scope with its services and instances as JSON |
@@ -93,7 +95,7 @@ The page has no login yet; reach it only over a network you trust.
 | `Agent:Controllers` | required | The bootstrap controller address as `host:port`, plus optional fallbacks. The controller answers with every replica's address, and the agent then connects to all of them |
 | `Agent:Id` | machine name | Id of this agent |
 | `Agent:Version` | none | Version of this agent, shown by the controller |
-| `Agent:Labels:<name>` | none | Free-form labels such as `env` and `site`, sent with the hello |
+| `Agent:Labels:<name>` | none | Free-form labels such as `environment` and `datacenter`. They describe the scope, are sent with every snapshot (a change reaches the controller within the snapshot interval) and are what the dashboard groups and filters by |
 | `Agent:Reconnect:MinDelay` | `00:00:01` | Shortest wait before reconnecting to a replica |
 | `Agent:Reconnect:MaxDelay` | `00:00:30` | Longest wait; repeated failures grow the wait up to this |
 | `Agent:ConfigReplyTimeout` | `00:00:10` | How long to wait for the controller's answer to the hello |
@@ -151,7 +153,7 @@ How a pod becomes an instance:
   "Agent": {
     "ScopeName": "orders-platform",
     "Controllers": ["controller.example:9440"],
-    "Labels": { "env": "prod", "site": "a" }
+    "Labels": { "environment": "prod", "datacenter": "a" }
   }
 }
 ```

@@ -52,30 +52,129 @@
     return count + " " + (count === 1 ? one : many);
   }
 
+  // The scopes to show are narrowed by ?filter=key:value (repeatable), which also keeps a wall display on one environment.
+  function readFilters() {
+    const map = new Map();
+    for (const entry of params.getAll("filter")) {
+      const colon = entry.indexOf(":");
+      if (colon > 0) map.set(entry.slice(0, colon), entry.slice(colon + 1));
+    }
+    return map;
+  }
+
+  const filters = readFilters();
+
+  function matchesFilters(scope) {
+    for (const [key, value] of filters) {
+      if ((scope.labels[key] || "") !== value) return false;
+    }
+    return true;
+  }
+
+  const SEVERITY = ["Healthy", "Unknown", "Degraded", "Unhealthy"];
+
+  function worstOf(scopes) {
+    let worst = "Healthy";
+    for (const scope of scopes) {
+      if (SEVERITY.indexOf(scope.health) > SEVERITY.indexOf(worst)) worst = scope.health;
+    }
+    return worst;
+  }
+
+  function tiles(scopes) {
+    const list = el("ul", "tiles");
+    for (const scope of scopes) {
+      const item = el("li");
+      const link = el("a", "tile " + scope.health.toLowerCase());
+      link.href = "#/scopes/" + encodeURIComponent(scope.name);
+      const title = el("span", "name");
+      title.appendChild(icon("scope"));
+      title.appendChild(document.createTextNode(" " + scope.name));
+      link.appendChild(title);
+      link.appendChild(status(scope.health));
+      link.appendChild(el("span", "muted",
+        plural(scope.services, "service", "services") + ", " + plural(scope.instances, "instance", "instances") +
+        (scope.problems > 0 ? ", " + scope.problems + " not healthy" : "")));
+      item.appendChild(link);
+      list.appendChild(item);
+    }
+    return list;
+  }
+
+  // Groups scopes by the first label, then by the next inside each group; scopes without the label go last.
+  function groups(scopes, keys, depth) {
+    if (keys.length === 0) return tiles(scopes);
+
+    const byValue = new Map();
+    for (const scope of scopes) {
+      const value = scope.labels[keys[0]] || null;
+      if (!byValue.has(value)) byValue.set(value, []);
+      byValue.get(value).push(scope);
+    }
+
+    const ordered = [...byValue.entries()].sort(([nameA, a], [nameB, b]) => {
+      if (nameA === null || nameB === null) return nameA === null ? 1 : -1;
+      const bySeverity = SEVERITY.indexOf(worstOf(b)) - SEVERITY.indexOf(worstOf(a));
+      return bySeverity !== 0 ? bySeverity : nameA.localeCompare(nameB);
+    });
+
+    const container = el("div");
+    for (const [value, members] of ordered) {
+      const section = el("section", "group");
+      const heading = el("h" + Math.min(depth + 2, 6));
+      heading.appendChild(status(worstOf(members)));
+      heading.appendChild(document.createTextNode(" " + keys[0] + ": " + (value === null ? "not set" : value)));
+      section.appendChild(heading);
+      section.appendChild(groups(members, keys.slice(1), depth + 1));
+      container.appendChild(section);
+    }
+    return container;
+  }
+
+  // Lets the reader pick one value of the outermost label, for example a single environment, or all of them.
+  function filterControl() {
+    const key = overview.groupBy[0];
+    const values = [...new Set(overview.scopes.map((scope) => scope.labels[key]).filter((value) => value))].sort();
+    if (!key || values.length < 2) return null;
+
+    const wrapper = el("div", "filter");
+    const label = el("label", "", "Show " + key + " ");
+    label.htmlFor = "filter-select";
+    const select = el("select");
+    select.id = "filter-select";
+    const all = el("option", "", "All");
+    all.value = "";
+    select.appendChild(all);
+    for (const value of values) {
+      const option = el("option", "", value);
+      option.value = value;
+      select.appendChild(option);
+    }
+    select.value = filters.get(key) || "";
+    select.addEventListener("change", () => {
+      if (select.value) filters.set(key, select.value); else filters.delete(key);
+      const url = new URL(location.href);
+      url.searchParams.delete("filter");
+      for (const [k, v] of filters) url.searchParams.append("filter", k + ":" + v);
+      history.replaceState(null, "", url);
+      render();
+    });
+    wrapper.appendChild(label);
+    wrapper.appendChild(select);
+    return wrapper;
+  }
+
   function renderOverview() {
     const root = el("div");
     root.appendChild(el("h2", "", "Scopes"));
 
-    if (!overview || overview.scopes.length === 0) {
-      root.appendChild(el("p", "muted", "No scope has reported yet."));
+    const visible = overview ? overview.scopes.filter(matchesFilters) : [];
+    if (visible.length === 0) {
+      root.appendChild(el("p", "muted", overview && overview.scopes.length > 0 ? "No scope matches the filter." : "No scope has reported yet."));
     } else {
-      const list = el("ul", "tiles");
-      for (const scope of overview.scopes) {
-        const item = el("li");
-        const link = el("a", "tile " + scope.health.toLowerCase());
-        link.href = "#/scopes/" + encodeURIComponent(scope.name);
-        const title = el("span", "name");
-        title.appendChild(icon("scope"));
-        title.appendChild(document.createTextNode(" " + scope.name));
-        link.appendChild(title);
-        link.appendChild(status(scope.health));
-        link.appendChild(el("span", "muted",
-          plural(scope.services, "service", "services") + ", " + plural(scope.instances, "instance", "instances") +
-          (scope.problems > 0 ? ", " + scope.problems + " not healthy" : "")));
-        item.appendChild(link);
-        list.appendChild(item);
-      }
-      root.appendChild(list);
+      const control = filterControl();
+      if (control) root.appendChild(control);
+      root.appendChild(groups(visible, overview.groupBy, 1));
     }
 
     root.appendChild(renderAlerts());
@@ -115,6 +214,9 @@
     const heading = el("h2", "", scope.name + " ");
     heading.appendChild(status(scope.health));
     root.appendChild(heading);
+
+    const labels = Object.entries(scope.labels).map(([key, value]) => key + "=" + value).join(", ");
+    if (labels) root.appendChild(el("p", "muted", labels));
 
     if (scope.services.length === 0) {
       root.appendChild(el("p", "muted", "This scope has no services."));
