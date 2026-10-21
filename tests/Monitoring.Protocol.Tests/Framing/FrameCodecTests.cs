@@ -24,6 +24,7 @@ public class FrameCodecTests
         new Delta(2, [], ["pod-1"]),
         new Goodbye("pod-1"),
         new Config("abc123", ["tcp://c1:9000", "tcp://c2:9000"]),
+        new Ack(12, SnapshotRequired: true),
     };
 
     [Theory]

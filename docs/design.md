@@ -132,10 +132,12 @@ One message set is used on every hop, serialized as JSON with System.Text.Json s
 | `Delta` | Agent to controller | Only what changed since the last message |
 | `Goodbye` | Child to parent | Graceful shutdown, so the entity is removed instead of marked unhealthy |
 | `Config` | Controller to agent | Effective configuration and the list of controller replica addresses; on connect and on every change |
+| `Ack` | Controller to agent | The last sequence number this replica applied, per agent; also asks for a new snapshot when the replica cannot use deltas yet |
 
 **Defaults (to be tuned)**
 
 - Heartbeat every 5 s; unhealthy after 3 missed heartbeats.
+- Protocol versions: `Hello` carries the version, and a peer at most one version away is served, so adjacent versions work together during rollouts.
 - Metrics pulled every 15 s; trace edges flushed every 10 s.
 - All pulls carry a cursor, so a reconnect never replays data and never loses more than one interval.
 

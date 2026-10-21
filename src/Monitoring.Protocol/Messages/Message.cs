@@ -14,4 +14,5 @@ namespace Monitoring.Protocol.Messages;
 [JsonDerivedType(typeof(Delta), "delta")]
 [JsonDerivedType(typeof(Goodbye), "goodbye")]
 [JsonDerivedType(typeof(Config), "config")]
+[JsonDerivedType(typeof(Ack), "ack")]
 public abstract record Message;
