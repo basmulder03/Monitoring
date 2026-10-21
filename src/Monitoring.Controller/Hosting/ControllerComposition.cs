@@ -47,7 +47,12 @@ internal static class ControllerComposition
                 options.ServiceDownWait = alerting.Duration("ServiceDownWait", options.ServiceDownWait);
                 options.EvaluationInterval = alerting.Duration("EvaluationInterval", options.EvaluationInterval);
             })
-            .AddDashboard()
+            .AddDashboard(options =>
+            {
+                var dashboard = controller.Section("Dashboard");
+                options.PushInterval = dashboard.Duration("PushInterval", options.PushInterval);
+                options.KeepAliveInterval = dashboard.Duration("KeepAliveInterval", options.KeepAliveInterval);
+            })
             .AddSecurity(options => options.AgentTokens.AddRange(tokens))
             .AddAgentLink(options =>
             {

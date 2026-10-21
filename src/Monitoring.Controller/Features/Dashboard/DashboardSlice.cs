@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Monitoring.Controller.Features.Dashboard;
 
@@ -10,10 +11,20 @@ public static class DashboardSlice
     /// <c>AddRegistry</c>, <c>AddHealth</c> and <c>AddAlerting</c> must be called as well; <c>MapDashboard</c> adds the endpoints.
     /// </summary>
     /// <param name="services">The service collection to extend.</param>
+    /// <param name="configure">Optionally changes the <see cref="DashboardOptions"/>.</param>
     /// <returns>The same collection, for chaining.</returns>
-    public static IServiceCollection AddDashboard(this IServiceCollection services)
+    /// <exception cref="ArgumentOutOfRangeException">An interval is not positive.</exception>
+    public static IServiceCollection AddDashboard(this IServiceCollection services, Action<DashboardOptions>? configure = null)
     {
+        var options = new DashboardOptions();
+        configure?.Invoke(options);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.PushInterval, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.KeepAliveInterval, TimeSpan.Zero);
+
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton(options);
         services.AddSingleton<DashboardModel>();
+        services.AddSingleton<OverviewStream>();
         return services;
     }
 }
