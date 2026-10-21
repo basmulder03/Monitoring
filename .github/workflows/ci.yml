@@ -65,7 +65,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build the image
-        run: docker build --build-arg PROJECT=${{ matrix.project }} -t monitoring-${{ matrix.project }}:ci -f deploy/Dockerfile .
-      - name: Size
-        run: docker images monitoring-${{ matrix.project }}:ci --format '{{.Repository}} {{.Size}}'
+        run: |
+          name="monitoring-$(echo '${{ matrix.project }}' | tr '[:upper:]' '[:lower:]')"
+          docker build --build-arg PROJECT=${{ matrix.project }} -t "$name:ci" -f deploy/Dockerfile .
+          docker images "$name:ci" --format '{{.Repository}} {{.Size}}'
 
