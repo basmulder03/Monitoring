@@ -24,7 +24,7 @@ public static class ControllerLinkSlice
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton(options);
         services.AddSingleton<ControllerSession>();
-        services.AddSingleton<ConnectAsync>(TcpConnector.ConnectAsync);
+        services.AddSingleton<ConnectAsync>(Monitoring.Common.TcpConnector.ConnectAsync);
         services.AddSingleton<RunSessionAsync>(provider =>
         {
             var session = provider.GetRequiredService<ControllerSession>();
