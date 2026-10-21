@@ -69,7 +69,7 @@ public class OverviewStreamTests
     }
 
     [Fact]
-    public async Task Stream_sends_nothing_new_while_the_state_stays_the_same_and_keeps_the_connection_alive()
+    public async Task Stream_sends_no_overview_while_the_state_stays_the_same_but_keeps_the_connection_alive()
     {
         // Arrange
         var fixture = new StreamFixture().WithInstance("shop", "orders", InstanceLifecycle.Running, HealthState.Healthy);
@@ -82,13 +82,11 @@ public class OverviewStreamTests
             fixture.Clock.Advance(TimeSpan.FromSeconds(1));
         }
 
-        fixture.Clock.Advance(TimeSpan.FromSeconds(15));
+        fixture.Clock.Advance(TimeSpan.FromSeconds(5));
         var next = await stream.NextEventAsync();
 
-        // Assert: the first thing after the first overview is the keep-alive comment, not a repeat of the overview
-        next.Name.ShouldBe("");
-        next.Data.ShouldBe("");
-        next.Comment.ShouldBe("keep-alive");
+        // Assert: the first thing after the first overview is the keep-alive event, not a repeat of the overview
+        next.Name.ShouldBe("keep-alive");
     }
 
     /// <summary>Starts the dashboard in memory with a fake clock and keeps a streaming request open against it.</summary>
@@ -125,8 +123,8 @@ public class OverviewStreamTests
         }
     }
 
-    /// <summary>One event, or a comment, read from the stream.</summary>
-    private sealed record StreamItem(string Name, string Data, string Comment);
+    /// <summary>One event read from the stream.</summary>
+    private sealed record StreamItem(string Name, string Data);
 
     /// <summary>A streaming request that is open against the in-memory dashboard.</summary>
     private sealed class OpenStream(WebApplication app, HttpClient client, HttpResponseMessage response, StreamReader reader) : IAsyncDisposable
@@ -139,12 +137,12 @@ public class OverviewStreamTests
             using var guard = CancellationTokenSource.CreateLinkedTokenSource(Ct);
             guard.CancelAfter(TimeSpan.FromSeconds(5));
 
-            string name = "", data = "", comment = "";
+            string name = "", data = "";
             while (await reader.ReadLineAsync(guard.Token) is { } line)
             {
                 if (line.Length == 0)
                 {
-                    return new StreamItem(name, data, comment);
+                    return new StreamItem(name, data);
                 }
 
                 if (line.StartsWith("event: ", StringComparison.Ordinal))
@@ -154,10 +152,6 @@ public class OverviewStreamTests
                 else if (line.StartsWith("data: ", StringComparison.Ordinal))
                 {
                     data = line["data: ".Length..];
-                }
-                else if (line.StartsWith(": ", StringComparison.Ordinal))
-                {
-                    comment = line[": ".Length..];
                 }
             }
 

@@ -2,6 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Monitoring.Protocol\Monitoring.Protocol.csproj" />
     <ProjectReference Include="..\Monitoring.Hosting\Monitoring.Hosting.csproj" />
+    <ProjectReference Include="..\Monitoring.Ui\Monitoring.Ui.csproj" />
   </ItemGroup>
   <PropertyGroup>
     <PublishAot>true</PublishAot>

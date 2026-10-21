@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Http;
 namespace Monitoring.Controller.Features.Dashboard;
 
 /// <summary>
-/// Streams the overview to one page as Server-Sent Events: the current overview at once, then a new one whenever it changes.
+/// Streams the overview to one page as Server-Sent Events: the current overview at once, then a new one whenever it changes, with a keep-alive event while nothing changes.
 /// </summary>
 /// <param name="model">Builds the overview.</param>
 /// <param name="options">Provides the push and keep-alive intervals.</param>
@@ -40,7 +40,8 @@ internal sealed class OverviewStream(DashboardModel model, DashboardOptions opti
                 }
                 else if (time.GetElapsedTime(silentSince) >= options.KeepAliveInterval)
                 {
-                    await response.WriteAsync(": keep-alive\n\n", ct).ConfigureAwait(false);
+                    // A real event rather than a comment, because a page cannot see comments and uses it to know the link is alive.
+                    await response.WriteAsync("event: keep-alive\ndata: {}\n\n", ct).ConfigureAwait(false);
                     await response.Body.FlushAsync(ct).ConfigureAwait(false);
                     silentSince = time.GetTimestamp();
                 }

@@ -93,6 +93,71 @@ public class DashboardEndpointsTests
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
+    [Theory]
+    [InlineData("/", "text/html")]
+    [InlineData("/tv", "text/html")]
+    [InlineData("/app.js", "text/javascript")]
+    [InlineData("/styles.css", "text/css")]
+    public async Task Page_files_are_served_with_their_media_type(string path, string mediaType)
+    {
+        // Arrange
+        await using var server = await new ApiFixture().StartAsync();
+
+        // Act
+        using var response = await server.Client.GetAsync(path, Ct);
+
+        // Assert
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        response.Content.Headers.ContentType!.MediaType.ShouldBe(mediaType);
+    }
+
+    [Fact]
+    public async Task Page_is_the_monitoring_page()
+    {
+        // Arrange
+        await using var server = await new ApiFixture().StartAsync();
+
+        // Act
+        var html = await server.Client.GetStringAsync("/", Ct);
+
+        // Assert
+        html.ShouldContain("<title>Monitoring</title>");
+        html.ShouldContain("/app.js");
+    }
+
+    [Fact]
+    public async Task Page_files_only_allow_the_page_to_load_its_own_files()
+    {
+        // Arrange
+        await using var server = await new ApiFixture().StartAsync();
+
+        // Act
+        using var response = await server.Client.GetAsync("/", Ct);
+
+        // Assert
+        response.Headers.GetValues("Content-Security-Policy").Single().ShouldContain("default-src 'none'");
+        response.Headers.GetValues("Content-Security-Policy").Single().ShouldContain("script-src 'self'");
+        response.Headers.GetValues("Content-Security-Policy").Single().ShouldContain("frame-ancestors 'none'");
+        response.Headers.GetValues("X-Content-Type-Options").Single().ShouldBe("nosniff");
+        response.Headers.CacheControl!.NoCache.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("/index.html")]
+    [InlineData("/nothing")]
+    [InlineData("/api/nothing")]
+    public async Task Other_paths_are_not_found(string path)
+    {
+        // Arrange
+        await using var server = await new ApiFixture().StartAsync();
+
+        // Act
+        using var response = await server.Client.GetAsync(path, Ct);
+
+        // Assert
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
     /// <summary>Starts the dashboard endpoints in memory over a fake registry.</summary>
     private sealed class ApiFixture
     {
