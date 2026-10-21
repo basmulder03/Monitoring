@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Monitoring.Client;
 using Microsoft.Extensions.Hosting;
 using Monitoring.Client.Features.Health;
 using Monitoring.Client.Features.Info;
@@ -29,6 +30,8 @@ public static class MonitoringExtensions
         services.AddSingleton(options);
         services.TryAddSingleton<InstanceDescriber>();
         services.TryAddSingleton<HealthReporter>();
+        services.AddSingleton<IPullSource, InfoPullSource>();
+        services.AddSingleton<IPullSource, HealthPullSource>();
         services.TryAddSingleton<PullHandler>();
         services.AddHostedService<LocalServer>();
         return services;

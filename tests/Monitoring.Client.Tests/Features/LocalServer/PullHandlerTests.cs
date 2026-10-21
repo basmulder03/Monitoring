@@ -81,6 +81,8 @@ public class PullHandlerTests
             services.AddSingleton<IHostEnvironment>(new Environment());
             services.AddSingleton<InstanceDescriber>();
             services.AddSingleton<HealthReporter>();
+            services.AddSingleton<IPullSource, InfoPullSource>();
+            services.AddSingleton<IPullSource, HealthPullSource>();
             services.AddSingleton<PullHandler>();
             return services.BuildServiceProvider().GetRequiredService<PullHandler>();
         }
