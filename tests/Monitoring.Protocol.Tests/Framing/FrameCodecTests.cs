@@ -23,6 +23,7 @@ public class FrameCodecTests
         new PullResult(7, PullKind.Metrics, 120, "{\"a\":1}"),
         new Snapshot(1, "shop", [new InstanceInfo("pod-1", "orders", InstanceLifecycle.Running, HealthState.Healthy, Labels)], Labels),
         new Snapshot(2, "shop", []),
+        new Snapshot(3, "shop", [new InstanceInfo("pod-1", "orders", InstanceLifecycle.Running, HealthState.Degraded, Labels, "1.4.2", [new HealthCheckResult("database", HealthState.Degraded, "slow")])]),
         new Delta(2, [], ["pod-1"]),
         new Goodbye("pod-1"),
         new Config("abc123", ["tcp://c1:9000", "tcp://c2:9000"]),
@@ -72,6 +73,39 @@ public class FrameCodecTests
 
         // Assert
         read.ShouldBeOfType<Hello>().ScopeName.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ReadAsync_restores_the_version_and_checks_of_an_instance()
+    {
+        // Arrange
+        var instance = new InstanceInfo("pod-1", "orders", InstanceLifecycle.Running, HealthState.Degraded, Labels, "1.4.2", [new HealthCheckResult("database", HealthState.Degraded, "slow")]);
+        var stream = await new FrameStreamBuilder().WithMessage(new Delta(1, [instance], [])).BuildAsync();
+
+        // Act
+        var read = (Delta)(await FrameCodec.ReadAsync(stream, ct: Ct))!;
+
+        // Assert
+        var restored = read.Upserted.Single();
+        restored.Version.ShouldBe("1.4.2");
+        restored.Checks!.Single().Name.ShouldBe("database");
+        restored.Checks!.Single().Description.ShouldBe("slow");
+    }
+
+    [Fact]
+    public async Task ReadAsync_accepts_an_instance_from_a_sender_that_knows_neither_version_nor_checks()
+    {
+        // Arrange: an instance as an older sender wrote it
+        var stream = await new FrameStreamBuilder()
+            .WithRawPayload("""{"type":"delta","sequence":1,"upserted":[{"id":"a","serviceName":"s","lifecycle":"Running","health":"Healthy","labels":{}}],"removed":[]}""")
+            .BuildAsync();
+
+        // Act
+        var read = (Delta)(await FrameCodec.ReadAsync(stream, ct: Ct))!;
+
+        // Assert
+        read.Upserted.Single().Version.ShouldBeNull();
+        read.Upserted.Single().Checks.ShouldBeNull();
     }
 
     [Fact]

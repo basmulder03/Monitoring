@@ -8,9 +8,13 @@ namespace Monitoring.Protocol.Instances;
 /// <param name="Lifecycle">Position in the instance's lifetime.</param>
 /// <param name="Health">Current health roll-up of the instance.</param>
 /// <param name="Labels">Free-form labels of the instance.</param>
+/// <param name="Version">Version of the application, as it reports itself; <see langword="null"/> while unknown.</param>
+/// <param name="Checks">Results of the application's own health checks; <see langword="null"/> when it reports none.</param>
 public sealed record InstanceInfo(
     string Id,
     string ServiceName,
     InstanceLifecycle Lifecycle,
     HealthState Health,
-    IReadOnlyDictionary<string, string> Labels);
+    IReadOnlyDictionary<string, string> Labels,
+    string? Version = null,
+    IReadOnlyList<HealthCheckResult>? Checks = null);
