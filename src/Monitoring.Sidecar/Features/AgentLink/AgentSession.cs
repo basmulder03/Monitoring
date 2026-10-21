@@ -166,15 +166,22 @@ internal sealed class AgentSession(
     private async Task<PullResult> AnswerAsync(Pull pull, CancellationToken ct)
     {
         var status = probe.Current;
-        var payload = pull.Kind switch
+        switch (pull.Kind)
         {
-            PullKind.Info when status.Description is { } description => ReportPayload.Write(description),
-            PullKind.Health => ReportPayload.Write(status.Health),
-            PullKind.Metrics => await link.GetMetricsAsync(ct).ConfigureAwait(false) is { } metrics ? ReportPayload.Write(metrics) : null,
-            _ => null,
-        };
+            case PullKind.Info when status.Description is { } description:
+                return new PullResult(pull.RequestId, pull.Kind, pull.Cursor, ReportPayload.Write(description));
 
-        return new PullResult(pull.RequestId, pull.Kind, pull.Cursor, payload);
+            case PullKind.Health:
+                return new PullResult(pull.RequestId, pull.Kind, pull.Cursor, ReportPayload.Write(status.Health));
+
+            case PullKind.Metrics or PullKind.Edges or PullKind.Spans:
+                // The sidecar only passes these on, so it needs no idea of what they contain; the cursor is the application's own.
+                var answer = await link.PullAsync(pull.Kind, pull.Cursor, ct).ConfigureAwait(false);
+                return new PullResult(pull.RequestId, pull.Kind, answer?.Cursor ?? pull.Cursor, answer?.PayloadJson);
+
+            default:
+                return new PullResult(pull.RequestId, pull.Kind, pull.Cursor, null);
+        }
     }
 
     private static TimeSpan Interval(Config config) => TimeSpan.FromSeconds(Math.Max(1, config.HeartbeatSeconds));

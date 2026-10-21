@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Monitoring.Protocol.Health;
+using Monitoring.Protocol.Messages;
 using Monitoring.Protocol.Reports;
 using Monitoring.Sidecar.Features.LibraryLink;
 using Monitoring.Sidecar.Tests.Shared;
@@ -43,18 +44,20 @@ public class SocketLibraryLinkTests
     }
 
     [Fact]
-    public async Task GetMetricsAsync_returns_the_metrics_of_the_application()
+    public async Task PullAsync_returns_the_answer_of_the_application_with_its_cursor()
     {
         // Arrange
         await using var app = new FakeApplication { Metrics = new MetricsReport([new MetricSeries("orders.placed", new Dictionary<string, string>(), 9)]) }.Start();
         using var link = LinkTo(app);
 
         // Act
-        var metrics = await link.GetMetricsAsync(Ct);
+        var answer = await link.PullAsync(PullKind.Metrics, 5, Ct);
 
         // Assert
-        metrics!.Series.Single().Name.ShouldBe("orders.placed");
+        var metrics = ReportPayload.ReadMetrics(answer!.PayloadJson)!;
+        metrics.Series.Single().Name.ShouldBe("orders.placed");
         metrics.Series.Single().Value.ShouldBe(9);
+        answer.Cursor.ShouldBe(5);
     }
 
     [Fact]

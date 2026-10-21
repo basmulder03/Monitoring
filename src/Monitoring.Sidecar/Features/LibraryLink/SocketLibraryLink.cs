@@ -22,15 +22,14 @@ internal sealed class SocketLibraryLink(LibraryLinkOptions options, TimeProvider
 
     /// <inheritdoc />
     public async Task<InstanceDescription?> GetDescriptionAsync(CancellationToken ct) =>
-        ReportPayload.ReadDescription(await AskAsync(PullKind.Info, ct).ConfigureAwait(false));
+        ReportPayload.ReadDescription((await AskAsync(PullKind.Info, 0, ct).ConfigureAwait(false))?.PayloadJson);
 
     /// <inheritdoc />
     public async Task<HealthReport?> GetHealthAsync(CancellationToken ct) =>
-        ReportPayload.ReadHealth(await AskAsync(PullKind.Health, ct).ConfigureAwait(false));
+        ReportPayload.ReadHealth((await AskAsync(PullKind.Health, 0, ct).ConfigureAwait(false))?.PayloadJson);
 
     /// <inheritdoc />
-    public async Task<MetricsReport?> GetMetricsAsync(CancellationToken ct) =>
-        ReportPayload.ReadMetrics(await AskAsync(PullKind.Metrics, ct).ConfigureAwait(false));
+    public Task<PullResult?> PullAsync(PullKind kind, long cursor, CancellationToken ct) => AskAsync(kind, cursor, ct);
 
     /// <summary>Closes the connection to the application.</summary>
     public void Dispose()
@@ -39,8 +38,8 @@ internal sealed class SocketLibraryLink(LibraryLinkOptions options, TimeProvider
         _gate.Dispose();
     }
 
-    /// <summary>Asks one question; null when the application cannot be reached, does not answer in time or answers without data.</summary>
-    private async Task<string?> AskAsync(PullKind kind, CancellationToken ct)
+    /// <summary>Asks one question; null when the application cannot be reached or does not answer in time.</summary>
+    private async Task<PullResult?> AskAsync(PullKind kind, long cursor, CancellationToken ct)
     {
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -51,7 +50,7 @@ internal sealed class SocketLibraryLink(LibraryLinkOptions options, TimeProvider
             {
                 var stream = _stream ??= await ConnectAsync(linked.Token).ConfigureAwait(false);
                 var request = ++_nextRequest;
-                await FrameCodec.WriteAsync(stream, new Pull(request, kind, 0), ct: linked.Token).ConfigureAwait(false);
+                await FrameCodec.WriteAsync(stream, new Pull(request, kind, cursor), ct: linked.Token).ConfigureAwait(false);
 
                 // Answers to earlier questions that timed out may still be on the way; skip them.
                 while (await FrameCodec.ReadAsync(stream, ct: linked.Token).ConfigureAwait(false) is { } message)
@@ -59,7 +58,7 @@ internal sealed class SocketLibraryLink(LibraryLinkOptions options, TimeProvider
                     if (message is PullResult result && result.RequestId == request)
                     {
                         NoteReachable();
-                        return result.PayloadJson;
+                        return result;
                     }
                 }
 

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Monitoring.Protocol.Health;
+using Monitoring.Protocol.Messages;
 using Monitoring.Protocol.Reports;
 using Monitoring.Sidecar.Features.LibraryLink;
 using Monitoring.Sidecar.Features.Probing;
@@ -267,6 +268,6 @@ public class ProbeServiceTests
             return Task.FromResult<HealthReport?>(Unreachable ? null : Health);
         }
 
-        public Task<MetricsReport?> GetMetricsAsync(CancellationToken ct) => Task.FromResult<MetricsReport?>(null);
+        public Task<PullResult?> PullAsync(PullKind kind, long cursor, CancellationToken ct) => Task.FromResult<PullResult?>(null);
     }
 }

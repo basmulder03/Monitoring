@@ -134,7 +134,7 @@ public class AgentSessionTests
     {
         // Arrange
         var fixture = new SessionFixture();
-        fixture.Link.Metrics = new MetricsReport([new MetricSeries("orders.placed", new Dictionary<string, string>(), 4)]);
+        fixture.Link.Answering(PullKind.Metrics, ReportPayload.Write(new MetricsReport([new MetricSeries("orders.placed", new Dictionary<string, string>(), 4)])));
         var agent = fixture.Start();
         await agent.AcceptAsync();
 
@@ -164,9 +164,64 @@ public class AgentSessionTests
         reply.ShouldBeOfType<PullResult>().PayloadJson.ShouldBeNull();
     }
 
+    [Fact]
+    public async Task RunAsync_passes_the_cursor_of_the_agent_on_and_the_cursor_of_the_application_back()
+    {
+        // Arrange
+        var fixture = new SessionFixture();
+        fixture.Link.Answering(PullKind.Spans, ReportPayload.Write(new SpansReport([])), cursor: 77);
+        var agent = fixture.Start();
+        await agent.AcceptAsync();
+
+        // Act
+        await agent.SendAsync(new Pull(46, PullKind.Spans, 50));
+        var reply = await agent.ReceiveAsync();
+
+        // Assert
+        var result = reply.ShouldBeOfType<PullResult>();
+        result.RequestId.ShouldBe(46);
+        result.Cursor.ShouldBe(77);
+        ReportPayload.ReadSpans(result.PayloadJson).ShouldNotBeNull();
+        fixture.Link.Asked.ShouldBe([(PullKind.Spans, 50)]);
+    }
+
+    [Fact]
+    public async Task RunAsync_answers_an_edges_pull_with_what_the_application_reports()
+    {
+        // Arrange
+        var fixture = new SessionFixture();
+        fixture.Link.Answering(PullKind.Edges, ReportPayload.Write(new EdgesReport([new EdgeReport("HTTP", "shop:80", 3, 0, 12, [3])])));
+        var agent = fixture.Start();
+        await agent.AcceptAsync();
+
+        // Act
+        await agent.SendAsync(new Pull(47, PullKind.Edges, 0));
+        var reply = await agent.ReceiveAsync();
+
+        // Assert
+        ReportPayload.ReadEdges(reply.ShouldBeOfType<PullResult>().PayloadJson)!.Edges.Single().Calls.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task RunAsync_keeps_the_agents_cursor_when_the_application_cannot_be_reached()
+    {
+        // Arrange
+        var fixture = new SessionFixture();
+        var agent = fixture.Start();
+        await agent.AcceptAsync();
+
+        // Act
+        await agent.SendAsync(new Pull(48, PullKind.Spans, 50));
+        var reply = await agent.ReceiveAsync();
+
+        // Assert
+        var result = reply.ShouldBeOfType<PullResult>();
+        result.Cursor.ShouldBe(50);
+        result.PayloadJson.ShouldBeNull();
+    }
+
     [Theory]
-    [InlineData(PullKind.Spans)]
-    [InlineData(PullKind.Edges)]
+    [InlineData((PullKind)99)]
     public async Task RunAsync_answers_kinds_of_data_it_does_not_provide_yet_with_nothing(PullKind kind)
     {
         // Arrange
