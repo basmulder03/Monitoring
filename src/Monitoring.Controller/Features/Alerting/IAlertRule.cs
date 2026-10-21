@@ -1,6 +1,6 @@
 namespace Monitoring.Controller.Features.Alerting;
 
-/// <summary>A state-based condition: "is this true for N minutes". Rules keep no state of their own.</summary>
+/// <summary>A state-based condition: "is this true for N minutes". Rules keep no state of their own, except what they need to see something change over time.</summary>
 internal interface IAlertRule
 {
     /// <summary>Unique, stable rule name; part of every alert key.</summary>

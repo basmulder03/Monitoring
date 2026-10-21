@@ -21,6 +21,8 @@ public static class AlertingSlice
         ArgumentOutOfRangeException.ThrowIfLessThan(options.InstanceUnhealthyWait, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.ServiceDownWait, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.ScopeUnknownWait, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.RestartLoopCount, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.RestartLoopWindow, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.EvaluationInterval, TimeSpan.Zero);
 
         services.AddLogging();
@@ -29,6 +31,7 @@ public static class AlertingSlice
         services.AddSingleton<IAlertRule, InstanceUnhealthyRule>();
         services.AddSingleton<IAlertRule, ServiceDownRule>();
         services.AddSingleton<IAlertRule, ScopeUnknownRule>();
+        services.AddSingleton<IAlertRule, RestartLoopRule>();
         services.AddSingleton<AlertEvaluator>();
         services.AddSingleton<IAlertEvaluator>(provider => provider.GetRequiredService<AlertEvaluator>());
         services.AddSingleton<IAlertState>(provider => provider.GetRequiredService<AlertEvaluator>());

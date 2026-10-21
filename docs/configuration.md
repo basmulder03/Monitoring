@@ -44,6 +44,8 @@ Logging is controlled by the usual `Logging:LogLevel` settings, for example `MON
 | `Controller:Registry:PurgeInterval` | `00:01:00` | How often expired Gone instances are dropped |
 | `Controller:Alerting:StartupGrace` | `00:10:00` | After startup no alert rule is evaluated for this long, so agents can send their snapshots first |
 | `Controller:Alerting:InstanceUnhealthyWait` | `00:00:30` | How long an instance must stay Unhealthy before its alert fires |
+| `Controller:Alerting:RestartLoopCount` | `3` | How many restarts of an instance within the window raise the `restart-loop` warning. Counted from when the controller first saw the instance, so an old restart count alone never raises it |
+| `Controller:Alerting:RestartLoopWindow` | `00:10:00` | The time within which that many restarts count as a loop |
 | `Controller:Alerting:ServiceDownWait` | `00:00:00` | How long a service must have no instance able to serve before its alert fires |
 | `Controller:Alerting:EvaluationInterval` | `00:00:05` | How often the alert rules run |
 

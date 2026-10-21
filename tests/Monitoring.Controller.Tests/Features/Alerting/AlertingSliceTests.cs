@@ -33,7 +33,35 @@ public class AlertingSliceTests
         var rules = provider.GetServices<IAlertRule>().Select(r => r.Name);
 
         // Assert
-        rules.ShouldBe(["instance-unhealthy", "service-down", "scope-unknown"], ignoreOrder: true);
+        rules.ShouldBe(["instance-unhealthy", "service-down", "scope-unknown", "restart-loop"], ignoreOrder: true);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void AddAlerting_rejects_a_restart_count_below_one(int count)
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        var add = () => services.AddAlerting(o => o.RestartLoopCount = count);
+
+        // Assert
+        add.ShouldThrow<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void AddAlerting_rejects_a_restart_window_that_is_not_positive()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        var add = () => services.AddAlerting(o => o.RestartLoopWindow = TimeSpan.Zero);
+
+        // Assert
+        add.ShouldThrow<ArgumentOutOfRangeException>();
     }
 
     [Theory]

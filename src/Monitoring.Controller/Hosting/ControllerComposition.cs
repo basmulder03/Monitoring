@@ -52,6 +52,8 @@ internal static class ControllerComposition
                 var alerting = controller.Section("Alerting");
                 options.StartupGrace = alerting.Duration("StartupGrace", options.StartupGrace);
                 options.InstanceUnhealthyWait = alerting.Duration("InstanceUnhealthyWait", options.InstanceUnhealthyWait);
+                options.RestartLoopCount = alerting.Int("RestartLoopCount", options.RestartLoopCount);
+                options.RestartLoopWindow = alerting.Duration("RestartLoopWindow", options.RestartLoopWindow);
                 options.ServiceDownWait = alerting.Duration("ServiceDownWait", options.ServiceDownWait);
                 options.ScopeUnknownWait = alerting.Duration("ScopeUnknownWait", options.ScopeUnknownWait);
                 options.EvaluationInterval = alerting.Duration("EvaluationInterval", options.EvaluationInterval);
