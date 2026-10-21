@@ -1,6 +1,6 @@
-namespace Monitoring.Agent.Features.ControllerLink;
+namespace Monitoring.Agent.Shared;
 
-/// <summary>Exponential reconnect delays with jitter, so restarted agents do not all return at the same moment.</summary>
+/// <summary>Exponential retry delays with jitter, so restarted agents do not all return at the same moment.</summary>
 internal static class Backoff
 {
     /// <summary>Computes how long to wait before the next connection attempt.</summary>

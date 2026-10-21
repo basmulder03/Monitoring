@@ -1,8 +1,8 @@
-using Monitoring.Agent.Features.ControllerLink;
+using Monitoring.Agent.Shared;
 using Shouldly;
 using Xunit;
 
-namespace Monitoring.Agent.Tests.Features.ControllerLink;
+namespace Monitoring.Agent.Tests.Shared;
 
 public class BackoffTests
 {

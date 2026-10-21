@@ -1,5 +1,6 @@
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
+using Monitoring.Agent.Shared;
 using Monitoring.Protocol.Messages;
 
 namespace Monitoring.Agent.Features.ControllerLink;
