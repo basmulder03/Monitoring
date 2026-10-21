@@ -8,7 +8,7 @@ namespace Monitoring.Controller.Features.AgentLink;
 public static class AgentLinkSlice
 {
     /// <summary>
-    /// Adds the listener for agent connections. It needs the registry and an <see cref="Security.IAgentAuthenticator"/>,
+    /// Adds the listener for agent connections and the background service that runs it. It needs the registry and an <see cref="Security.IAgentAuthenticator"/>,
     /// so <c>AddRegistry</c> and <c>AddSecurity</c> must be called as well.
     /// </summary>
     /// <param name="services">The service collection to extend.</param>
@@ -35,6 +35,7 @@ public static class AgentLinkSlice
         services.AddSingleton(options);
         services.AddSingleton<AgentConnectionHandler>();
         services.AddSingleton<IAgentListener, AgentListener>();
+        services.AddHostedService<AgentListenerService>();
         return services;
     }
 }

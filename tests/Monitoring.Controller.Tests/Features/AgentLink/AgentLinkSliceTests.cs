@@ -81,4 +81,17 @@ public class AgentLinkSliceTests
         // Assert
         add.ShouldThrow<ArgumentOutOfRangeException>();
     }
+
+    [Fact]
+    public void AddAgentLink_registers_the_listener_service_as_a_hosted_service()
+    {
+        // Arrange
+        using var provider = new ServiceCollection().AddRegistry().AddSecurity(_ => { }).AddAgentLink().BuildServiceProvider();
+
+        // Act
+        var hosted = provider.GetServices<Microsoft.Extensions.Hosting.IHostedService>();
+
+        // Assert
+        hosted.ShouldContain(service => service.GetType().Name == "AgentListenerService");
+    }
 }
