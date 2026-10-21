@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Monitoring.Controller.Features.Alerting;
 using Monitoring.Controller.Features.Dashboard;
 using Monitoring.Controller.Features.Health;
+using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Registry;
 using Shouldly;
 using Xunit;
@@ -14,7 +15,7 @@ public class DashboardSliceTests
     public void AddDashboard_makes_the_model_resolvable_together_with_what_it_reads_from()
     {
         // Arrange
-        using var provider = new ServiceCollection().AddRegistry().AddHealth().AddAlerting().AddDashboard().BuildServiceProvider();
+        using var provider = new ServiceCollection().AddRegistry().AddLiveness().AddHealth().AddAlerting().AddDashboard().BuildServiceProvider();
 
         // Act
         var model = provider.GetService<DashboardModel>();

@@ -7,6 +7,7 @@ using Microsoft.Extensions.Time.Testing;
 using Monitoring.Controller.Features.Alerting;
 using Monitoring.Controller.Features.Dashboard;
 using Monitoring.Controller.Features.Health;
+using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Tests.Shared;
 using Monitoring.Protocol.Health;
@@ -108,6 +109,7 @@ public class OverviewStreamTests
             builder.WebHost.UseTestServer();
             builder.Services.AddSingleton<TimeProvider>(Clock);
             builder.Services.AddSingleton<IScopeRegistry>(Registry);
+            builder.Services.AddSingleton<IAgentLiveness>(new FakeAgentLiveness());
             builder.Services.AddSingleton<IHealthRollup, HealthRollup>();
             builder.Services.AddSingleton<IAlertState>(new NoAlerts());
             builder.Services.AddDashboard();

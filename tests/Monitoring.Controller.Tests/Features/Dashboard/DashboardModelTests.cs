@@ -182,6 +182,84 @@ public class DashboardModelTests
     }
 
     [Fact]
+    public void BuildOverview_marks_a_scope_with_a_live_agent_as_connected_without_a_last_seen_time()
+    {
+        // Arrange
+        var model = new ModelFixture().WithInstance("shop", "orders", Running, Healthy).Build();
+
+        // Act
+        var scope = model.BuildOverview().Scopes.Single();
+
+        // Assert: a time that keeps changing would make every heartbeat look like a change
+        scope.AgentConnected.ShouldBeTrue();
+        scope.LastSeen.ShouldBeNull();
+    }
+
+    [Fact]
+    public void BuildOverview_shows_a_scope_whose_agent_is_gone_as_unknown_with_the_time_it_was_last_heard_from()
+    {
+        // Arrange
+        var lastSeen = new DateTimeOffset(2026, 10, 21, 9, 0, 0, TimeSpan.Zero);
+        var model = new ModelFixture().WithInstance("shop", "orders", Running, Healthy).WithAgentGone("shop", lastSeen).Build();
+
+        // Act
+        var scope = model.BuildOverview().Scopes.Single();
+
+        // Assert
+        scope.AgentConnected.ShouldBeFalse();
+        scope.Health.ShouldBe(Unknown);
+        scope.LastSeen.ShouldBe(lastSeen);
+    }
+
+    [Fact]
+    public void BuildOverview_keeps_the_last_known_counts_of_a_scope_whose_agent_is_gone()
+    {
+        // Arrange
+        var model = new ModelFixture()
+            .WithInstance("shop", "orders", Running, Healthy)
+            .WithInstance("shop", "orders", Running, Degraded)
+            .WithAgentGone("shop")
+            .Build();
+
+        // Act
+        var scope = model.BuildOverview().Scopes.Single();
+
+        // Assert
+        scope.Instances.ShouldBe(2);
+        scope.Problems.ShouldBe(1);
+    }
+
+    [Fact]
+    public void BuildScope_says_whether_the_agent_is_connected_and_when_it_was_last_heard_from()
+    {
+        // Arrange
+        var lastSeen = new DateTimeOffset(2026, 10, 21, 9, 0, 0, TimeSpan.Zero);
+        var model = new ModelFixture().WithInstance("shop", "orders", Running, Healthy).WithAgentGone("shop", lastSeen).Build();
+
+        // Act
+        var scope = model.BuildScope("shop")!;
+
+        // Assert
+        scope.AgentConnected.ShouldBeFalse();
+        scope.LastSeen.ShouldBe(lastSeen);
+        scope.Services.Single().Health.ShouldBe(Healthy);
+    }
+
+    [Fact]
+    public void BuildScope_has_no_last_seen_time_while_the_agent_is_connected()
+    {
+        // Arrange
+        var model = new ModelFixture().WithInstance("shop", "orders", Running, Healthy).Build();
+
+        // Act
+        var scope = model.BuildScope("shop")!;
+
+        // Assert
+        scope.AgentConnected.ShouldBeTrue();
+        scope.LastSeen.ShouldBeNull();
+    }
+
+    [Fact]
     public void BuildScope_is_null_for_a_scope_that_is_not_known()
     {
         // Arrange
@@ -214,6 +292,7 @@ public class DashboardModelTests
         private readonly FakeScopeRegistry _registry = new();
         private readonly List<Alert> _alerts = [];
         private readonly DashboardOptions _options = new();
+        private readonly FakeAgentLiveness _liveness = new();
 
         public ModelFixture WithInstance(string scope, string service, InstanceLifecycle lifecycle, HealthState health, string? id = null)
         {
@@ -224,6 +303,12 @@ public class DashboardModelTests
         public ModelFixture WithEmptyScope(string scope)
         {
             _registry.WithEmptyScope(scope);
+            return this;
+        }
+
+        public ModelFixture WithAgentGone(string scope, DateTimeOffset? lastSeen = null)
+        {
+            _liveness.WithDeadScope(scope, lastSeen);
             return this;
         }
 
@@ -245,7 +330,7 @@ public class DashboardModelTests
             return this;
         }
 
-        public DashboardModel Build() => new(_registry, new HealthRollup(_registry), new FixedAlerts(_alerts), _options);
+        public DashboardModel Build() => new(_registry, new HealthRollup(_registry, _liveness), new FixedAlerts(_alerts), _liveness, _options);
     }
 
     /// <summary>Alert state that returns the alerts it was given.</summary>

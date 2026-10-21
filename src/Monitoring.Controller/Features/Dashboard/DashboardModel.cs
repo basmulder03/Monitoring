@@ -1,5 +1,6 @@
 using Monitoring.Controller.Features.Alerting;
 using Monitoring.Controller.Features.Health;
+using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Instances;
@@ -10,8 +11,10 @@ namespace Monitoring.Controller.Features.Dashboard;
 /// <param name="registry">The instances per scope.</param>
 /// <param name="health">The health roll-up per service and scope.</param>
 /// <param name="alerts">The alerts that are firing.</param>
+/// <param name="liveness">Tells whether each scope's agent is alive.</param>
 /// <param name="options">Provides the label names to group by.</param>
-internal sealed class DashboardModel(IScopeRegistry registry, IHealthRollup health, IAlertState alerts, DashboardOptions options)
+internal sealed class DashboardModel(
+    IScopeRegistry registry, IHealthRollup health, IAlertState alerts, IAgentLiveness liveness, DashboardOptions options)
 {
     /// <summary>Builds the overview: a summary per scope and the alerts that are firing.</summary>
     /// <returns>The overview.</returns>
@@ -55,19 +58,29 @@ internal sealed class DashboardModel(IScopeRegistry registry, IHealthRollup heal
             .ThenBy(service => service.Name, StringComparer.Ordinal)
             .ToList();
 
-        return new ScopeDetail(scopeName, health.GetScopeHealth(scopeName), services, new Dictionary<string, string>(registry.GetScopeLabels(scopeName)));
+        var agent = liveness.GetScopeLiveness(scopeName);
+        return new ScopeDetail(
+            scopeName,
+            health.GetScopeHealth(scopeName),
+            services,
+            new Dictionary<string, string>(registry.GetScopeLabels(scopeName)),
+            agent.IsLive,
+            agent.IsLive ? null : agent.LastSeen);
     }
 
     private ScopeSummary Summarize(string scopeName)
     {
         var live = registry.GetInstances(scopeName).Where(IsLive).ToList();
+        var agent = liveness.GetScopeLiveness(scopeName);
         return new ScopeSummary(
             scopeName,
             health.GetScopeHealth(scopeName),
             health.GetServiceHealth(scopeName).Count,
             live.Count,
             live.Count(instance => instance.Health != HealthState.Healthy),
-            new Dictionary<string, string>(registry.GetScopeLabels(scopeName)));
+            new Dictionary<string, string>(registry.GetScopeLabels(scopeName)),
+            agent.IsLive,
+            agent.IsLive ? null : agent.LastSeen);
     }
 
     private static bool IsLive(InstanceInfo instance) =>

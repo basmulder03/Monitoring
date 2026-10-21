@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Monitoring.Controller.Features.Alerting;
 using Monitoring.Controller.Features.Dashboard;
 using Monitoring.Controller.Features.Health;
+using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Tests.Shared;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Instances;
@@ -47,6 +48,7 @@ public class DashboardEndpointsTests
         scope.GetProperty("name").GetString().ShouldBe("shop");
         scope.GetProperty("health").GetString().ShouldBe("Unhealthy");
         scope.GetProperty("instances").GetInt32().ShouldBe(1);
+        scope.GetProperty("agentConnected").GetBoolean().ShouldBeTrue();
         json.RootElement.GetProperty("alerts").GetArrayLength().ShouldBe(0);
         json.RootElement.GetProperty("groupBy").EnumerateArray().Select(k => k.GetString()).ShouldBe(["environment", "datacenter"]);
     }
@@ -194,6 +196,7 @@ public class DashboardEndpointsTests
             var builder = WebApplication.CreateSlimBuilder();
             builder.WebHost.UseTestServer();
             builder.Services.AddSingleton<Monitoring.Controller.Features.Registry.IScopeRegistry>(_registry);
+            builder.Services.AddSingleton<IAgentLiveness>(new FakeAgentLiveness());
             builder.Services.AddSingleton<IHealthRollup, HealthRollup>();
             builder.Services.AddSingleton<IAlertState>(new NoAlerts());
             builder.Services.AddDashboard();
