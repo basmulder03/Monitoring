@@ -125,7 +125,7 @@ One message set is used on every hop, serialized as JSON with System.Text.Json s
 
 | Message | Direction | Purpose |
 | --- | --- | --- |
-| `Hello` | Child to parent | Identity: protocol version, instance id, service name, version, labels (for example `environment`, `datacenter`, `namespace`) |
+| `Hello` | Child to parent | Identity: protocol version, instance id, service name, version, labels (for example `environment`, `datacenter`, `namespace`), and for an agent the scope it reports as |
 | `Heartbeat` | Child to parent | Every 5 s; sequence number plus a one-byte health summary |
 | `Pull` / `PullResult` | Parent to child and back | Request info, health checks, metrics or spans since a cursor |
 | `Snapshot` | Agent to controller | Full state of the agent's scope; on connect and every 5 minutes as reconciliation |
@@ -159,7 +159,7 @@ Two independent settings, each behind its own interface (`ITransportSecurity`, `
 
 | Authentication | How an agent proves who it is | Notes |
 | --- | --- | --- |
-| `token` (default) | Sends a per-scope token in `Hello` | The controller config holds only token hashes and the scope each token may report as; two tokens per scope can be valid during rotation |
+| `token` (default) | Sends a token in `Hello`, together with the scope it reports as | The controller config holds only token hashes, never a list of agents. An enrollment token (scope `*`) lets any agent that holds it register itself under the scope it announces; a token can also be bound to one scope, so its holders can only report as that scope. Two tokens per scope can be valid during rotation |
 | `serviceAccount` | Sends its projected Kubernetes service account token; the controller validates it | No secrets to hand out and automatic rotation; Kubernetes only, and the controller needs access to each cluster's token review or OIDC endpoint |
 | `certificate` | The client certificate from `mtls` | Built-in enrollment: the agent generates a key in memory and the controller signs a short-lived certificate after a token check; or certificates from cert-manager or the company PKI |
 

@@ -38,7 +38,9 @@ internal sealed class AgentConnectionHandler(
             var identity = await HandshakeAsync(stream, ct).ConfigureAwait(false);
             if (identity is not null)
             {
+                logger.LogInformation("Agent for scope '{Scope}' connected", identity.ScopeName);
                 await ReceiveAsync(stream, identity, ct).ConfigureAwait(false);
+                logger.LogInformation("Agent for scope '{Scope}' disconnected", identity.ScopeName);
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
