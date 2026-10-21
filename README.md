@@ -35,7 +35,7 @@ dotnet build
 dotnet test
 ```
 
-Node.js is needed for the page script tests, and the browser tests download a Chromium build the first time. [docs/testing.md](docs/testing.md) explains both.
+Node.js 22 or later is needed to build the dashboard (TypeScript, see [src/Monitoring.Ui/ui](src/Monitoring.Ui/ui/README.md)), and the browser tests download a Chromium build the first time. [docs/testing.md](docs/testing.md) explains both.
 
 ## Run
 

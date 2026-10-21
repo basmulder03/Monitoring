@@ -1,0 +1,43 @@
+/* Design tokens. Text colours keep a contrast of at least 4.5:1 on the surfaces they sit on, UI parts at least 3:1.
+   The tests check this, so change a colour only together with its pair. */
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --surface: #f3f5f7;
+  --fg: #14181c;
+  --muted: #475059;
+  --border: #6b7680;
+  --focus: #0b57d0;
+  --healthy: #0b6e2e;
+  --degraded: #7a4f00;
+  --unhealthy: #b3261e;
+  --unknown: #4a5560;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1217;
+    --surface: #171d24;
+    --fg: #eef2f6;
+    --muted: #b4bec8;
+    --border: #8996a3;
+    --focus: #8ab4ff;
+    --healthy: #62d68c;
+    --degraded: #f2b84b;
+    --unhealthy: #ff8f86;
+    --unknown: #b4bec8;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0e1217;
+  --surface: #171d24;
+  --fg: #eef2f6;
+  --muted: #b4bec8;
+  --border: #8996a3;
+  --focus: #8ab4ff;
+  --healthy: #62d68c;
+  --degraded: #f2b84b;
+  --unhealthy: #ff8f86;
+  --unknown: #b4bec8;
+}

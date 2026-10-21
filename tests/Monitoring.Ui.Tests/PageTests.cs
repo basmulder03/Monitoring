@@ -72,31 +72,37 @@ public class PageTests
     [InlineData("innerHTML")]
     [InlineData("outerHTML")]
     [InlineData("insertAdjacentHTML")]
+    [InlineData("dangerouslySetInnerHTML")]
     [InlineData("document.write")]
     [InlineData("eval(")]
-    public void The_script_never_puts_data_into_the_page_as_markup(string forbidden)
+    public void The_source_never_puts_data_into_the_page_as_markup(string forbidden)
     {
-        // Arrange: names and labels come from agents and must only ever be shown as text
-        var script = UiAssets.ReadText("app.js")!;
+        // Arrange: names and labels come from agents and must only ever be shown as text.
+        // The source is looked at rather than the bundle, which contains the framework and what it can do.
+        var sources = Directory.EnumerateFiles(SourceDirectory(), "*.ts*", SearchOption.AllDirectories).ToList();
 
         // Act
-        var uses = script.Contains(forbidden, StringComparison.Ordinal);
+        var offenders = sources.Where(file => File.ReadAllText(file).Contains(forbidden, StringComparison.Ordinal)).ToList();
 
         // Assert
-        uses.ShouldBeFalse();
+        sources.ShouldNotBeEmpty();
+        offenders.ShouldBeEmpty();
     }
 
     [Fact]
-    public void The_script_listens_to_the_live_stream_and_to_its_keep_alive()
+    public void The_page_listens_to_the_live_stream_and_to_its_keep_alive()
     {
         // Arrange
-        var script = UiAssets.ReadText("app.js")!;
+        var services = File.ReadAllText(Path.Combine(SourceDirectory(), "services", "browserServices.ts"));
 
         // Act
-        var listens = script.Contains("new EventSource(\"/api/events\")", StringComparison.Ordinal)
-            && script.Contains("addEventListener(\"keep-alive\"", StringComparison.Ordinal);
+        var listens = services.Contains("new EventSource(\"/api/events\")", StringComparison.Ordinal)
+            && services.Contains("addEventListener(\"keep-alive\"", StringComparison.Ordinal);
 
         // Assert
         listens.ShouldBeTrue();
     }
+
+    private static string SourceDirectory([System.Runtime.CompilerServices.CallerFilePath] string file = "") =>
+        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(file)!, "..", "..", "src", "Monitoring.Ui", "ui", "src"));
 }

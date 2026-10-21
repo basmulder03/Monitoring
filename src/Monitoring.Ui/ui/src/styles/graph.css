@@ -1,0 +1,14 @@
+.graph-frame { overflow-x: auto; padding: 0.5rem 0; }
+svg.graph { width: 100%; height: auto; min-width: 480px; max-height: 70vh; }
+svg.graph .node rect { fill: var(--surface); stroke: var(--border); stroke-width: 1.5; }
+svg.graph .node { cursor: pointer; }
+svg.graph .node:focus-visible rect, svg.graph .node.selected rect { stroke: var(--focus); stroke-width: 3; }
+svg.graph .node.unhealthy rect { stroke: var(--unhealthy); stroke-width: 3; }
+svg.graph .node.degraded rect { stroke: var(--degraded); stroke-width: 3; }
+svg.graph .node-name { fill: var(--fg); font-size: 14px; font-weight: 600; }
+svg.graph .node-kind { fill: var(--muted); font-size: 12px; }
+svg.graph .edge path { stroke: var(--muted); }
+svg.graph .edge.failing path { stroke: var(--unhealthy); }
+svg.graph .arrow { fill: var(--muted); }
+svg.graph .edge-label { fill: var(--unhealthy); font-size: 12px; font-weight: 600; }
+svg.graph .dim { opacity: 0.25; }

@@ -7,7 +7,7 @@ namespace Monitoring.Ui.Tests;
 public class ContrastTests
 {
     private const string Light = ":root";
-    private const string Dark = ":root[data-theme=\"dark\"]";
+    private const string Dark = ":root[data-theme=dark]";
 
     private static readonly string[] TextTokens = ["fg", "muted", "healthy", "degraded", "unhealthy", "unknown"];
 
@@ -46,9 +46,9 @@ public class ContrastTests
     [InlineData(":root", "border", "bg")]
     [InlineData(":root", "border", "surface")]
     [InlineData(":root", "focus", "bg")]
-    [InlineData(":root[data-theme=\"dark\"]", "border", "bg")]
-    [InlineData(":root[data-theme=\"dark\"]", "border", "surface")]
-    [InlineData(":root[data-theme=\"dark\"]", "focus", "bg")]
+    [InlineData(":root[data-theme=dark]", "border", "bg")]
+    [InlineData(":root[data-theme=dark]", "border", "surface")]
+    [InlineData(":root[data-theme=dark]", "focus", "bg")]
     public void Borders_and_focus_rings_have_a_contrast_of_at_least_3_to_1(string theme, string part, string background)
     {
         // Arrange
@@ -69,7 +69,7 @@ public class ContrastTests
         var forced = CssTokens.Read(css, Dark);
 
         // Act
-        var followsSystem = CssTokens.Read(css, "  :root:not([data-theme=\"light\"])");
+        var followsSystem = CssTokens.Read(css, "  :root:not([data-theme=light])");
 
         // Assert
         followsSystem.ShouldBe(forced);

@@ -3,3 +3,4 @@ obj/
 artifacts/
 .idea/
 node_modules/
+src/Monitoring.Ui/wwwroot/

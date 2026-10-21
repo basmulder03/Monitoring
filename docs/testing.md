@@ -6,14 +6,16 @@ which are installed for you the first time they are needed, and are skipped with
 | Tests | Where | Needs | Installed by |
 | --- | --- | --- | --- |
 | Unit and component tests | `tests/*` | .NET SDK | NuGet |
-| Page script in a DOM (jsdom) | `tests/Monitoring.Ui.Tests` | Node and npm | The build runs `npm ci` when `node_modules` is missing |
+| Dashboard components and logic, in a DOM (Vitest and jsdom) | `src/Monitoring.Ui/ui/test` | Node and npm | The build of `Monitoring.Ui` runs `npm ci` |
 | Dashboard in a real browser, with axe accessibility checks | `tests/Monitoring.Component.Tests/Browser` | A Chromium build, and its system libraries | The test fixture runs Playwright's installer when the browser is missing |
 
-## Page script (jsdom)
+## Dashboard (TypeScript)
 
-`tests/Monitoring.Ui.Tests` runs the real `index.html` and `app.js` in jsdom and checks grouping, filtering, escaping of agent data,
-alerts, announcements and themes. `package.json` and `package-lock.json` list the dependencies; the build runs `npm ci` itself.
-To do it by hand, run `npm ci` in that folder. Set `SkipNodeDependencies=true` to stop the build from doing it.
+The dashboard in `src/Monitoring.Ui/ui` is built with Node, which the build of `Monitoring.Ui` needs (Node 22 or later); it runs `npm ci` and `npm run build` itself and stops with a message when npm is missing.
+`dotnet test` runs the Vitest tests as one test (`DashboardTests`); to work on them directly, run `npm test` in that folder. The tests mount the real app against fakes for the browser (clock, timers, the live stream, storage),
+and use the generated contract types, so a fixture that no longer matches what the controller sends does not compile.
+
+`tests/Monitoring.Ui.Tests` also checks that `contracts.ts` matches the C# types (regenerate with `UPDATE_CONTRACTS=1`), that the design tokens have enough contrast in both themes, and that no source file can put data into the page as markup.
 
 ## Browser tests (Playwright and axe)
 

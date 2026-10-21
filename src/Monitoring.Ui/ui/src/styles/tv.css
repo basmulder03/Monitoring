@@ -1,0 +1,9 @@
+/* Wall display: the page rotates and is read from across a room, so type scales with the screen and the cursor is hidden. */
+body.tv { cursor: none; font-size: clamp(1.25rem, 2.2vw, 3rem); }
+body.tv .tiles { grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr)); }
+body.tv #theme-toggle { display: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .tile { transition: transform 0.1s; }
+  .tile:hover { transform: translateY(-1px); }
+}

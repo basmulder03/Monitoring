@@ -1,0 +1,29 @@
+.group { margin: 0 0 1rem; }
+.group .group { margin-left: 0.5rem; padding-left: 0.75rem; border-left: 2px solid var(--border); }
+.filter { margin: 0 0 1rem; }
+.filter select { font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--border); border-radius: 0.4rem; padding: 0.25rem 0.5rem; }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 0.75rem; list-style: none; margin: 0; padding: 0; }
+.tile {
+  display: flex; flex-direction: column; gap: 0.25rem; height: 100%;
+  padding: 0.75rem 1rem; text-decoration: none;
+  background: var(--surface); border: 1px solid var(--border); border-left-width: 0.5rem; border-radius: 0.5rem;
+}
+.tile .name { font-weight: 700; overflow-wrap: anywhere; }
+.status { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 600; }
+.status.healthy { color: var(--healthy); }
+.status.degraded { color: var(--degraded); }
+.status.unhealthy { color: var(--unhealthy); }
+.status.unknown { color: var(--unknown); }
+.tile.healthy { border-left-color: var(--healthy); }
+.tile.degraded { border-left-color: var(--degraded); }
+.tile.unhealthy { border-left-color: var(--unhealthy); }
+.tile.unknown { border-left-color: var(--unknown); }
+
+.disconnected { color: var(--unhealthy); font-weight: 600; }
+
+.alerts { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.alert { display: flex; gap: 0.75rem; align-items: baseline; flex-wrap: wrap; padding: 0.5rem 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 0.5rem; }
+.alert .severity { font-weight: 700; }
+.alert .severity.critical { color: var(--unhealthy); }
+.alert .severity.warning { color: var(--degraded); }

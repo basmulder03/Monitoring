@@ -9,18 +9,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Monitoring.Ui/Monitoring.Ui.csproj" />
+    <ProjectReference Include="../../src/Monitoring.Controller/Monitoring.Controller.csproj" />
   </ItemGroup>
 
-  <!-- The page script is tested in jsdom. Its dependencies come from npm, and the build fetches them when they are missing.
-       Without npm (or without network) the build goes on and the script test is skipped with an explanation.
-       Behind a proxy that inspects TLS, make Node trust the system certificates with the NODE_OPTIONS setting use-system-ca (see docs/testing.md). -->
-  <Target Name="InstallScriptTestDependencies" BeforeTargets="BeforeBuild"
-          Condition="!Exists('$(MSBuildProjectDirectory)/node_modules/jsdom') And '$(SkipNodeDependencies)' != 'true'">
-    <Exec Command="npm ci" WorkingDirectory="$(MSBuildProjectDirectory)" IgnoreExitCode="true" ContinueOnError="true"
-          StandardOutputImportance="low" StandardErrorImportance="low">
-      <Output TaskParameter="ExitCode" PropertyName="NpmExitCode" />
-    </Exec>
-    <Message Importance="high" Condition="'$(NpmExitCode)' != '0'"
-             Text="npm ci did not succeed (exit code $(NpmExitCode)), so the page script tests will be skipped. See docs/testing.md." />
-  </Target>
 </Project>

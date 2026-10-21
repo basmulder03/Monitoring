@@ -1,9 +1,0 @@
-{
-  "name": "monitoring-ui-tests",
-  "private": true,
-  "version": "0.0.0",
-  "description": "Test-only dependencies for the dashboard page: jsdom runs the page script in a real DOM.",
-  "devDependencies": {
-    "jsdom": "^30.1.3"
-  }
-}
