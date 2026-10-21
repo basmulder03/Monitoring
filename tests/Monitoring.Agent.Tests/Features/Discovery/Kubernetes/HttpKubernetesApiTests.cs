@@ -1,0 +1,302 @@
+using System.Net;
+using System.Text;
+using System.Text.Json;
+using Monitoring.Agent.Features.Discovery.Kubernetes;
+using Monitoring.Agent.Features.Discovery.Kubernetes.Models;
+using Monitoring.Agent.Tests.Shared;
+using Shouldly;
+using Xunit;
+
+namespace Monitoring.Agent.Tests.Features.Discovery.Kubernetes;
+
+public class HttpKubernetesApiTests
+{
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    [Fact]
+    public async Task ListPodsAsync_gets_the_pods_of_the_namespace()
+    {
+        // Arrange
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, ApiJson.List("10"));
+
+        // Act
+        await server.Api.ListPodsAsync("shop", Ct);
+
+        // Assert
+        server.Requests.Single().ShouldBe("GET api/v1/namespaces/shop/pods");
+    }
+
+    [Fact]
+    public async Task ListPodsAsync_escapes_the_namespace_in_the_path()
+    {
+        // Arrange
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, ApiJson.List("10"));
+
+        // Act
+        await server.Api.ListPodsAsync("a/b c", Ct);
+
+        // Assert
+        server.Requests.Single().ShouldBe("GET api/v1/namespaces/a%2Fb%20c/pods");
+    }
+
+    [Fact]
+    public async Task ListPodsAsync_returns_the_pods_and_the_version_to_watch_from()
+    {
+        // Arrange
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, ApiJson.List("42", new PodBuilder().Named("a").Build(), new PodBuilder().Named("b").Build()));
+
+        // Act
+        var result = await server.Api.ListPodsAsync("shop", Ct);
+
+        // Assert
+        result.ResourceVersion.ShouldBe("42");
+        result.Pods.Select(p => p.Metadata.Name).ShouldBe(["a", "b"]);
+    }
+
+    [Fact]
+    public async Task ListPodsAsync_returns_no_pods_when_the_list_has_no_items()
+    {
+        // Arrange
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, """{"metadata":{"resourceVersion":"7"}}""");
+
+        // Act
+        var result = await server.Api.ListPodsAsync("shop", Ct);
+
+        // Assert
+        result.Pods.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ListPodsAsync_fails_when_the_answer_has_no_resource_version()
+    {
+        // Arrange
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, """{"items":[]}""");
+
+        // Act
+        var list = async () => await server.Api.ListPodsAsync("shop", Ct);
+
+        // Assert
+        await list.ShouldThrowAsync<KubernetesApiException>();
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Forbidden, 403)]
+    [InlineData(HttpStatusCode.Unauthorized, 401)]
+    [InlineData(HttpStatusCode.InternalServerError, 500)]
+    public async Task ListPodsAsync_reports_the_status_code_of_an_error_answer(HttpStatusCode status, int expected)
+    {
+        // Arrange
+        var server = new FakeApiServer().Answering(status, """{"message":"nope"}""");
+
+        // Act
+        var list = async () => await server.Api.ListPodsAsync("shop", Ct);
+
+        // Assert
+        var exception = await list.ShouldThrowAsync<KubernetesApiException>();
+        exception.StatusCode.ShouldBe(expected);
+        exception.Message.ShouldContain("nope");
+    }
+
+    [Fact]
+    public async Task ListPodsAsync_fails_clearly_on_unreadable_json()
+    {
+        // Arrange
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, "not json");
+
+        // Act
+        var list = async () => await server.Api.ListPodsAsync("shop", Ct);
+
+        // Assert
+        await list.ShouldThrowAsync<KubernetesApiException>();
+    }
+
+    [Fact]
+    public async Task WatchPodsAsync_asks_for_bookmarks_the_duration_and_the_version()
+    {
+        // Arrange
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, "");
+
+        // Act
+        await server.Api.WatchPodsAsync("shop", "42", TimeSpan.FromSeconds(59.2), Ct).ToListAsync(Ct);
+
+        // Assert
+        server.Requests.Single().ShouldBe(
+            "GET api/v1/namespaces/shop/pods?watch=true&allowWatchBookmarks=true&timeoutSeconds=60&resourceVersion=42");
+    }
+
+    [Theory]
+    [InlineData("ADDED", "Added")]
+    [InlineData("MODIFIED", "Modified")]
+    [InlineData("DELETED", "Deleted")]
+    public async Task WatchPodsAsync_yields_the_pod_and_the_version_of_each_change(string kind, string expected)
+    {
+        // Arrange
+        var pod = new PodBuilder().Named("orders-1").AtVersion("55").Build();
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, ApiJson.Event(kind, pod));
+
+        // Act
+        var events = await server.Api.WatchPodsAsync("shop", "1", TimeSpan.FromSeconds(60), Ct).ToListAsync(Ct);
+
+        // Assert
+        var podEvent = events.Single();
+        (podEvent.Type.ToString(), podEvent.Pod!.Metadata.Name, podEvent.ResourceVersion).ShouldBe((expected, "orders-1", "55"));
+    }
+
+    [Fact]
+    public async Task WatchPodsAsync_yields_a_bookmark_with_only_the_version()
+    {
+        // Arrange
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, """{"type":"BOOKMARK","object":{"metadata":{"resourceVersion":"99"}}}""");
+
+        // Act
+        var events = await server.Api.WatchPodsAsync("shop", "1", TimeSpan.FromSeconds(60), Ct).ToListAsync(Ct);
+
+        // Assert
+        events.Single().ShouldBe(new PodEvent(PodEventType.Bookmark, null, "99"));
+    }
+
+    [Fact]
+    public async Task WatchPodsAsync_yields_events_in_order_and_skips_blank_lines_and_unknown_types()
+    {
+        // Arrange
+        var body = string.Join("\n",
+            ApiJson.Event("ADDED", new PodBuilder().Named("a").Build()),
+            "",
+            """{"type":"SOMETHING_NEW","object":{}}""",
+            ApiJson.Event("DELETED", new PodBuilder().Named("b").Build()));
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, body);
+
+        // Act
+        var events = await server.Api.WatchPodsAsync("shop", "1", TimeSpan.FromSeconds(60), Ct).ToListAsync(Ct);
+
+        // Assert
+        events.Select(e => (e.Type, e.Pod!.Metadata.Name)).ShouldBe([(PodEventType.Added, "a"), (PodEventType.Deleted, "b")]);
+    }
+
+    [Fact]
+    public async Task WatchPodsAsync_signals_an_expired_version_reported_inside_the_stream()
+    {
+        // Arrange
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, """{"type":"ERROR","object":{"code":410,"message":"too old"}}""");
+
+        // Act
+        var watch = async () => await server.Api.WatchPodsAsync("shop", "1", TimeSpan.FromSeconds(60), Ct).ToListAsync(Ct);
+
+        // Assert
+        await watch.ShouldThrowAsync<KubernetesResourceExpiredException>();
+    }
+
+    [Fact]
+    public async Task WatchPodsAsync_reports_any_other_error_inside_the_stream()
+    {
+        // Arrange
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, """{"type":"ERROR","object":{"code":500,"message":"broken"}}""");
+
+        // Act
+        var watch = async () => await server.Api.WatchPodsAsync("shop", "1", TimeSpan.FromSeconds(60), Ct).ToListAsync(Ct);
+
+        // Assert
+        var exception = await watch.ShouldThrowAsync<KubernetesApiException>();
+        (exception.StatusCode, exception.Message).ShouldSatisfyAllConditions(
+            r => r.StatusCode.ShouldBe(500),
+            r => r.Message.ShouldContain("broken"));
+    }
+
+    [Fact]
+    public async Task WatchPodsAsync_signals_an_expired_version_answered_with_http_410()
+    {
+        // Arrange
+        var server = new FakeApiServer().Answering(HttpStatusCode.Gone, """{"message":"too old"}""");
+
+        // Act
+        var watch = async () => await server.Api.WatchPodsAsync("shop", "1", TimeSpan.FromSeconds(60), Ct).ToListAsync(Ct);
+
+        // Assert
+        await watch.ShouldThrowAsync<KubernetesResourceExpiredException>();
+    }
+
+    [Fact]
+    public async Task WatchPodsAsync_reports_an_http_error()
+    {
+        // Arrange
+        var server = new FakeApiServer().Answering(HttpStatusCode.InternalServerError, "oops");
+
+        // Act
+        var watch = async () => await server.Api.WatchPodsAsync("shop", "1", TimeSpan.FromSeconds(60), Ct).ToListAsync(Ct);
+
+        // Assert
+        (await watch.ShouldThrowAsync<KubernetesApiException>()).StatusCode.ShouldBe(500);
+    }
+
+    [Fact]
+    public async Task WatchPodsAsync_fails_clearly_on_an_unreadable_line()
+    {
+        // Arrange
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, "not json");
+
+        // Act
+        var watch = async () => await server.Api.WatchPodsAsync("shop", "1", TimeSpan.FromSeconds(60), Ct).ToListAsync(Ct);
+
+        // Assert
+        await watch.ShouldThrowAsync<KubernetesApiException>();
+    }
+
+    [Fact]
+    public async Task WatchPodsAsync_honours_cancellation()
+    {
+        // Arrange
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, ApiJson.Event("ADDED", new PodBuilder().Build()));
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        // Act
+        var watch = async () => await server.Api.WatchPodsAsync("shop", "1", TimeSpan.FromSeconds(60), cancelled.Token).ToListAsync(CancellationToken.None);
+
+        // Assert
+        await watch.ShouldThrowAsync<OperationCanceledException>();
+    }
+
+    /// <summary>Serialises API answers the way the Kubernetes API does.</summary>
+    private static class ApiJson
+    {
+        private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
+
+        public static string List(string version, params Pod[] pods) =>
+            JsonSerializer.Serialize(new PodList(new ListMetadata(version), [.. pods]), Options);
+
+        public static string Event(string kind, Pod pod) =>
+            JsonSerializer.Serialize(new { type = kind, @object = pod }, Options);
+    }
+
+    /// <summary>An API server stand-in that answers every request the same way and records what was asked.</summary>
+    private sealed class FakeApiServer
+    {
+        private readonly List<string> _requests = [];
+        private HttpStatusCode _status = HttpStatusCode.OK;
+        private string _body = "";
+
+        public IReadOnlyList<string> Requests => _requests;
+
+        public HttpKubernetesApi Api => new(new HttpClient(new StubHandler(this)) { BaseAddress = new Uri("https://kubernetes.test/") });
+
+        public FakeApiServer Answering(HttpStatusCode status, string body)
+        {
+            _status = status;
+            _body = body;
+            return this;
+        }
+
+        private sealed class StubHandler(FakeApiServer server) : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                server._requests.Add($"{request.Method} {request.RequestUri!.PathAndQuery.TrimStart('/')}");
+                return Task.FromResult(new HttpResponseMessage(server._status)
+                {
+                    Content = new StringContent(server._body, Encoding.UTF8, "application/json"),
+                });
+            }
+        }
+    }
+}
