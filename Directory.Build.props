@@ -1,0 +1,18 @@
+<Project>
+  <!-- Separate output per OS: restore results hold absolute package paths, so a Linux (WSL) build and a Windows IDE must not share obj/. -->
+  <PropertyGroup>
+    <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts/$(OS)</ArtifactsPath>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <!-- Production projects must stay Native AOT compatible: trim/AOT warnings fail the build. -->
+  <PropertyGroup Condition="!$(MSBuildProjectName.EndsWith('.Tests'))">
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+</Project>

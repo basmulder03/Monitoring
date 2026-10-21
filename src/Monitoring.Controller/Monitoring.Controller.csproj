@@ -1,0 +1,11 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Monitoring.Protocol\Monitoring.Protocol.csproj" />
+  </ItemGroup>
+  <PropertyGroup>
+    <PublishAot>true</PublishAot>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Monitoring.Agent/Monitoring.Agent.csproj" />
+    <Project Path="src/Monitoring.Client/Monitoring.Client.csproj" />
+    <Project Path="src/Monitoring.Controller/Monitoring.Controller.csproj" />
+    <Project Path="src/Monitoring.Protocol/Monitoring.Protocol.csproj" />
+    <Project Path="src/Monitoring.Sidecar/Monitoring.Sidecar.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Monitoring.Protocol.Tests/Monitoring.Protocol.Tests.csproj" />
+  </Folder>
+</Solution>
