@@ -10,5 +10,6 @@
     <Project Path="tests/Monitoring.Agent.Tests/Monitoring.Agent.Tests.csproj" />
     <Project Path="tests/Monitoring.Controller.Tests/Monitoring.Controller.Tests.csproj" />
     <Project Path="tests/Monitoring.Protocol.Tests/Monitoring.Protocol.Tests.csproj" />
+    <Project Path="tests/Monitoring.Tests.Shared/Monitoring.Tests.Shared.csproj" />
   </Folder>
 </Solution>

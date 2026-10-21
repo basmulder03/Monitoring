@@ -5,6 +5,7 @@ using Monitoring.Controller.Features.AgentLink;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Features.Security;
 using Monitoring.Controller.Tests.Shared;
+using Monitoring.Tests.Shared;
 using Monitoring.Protocol.Framing;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Instances;

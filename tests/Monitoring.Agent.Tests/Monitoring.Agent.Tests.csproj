@@ -11,4 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Monitoring.Agent/Monitoring.Agent.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Monitoring.Tests.Shared/Monitoring.Tests.Shared.csproj" />
+  </ItemGroup>
 </Project>
