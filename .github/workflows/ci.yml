@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build
+        run: dotnet build --configuration Release
+      - name: Install the browser for the dashboard tests
+        run: pwsh artifacts/Unix/bin/Monitoring.Component.Tests/release/playwright.ps1 install --with-deps chromium
+      - name: Test
+        run: dotnet test --configuration Release --no-build
