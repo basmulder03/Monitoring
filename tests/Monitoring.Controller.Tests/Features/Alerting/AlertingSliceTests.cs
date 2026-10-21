@@ -59,4 +59,32 @@ public class AlertingSliceTests
         // Assert
         add.ShouldThrow<ArgumentOutOfRangeException>();
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void AddAlerting_rejects_an_evaluation_interval_that_is_not_positive(int seconds)
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        var add = () => services.AddAlerting(o => o.EvaluationInterval = TimeSpan.FromSeconds(seconds));
+
+        // Assert
+        add.ShouldThrow<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void AddAlerting_registers_the_evaluation_service_as_a_hosted_service()
+    {
+        // Arrange
+        using var provider = new ServiceCollection().AddRegistry().AddAlerting().BuildServiceProvider();
+
+        // Act
+        var hosted = provider.GetServices<Microsoft.Extensions.Hosting.IHostedService>();
+
+        // Assert
+        hosted.ShouldContain(service => service.GetType().Name == "AlertEvaluationService");
+    }
 }

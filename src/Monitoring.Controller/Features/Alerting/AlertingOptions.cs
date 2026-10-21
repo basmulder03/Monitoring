@@ -14,4 +14,7 @@ public sealed class AlertingOptions
 
     /// <summary>How long a service must stay without a serving instance before the alert fires.</summary>
     public TimeSpan ServiceDownWait { get; set; } = TimeSpan.Zero;
+
+    /// <summary>How often the rules are evaluated.</summary>
+    public TimeSpan EvaluationInterval { get; set; } = TimeSpan.FromSeconds(5);
 }
