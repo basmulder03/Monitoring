@@ -11,5 +11,6 @@ internal sealed class MetricsPullSource(MetricsCollector collector) : IPullSourc
     public PullKind Kind => PullKind.Metrics;
 
     /// <inheritdoc />
-    public ValueTask<string?> ReadAsync(CancellationToken ct) => ValueTask.FromResult<string?>(ReportPayload.Write(collector.Read()));
+    public ValueTask<PullData> ReadAsync(long cursor, CancellationToken ct) =>
+        ValueTask.FromResult(new PullData(ReportPayload.Write(collector.Read()), cursor));
 }

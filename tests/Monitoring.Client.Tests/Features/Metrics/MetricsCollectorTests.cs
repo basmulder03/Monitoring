@@ -202,7 +202,7 @@ public class MetricsCollectorTests
         var source = new MetricsPullSource(fixture.Collector);
 
         // Act
-        var json = await source.ReadAsync(Ct);
+        var json = (await source.ReadAsync(0, Ct)).Payload;
 
         // Assert
         ReportPayload.ReadMetrics(json)!.Series.ShouldContain(s => s.Name == "orders.placed" && s.Value == 1);

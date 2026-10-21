@@ -11,5 +11,6 @@ internal sealed class InfoPullSource(InstanceDescriber describer) : IPullSource
     public PullKind Kind => PullKind.Info;
 
     /// <inheritdoc />
-    public ValueTask<string?> ReadAsync(CancellationToken ct) => ValueTask.FromResult<string?>(ReportPayload.Write(describer.Describe()));
+    public ValueTask<PullData> ReadAsync(long cursor, CancellationToken ct) =>
+        ValueTask.FromResult(new PullData(ReportPayload.Write(describer.Describe()), cursor));
 }

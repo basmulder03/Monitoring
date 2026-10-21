@@ -23,6 +23,18 @@ public static class ReportPayload
     public static string Write(MetricsReport report) =>
         JsonSerializer.Serialize(report, ReportJsonContext.Default.MetricsReport);
 
+    /// <summary>Writes the dependency edges of an application.</summary>
+    /// <param name="report">The report.</param>
+    /// <returns>The JSON text.</returns>
+    public static string Write(EdgesReport report) =>
+        JsonSerializer.Serialize(report, ReportJsonContext.Default.EdgesReport);
+
+    /// <summary>Writes the recent spans of an application.</summary>
+    /// <param name="report">The report.</param>
+    /// <returns>The JSON text.</returns>
+    public static string Write(SpansReport report) =>
+        JsonSerializer.Serialize(report, ReportJsonContext.Default.SpansReport);
+
     /// <summary>Reads a description of an application.</summary>
     /// <param name="json">The JSON text of a pull result.</param>
     /// <returns>The description, or <see langword="null"/> when the text is not one.</returns>
@@ -40,6 +52,18 @@ public static class ReportPayload
     /// <returns>The report, or <see langword="null"/> when the text is not one.</returns>
     public static MetricsReport? ReadMetrics(string? json) =>
         Read(json, ReportJsonContext.Default.MetricsReport);
+
+    /// <summary>Reads the dependency edges of an application.</summary>
+    /// <param name="json">The JSON text of a pull result.</param>
+    /// <returns>The report, or <see langword="null"/> when the text is not one.</returns>
+    public static EdgesReport? ReadEdges(string? json) =>
+        Read(json, ReportJsonContext.Default.EdgesReport);
+
+    /// <summary>Reads the recent spans of an application.</summary>
+    /// <param name="json">The JSON text of a pull result.</param>
+    /// <returns>The report, or <see langword="null"/> when the text is not one.</returns>
+    public static SpansReport? ReadSpans(string? json) =>
+        Read(json, ReportJsonContext.Default.SpansReport);
 
     private static T? Read<T>(string? json, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> type)
         where T : class

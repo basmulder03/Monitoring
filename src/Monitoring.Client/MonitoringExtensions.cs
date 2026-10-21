@@ -5,6 +5,7 @@ using Monitoring.Client.Features.Health;
 using Monitoring.Client.Features.Info;
 using Monitoring.Client.Features.LocalServer;
 using Monitoring.Client.Features.Metrics;
+using Monitoring.Client.Features.Tracing;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -36,6 +37,12 @@ public static class MonitoringExtensions
         services.TryAddSingleton<MetricsCollector>();
         services.AddHostedService(provider => provider.GetRequiredService<MetricsCollector>());
         services.AddSingleton<IPullSource, MetricsPullSource>();
+        services.TryAddSingleton(new EdgeCounters(options.MaxEdges));
+        services.TryAddSingleton(new SpanBuffer(options.SpanBufferSize));
+        services.TryAddSingleton<TraceCollector>();
+        services.AddHostedService(provider => provider.GetRequiredService<TraceCollector>());
+        services.AddSingleton<IPullSource, EdgesPullSource>();
+        services.AddSingleton<IPullSource, SpansPullSource>();
         services.TryAddSingleton<PullHandler>();
         services.AddHostedService<LocalServer>();
         return services;

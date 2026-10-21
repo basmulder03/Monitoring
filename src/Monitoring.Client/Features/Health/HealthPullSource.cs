@@ -11,6 +11,6 @@ internal sealed class HealthPullSource(HealthReporter reporter) : IPullSource
     public PullKind Kind => PullKind.Health;
 
     /// <inheritdoc />
-    public async ValueTask<string?> ReadAsync(CancellationToken ct) =>
-        ReportPayload.Write(await reporter.ReportAsync(ct).ConfigureAwait(false));
+    public async ValueTask<PullData> ReadAsync(long cursor, CancellationToken ct) =>
+        new(ReportPayload.Write(await reporter.ReportAsync(ct).ConfigureAwait(false)), cursor);
 }
