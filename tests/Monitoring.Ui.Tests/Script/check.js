@@ -154,7 +154,7 @@ test("says nothing about the agent for a scope whose agent is connected", () => 
 
 test("shows a banner in the scope view when the agent is not connected", async () => {
   const detail = { name: "shop", health: "Unknown", labels: {}, agentConnected: false, lastSeen: new Date(Date.now() - 120000).toISOString(),
-    services: [{ name: "orders", health: "Healthy", liveInstances: 1, healthyInstances: 1, instances: [{ id: "orders-1", lifecycle: "Running", health: "Healthy", labels: {} }] }] };
+    services: [{ name: "orders", health: "Healthy", liveInstances: 1, healthyInstances: 1, instances: [{ id: "orders-1", lifecycle: "Running", health: "Healthy", labels: {}, checks: [], containers: [], metrics: [] }] }] };
   const page = withOverview(overview([scope("shop", "Unknown", {}, { agentConnected: false })], []), { url: "http://controller/#/scopes/shop", scopeResponses: { shop: detail } });
   await page.settle();
   const text = page.app.textContent;
@@ -182,7 +182,7 @@ test("opens the scope view when the address changes and returns with the link ba
 });
 
 test("expands the services that are not healthy", async () => {
-  const instance = { id: "i-1", lifecycle: "Running", health: "Healthy", labels: {} };
+  const instance = { id: "i-1", lifecycle: "Running", health: "Healthy", labels: {}, checks: [], containers: [], metrics: [] };
   const detail = { name: "shop", health: "Degraded", labels: {}, agentConnected: true, services: [
     { name: "fine", health: "Healthy", liveInstances: 1, healthyInstances: 1, instances: [instance] },
     { name: "broken", health: "Unhealthy", liveInstances: 1, healthyInstances: 0, instances: [instance] }] };
@@ -190,6 +190,52 @@ test("expands the services that are not healthy", async () => {
   await page.settle();
   const open = all(page, "details.service").map((d) => [d.querySelector("strong").textContent, d.open]);
   assert.deepStrictEqual(open, [["fine", false], ["broken", true]]);
+});
+
+function detailWith(instance) {
+  return { name: "shop", health: "Degraded", labels: {}, agentConnected: true, services: [
+    { name: "orders", health: "Degraded", liveInstances: 1, healthyInstances: 0, instances: [instance] }] };
+}
+
+const podInstance = {
+  id: "orders-1", lifecycle: "Running", health: "Degraded", labels: {}, version: "1.2.3",
+  checks: [{ name: "database", health: "Degraded", description: "slow <b>query</b>" }],
+  metrics: [{ name: "a", labels: {}, value: 1 }],
+  containers: [
+    { name: "orders", role: "App", phase: "Running", health: "Degraded", ready: false, restarts: 3, image: "orders:1", lastReason: "OOMKilled", lastExitCode: 137 },
+    { name: "monitoring-sidecar", role: "MonitoringSidecar", phase: "Waiting", health: "Unhealthy", ready: false, restarts: 0, reason: "CrashLoopBackOff" }],
+};
+
+test("shows the version, checks and containers of an instance", async () => {
+  const page = withOverview(overview([scope("shop", "Degraded", {})], []), { url: "http://controller/#/scopes/shop", scopeResponses: { shop: detailWith(podInstance) } });
+  await page.settle();
+  const text = all(page, "details.instance")[0].textContent;
+  assert.ok(text.includes("1.2.3"), text);
+  assert.ok(text.includes("database"), text);
+  assert.ok(text.includes("Monitoring sidecar"), text);
+  assert.ok(text.includes("Waiting: CrashLoopBackOff"), text);
+  assert.ok(text.includes("3 (last: OOMKilled, exit 137)"), text);
+  assert.ok(text.includes("1 metric reported"), text);
+});
+
+test("shows what an instance says about itself as text, never as markup", async () => {
+  const page = withOverview(overview([scope("shop", "Degraded", {})], []), { url: "http://controller/#/scopes/shop", scopeResponses: { shop: detailWith(podInstance) } });
+  await page.settle();
+  assert.strictEqual(all(page, "details.instance b").length, 0);
+  assert.ok(all(page, "details.instance")[0].textContent.includes("slow <b>query</b>"));
+});
+
+test("an instance stays open while the page updates", async () => {
+  const page = withOverview(overview([scope("shop", "Degraded", {})], []), { url: "http://controller/#/scopes/shop", scopeResponses: { shop: detailWith(podInstance) } });
+  await page.settle();
+  const first = all(page, "details.instance")[0];
+  first.open = true;
+  first.dispatchEvent(new page.window.Event("toggle"));
+  page.window.location.hash = "#/";
+  await page.settle();
+  page.window.location.hash = "#/scopes/shop";
+  await page.settle();
+  assert.strictEqual(all(page, "details.instance")[0].open, true);
 });
 
 test("says so when the scope in the address is not known", async () => {

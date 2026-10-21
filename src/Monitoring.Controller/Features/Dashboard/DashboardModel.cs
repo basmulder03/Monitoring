@@ -87,5 +87,13 @@ internal sealed class DashboardModel(
         instance.Lifecycle is InstanceLifecycle.Starting or InstanceLifecycle.Running;
 
     private static InstanceDetail ToDetail(InstanceInfo instance) =>
-        new(instance.Id, instance.Lifecycle, instance.Health, instance.Labels);
+        new(
+            instance.Id,
+            instance.Lifecycle,
+            instance.Health,
+            instance.Labels,
+            instance.Version,
+            instance.Checks ?? [],
+            instance.Containers ?? [],
+            instance.Metrics ?? []);
 }

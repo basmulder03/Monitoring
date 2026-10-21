@@ -45,6 +45,21 @@ internal sealed class FakeScopeRegistry : IScopeRegistry
         return this;
     }
 
+    /// <summary>Adds an instance exactly as given, creating the scope when needed.</summary>
+    /// <param name="scope">Scope that holds the instance.</param>
+    /// <param name="instance">The instance.</param>
+    /// <returns>This fake, for chaining.</returns>
+    public FakeScopeRegistry WithInstance(string scope, InstanceInfo instance)
+    {
+        if (!_scopes.TryGetValue(scope, out var list))
+        {
+            _scopes[scope] = list = [];
+        }
+
+        list.Add(instance);
+        return this;
+    }
+
     /// <summary>Sets a label of a scope, creating the scope when needed.</summary>
     /// <param name="scope">The scope.</param>
     /// <param name="key">Label name.</param>

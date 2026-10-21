@@ -233,7 +233,7 @@
 
     for (const service of scope.services) {
       const details = el("details", "service");
-      details.open = service.health !== "Healthy";
+      remember(details, "service:" + scope.name + "/" + service.name, service.health !== "Healthy");
       const summary = el("summary");
       summary.appendChild(el("strong", "", service.name));
       summary.appendChild(status(service.health));
@@ -246,7 +246,9 @@
       table.appendChild(head);
       for (const instance of service.instances) {
         const row = el("tr");
-        row.appendChild(el("td", "", instance.id));
+        const name = el("td");
+        name.appendChild(renderInstance(scope.name, instance));
+        row.appendChild(name);
         row.appendChild(el("td", "", instance.lifecycle));
         const health = el("td");
         health.appendChild(status(instance.health));
@@ -259,6 +261,77 @@
     }
 
     return root;
+  }
+
+  // The view is rebuilt on every update, so what a person opened is remembered here instead of in the elements.
+  const opened = new Map();
+
+  function remember(details, key, openByDefault) {
+    details.open = opened.has(key) ? opened.get(key) : openByDefault;
+    details.addEventListener("toggle", () => opened.set(key, details.open));
+  }
+
+  function renderInstance(scopeName, instance) {
+    const details = el("details", "instance");
+    remember(details, "instance:" + scopeName + "/" + instance.id, false);
+    const summary = el("summary", "", instance.id);
+    if (instance.version) summary.appendChild(el("span", "muted", " " + instance.version));
+    details.appendChild(summary);
+
+    if (instance.checks.length > 0) {
+      details.appendChild(el("h4", "", "Health checks"));
+      const list = el("ul", "checks");
+      for (const check of instance.checks) {
+        const item = el("li");
+        item.appendChild(status(check.health));
+        item.appendChild(el("strong", "", " " + check.name));
+        if (check.description) item.appendChild(el("span", "muted", " " + check.description));
+        list.appendChild(item);
+      }
+      details.appendChild(list);
+    }
+
+    if (instance.containers.length > 0) {
+      details.appendChild(el("h4", "", "Containers"));
+      const table = el("table", "containers");
+      const head = el("tr");
+      for (const title of ["Container", "Role", "State", "Health", "Restarts", "Image"]) head.appendChild(el("th", "", title));
+      table.appendChild(head);
+      for (const container of instance.containers) {
+        const row = el("tr");
+        row.appendChild(el("td", "", container.name));
+        row.appendChild(el("td", "", roleText(container.role)));
+        row.appendChild(el("td", "", stateText(container)));
+        const health = el("td");
+        health.appendChild(status(container.health));
+        row.appendChild(health);
+        row.appendChild(el("td", "", String(container.restarts) + lastRunText(container)));
+        row.appendChild(el("td", "muted", container.image || ""));
+        table.appendChild(row);
+      }
+      details.appendChild(table);
+    }
+
+    if (instance.metrics.length > 0) {
+      details.appendChild(el("p", "muted", plural(instance.metrics.length, "metric", "metrics") + " reported"));
+    }
+
+    return details;
+  }
+
+  function roleText(role) {
+    return { App: "Application", MonitoringSidecar: "Monitoring sidecar", OtherSidecar: "Sidecar", Init: "Init" }[role] || role;
+  }
+
+  function stateText(container) {
+    const detail = container.reason ? ": " + container.reason : "";
+    const exit = container.phase === "Terminated" && container.exitCode !== undefined ? " (exit " + container.exitCode + ")" : "";
+    return container.phase + detail + exit;
+  }
+
+  function lastRunText(container) {
+    if (container.restarts === 0 || !container.lastReason) return "";
+    return " (last: " + container.lastReason + (container.lastExitCode !== undefined ? ", exit " + container.lastExitCode : "") + ")";
   }
 
   function show(content) {

@@ -169,6 +169,43 @@ public class DashboardModelTests
     }
 
     [Fact]
+    public void BuildScope_carries_what_an_instance_says_about_itself()
+    {
+        // Arrange
+        var checks = new[] { new HealthCheckResult("database", Degraded, "slow") };
+        var containers = new[] { new ContainerInfo("orders", ContainerRole.App, ContainerPhase.Running, Healthy, true, 2) };
+        var metrics = new[] { new Monitoring.Protocol.Reports.MetricSeries("orders.placed", new Dictionary<string, string>(), 3) };
+        var model = new ModelFixture()
+            .WithInstance("shop", new InstanceInfo("orders-1", "orders", Running, Degraded, new Dictionary<string, string>(), "1.2.3", checks, metrics, containers))
+            .Build();
+
+        // Act
+        var instance = model.BuildScope("shop")!.Services.Single().Instances.Single();
+
+        // Assert
+        instance.Version.ShouldBe("1.2.3");
+        instance.Checks.ShouldBe(checks);
+        instance.Containers.ShouldBe(containers);
+        instance.Metrics.ShouldBe(metrics);
+    }
+
+    [Fact]
+    public void BuildScope_gives_an_instance_that_reports_nothing_empty_lists()
+    {
+        // Arrange
+        var model = new ModelFixture().WithInstance("shop", "orders", Running, Healthy).Build();
+
+        // Act
+        var instance = model.BuildScope("shop")!.Services.Single().Instances.Single();
+
+        // Assert
+        instance.Version.ShouldBeNull();
+        instance.Checks.ShouldBeEmpty();
+        instance.Containers.ShouldBeEmpty();
+        instance.Metrics.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void BuildScope_carries_the_labels_of_the_scope()
     {
         // Arrange
@@ -297,6 +334,12 @@ public class DashboardModelTests
         public ModelFixture WithInstance(string scope, string service, InstanceLifecycle lifecycle, HealthState health, string? id = null)
         {
             _registry.WithInstance(scope, service, lifecycle, health, id);
+            return this;
+        }
+
+        public ModelFixture WithInstance(string scope, InstanceInfo instance)
+        {
+            _registry.WithInstance(scope, instance);
             return this;
         }
 

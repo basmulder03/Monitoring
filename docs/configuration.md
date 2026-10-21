@@ -94,7 +94,7 @@ The controller serves the dashboard itself, so there is nothing else to install.
 | `/?filter=environment:prod` | Shows only scopes with that label value; repeat `filter` for several labels. It works on `/tv` too, so a wall display can stay on one environment. When the scopes have several values of the outermost label, a selector in the page switches between them |
 | `/?theme=dark` or `?theme=light` | Forces a theme; otherwise the page follows the system setting, and the button in the corner switches it |
 | `/api/overview` | The overview as JSON |
-| `/api/scopes/<name>` | One scope with its services and instances as JSON |
+| `/api/scopes/<name>` | One scope with its services and instances as JSON, each instance with its version, health checks, containers and latest metrics |
 | `/api/events` | The overview as Server-Sent Events: the current one at once, then one per change, plus a keep-alive event while nothing changes |
 
 The page has no login yet; reach it only over a network you trust.
