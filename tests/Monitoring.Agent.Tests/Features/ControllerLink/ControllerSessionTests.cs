@@ -17,7 +17,7 @@ namespace Monitoring.Agent.Tests.Features.ControllerLink;
 public class ControllerSessionTests
 {
     [Fact]
-    public async Task RunAsync_introduces_the_agent_with_its_identity_labels_and_token()
+    public async Task RunAsync_introduces_the_agent_with_its_identity_labels_token_and_scope()
     {
         // Arrange
         var controller = new SessionFixture()
@@ -29,7 +29,7 @@ public class ControllerSessionTests
         var hello = await controller.ReceiveAsync();
 
         // Assert
-        var expected = new Hello(ProtocolVersion.Current, "agent-7", "monitoring-agent", "1.2.3", new Dictionary<string, string> { ["env"] = "prod" }, "secret");
+        var expected = new Hello(ProtocolVersion.Current, "agent-7", "monitoring-agent", "1.2.3", new Dictionary<string, string> { ["env"] = "prod" }, "secret", "shop");
         hello.ShouldBeOfType<Hello>().ShouldBeEquivalentTo(expected);
     }
 

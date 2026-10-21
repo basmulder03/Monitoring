@@ -80,7 +80,8 @@ internal sealed class ControllerSession(
         "monitoring-agent",
         options.AgentVersion,
         new Dictionary<string, string>(options.Labels),
-        options.Token);
+        options.Token,
+        store.ScopeName);
 
     /// <summary>Waits for the controller's answer to the hello; null when it refuses, stays silent or answers with anything else.</summary>
     private async Task<Config?> ReadConfigAsync(Stream stream, CancellationTokenSource timeout, CancellationToken ct)
