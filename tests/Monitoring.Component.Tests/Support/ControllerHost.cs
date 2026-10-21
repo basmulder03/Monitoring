@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monitoring.Controller.Features.AgentLink;
@@ -24,6 +26,9 @@ internal sealed class ControllerHost : IAsyncDisposable
     public IScopeRegistry Registry => _host!.Services.GetRequiredService<IScopeRegistry>();
 
     public string Address => $"127.0.0.1:{_host!.Services.GetRequiredService<IAgentListener>().LocalEndPoint!.Port}";
+
+    /// <summary>The address of the dashboard's web server, such as <c>http://127.0.0.1:5000</c>.</summary>
+    public string WebAddress => _host!.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
 
     /// <summary>Accepts any agent holding the token, whatever scope it announces.</summary>
     public ControllerHost AcceptingEnrollment(string token) => AcceptingScope(AgentTokenEntry.AnyScope, token);

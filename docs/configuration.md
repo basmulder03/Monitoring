@@ -32,6 +32,10 @@ Logging is controlled by the usual `Logging:LogLevel` settings, for example `MON
 | `Controller:Replicas` | none | The individual `host:port` address of every controller replica, handed to agents so they connect to all of them. List every replica, including this one: agents follow exactly this list |
 | `Controller:AgentTokens` | required | The accepted agent tokens, see below. At least one |
 | `Controller:AgentLink:HelloTimeout` | `00:00:10` | How long a new connection may stay silent before it must say hello |
+| `Controller:Web:Address` | `0.0.0.0` | IP address the dashboard's web server listens on |
+| `Controller:Web:Port` | `8080` | TCP port of the dashboard and its API; plain HTTP, so keep it on a network you trust |
+| `Controller:Dashboard:PushInterval` | `00:00:01` | How often open pages are checked for changes to push; bursts of changes become one update |
+| `Controller:Dashboard:KeepAliveInterval` | `00:00:05` | How long a stream may stay silent before a keep-alive event is sent. Keep it well below 15 seconds, after which a page warns that its data is old |
 | `Controller:Registry:GoneRetention` | `00:10:00` | How long a removed instance stays visible as Gone |
 | `Controller:Registry:PurgeInterval` | `00:01:00` | How often expired Gone instances are dropped |
 | `Controller:Alerting:StartupGrace` | `00:10:00` | After startup no alert rule is evaluated for this long, so agents can send their snapshots first |
@@ -64,6 +68,21 @@ The hash is the SHA-256 of the token as lower-case hexadecimal text: `printf '%s
 ```
 
 Without transport security the token travels in clear text. Use it only on a network you trust; TLS comes in a later version.
+
+### Dashboard
+
+The controller serves the dashboard itself, so there is nothing else to install. Open `http://<controller>:8080/` in a browser.
+
+| Path | Shows |
+| --- | --- |
+| `/` | A tile per scope with its status as an icon and a word, unhealthiest first, and the alerts that are firing. Select a tile for its services and pods |
+| `/tv` | The same for a wall display: type scales with the screen and the cursor is hidden |
+| `/?theme=dark` or `?theme=light` | Forces a theme; otherwise the page follows the system setting, and the button in the corner switches it |
+| `/api/overview` | The overview as JSON |
+| `/api/scopes/<name>` | One scope with its services and instances as JSON |
+| `/api/events` | The overview as Server-Sent Events: the current one at once, then one per change, plus a keep-alive event while nothing changes |
+
+The page has no login yet; reach it only over a network you trust.
 
 ## Agent
 
