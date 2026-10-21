@@ -17,6 +17,7 @@
     <Project Path="tests/Monitoring.Controller.Tests/Monitoring.Controller.Tests.csproj" />
     <Project Path="tests/Monitoring.Hosting.Tests/Monitoring.Hosting.Tests.csproj" />
     <Project Path="tests/Monitoring.Protocol.Tests/Monitoring.Protocol.Tests.csproj" />
+    <Project Path="tests/Monitoring.Sidecar.Tests/Monitoring.Sidecar.Tests.csproj" />
     <Project Path="tests/Monitoring.Tests.Shared/Monitoring.Tests.Shared.csproj" />
     <Project Path="tests/Monitoring.Ui.Tests/Monitoring.Ui.Tests.csproj" />
   </Folder>
