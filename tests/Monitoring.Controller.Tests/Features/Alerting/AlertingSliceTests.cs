@@ -36,6 +36,19 @@ public class AlertingSliceTests
         rules.ShouldBe(["instance-unhealthy", "service-down", "scope-unknown", "restart-loop"], ignoreOrder: true);
     }
 
+    [Fact]
+    public void AddAlerting_rejects_a_silence_without_a_rule()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        var add = () => services.AddAlerting(o => o.Silences.Add(new AlertSilence("", "shop/", DateTimeOffset.UtcNow.AddDays(1))));
+
+        // Assert
+        add.ShouldThrow<ArgumentException>();
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]

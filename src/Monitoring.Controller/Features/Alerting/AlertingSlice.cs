@@ -24,6 +24,10 @@ public static class AlertingSlice
         ArgumentOutOfRangeException.ThrowIfLessThan(options.RestartLoopCount, 1);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.RestartLoopWindow, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.EvaluationInterval, TimeSpan.Zero);
+        foreach (var silence in options.Silences.Where(silence => string.IsNullOrWhiteSpace(silence.Rule)))
+        {
+            throw new ArgumentException($"A silence needs the name of a rule, or '*' for every rule (it ends {silence.Until:u}).", nameof(configure));
+        }
 
         services.AddLogging();
         services.TryAddSingleton(TimeProvider.System);

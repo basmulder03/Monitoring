@@ -57,6 +57,7 @@ internal static class ControllerComposition
                 options.ServiceDownWait = alerting.Duration("ServiceDownWait", options.ServiceDownWait);
                 options.ScopeUnknownWait = alerting.Duration("ScopeUnknownWait", options.ScopeUnknownWait);
                 options.EvaluationInterval = alerting.Duration("EvaluationInterval", options.EvaluationInterval);
+                options.Silences = [.. alerting.Items("Silences").Select(ReadSilence)];
             })
             .AddDashboard(options =>
             {
@@ -128,6 +129,15 @@ internal static class ControllerComposition
             kestrel.AddServerHeader = false;
             kestrel.Listen(address, port);
         });
+    }
+
+    /// <summary>Reads one silence; the end time is required, so a silence cannot be forgotten.</summary>
+    private static AlertSilence ReadSilence(SettingsReader item)
+    {
+        var until = item.Required("Until");
+        return DateTimeOffset.TryParse(until, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var end)
+            ? new AlertSilence(item.Text("Rule", "*"), item.Text("Subject", ""), end, item.Optional("Reason"))
+            : throw new ConfigurationException($"Setting '{item.NameOf("Until")}' must be a date and time like 2026-11-02T06:00:00Z, but is '{until}'.");
     }
 
     private static List<AgentTokenEntry> ReadAgentTokens(SettingsReader controller)

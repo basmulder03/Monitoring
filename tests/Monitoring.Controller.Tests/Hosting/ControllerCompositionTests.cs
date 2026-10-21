@@ -134,6 +134,40 @@ public class ControllerCompositionTests
     }
 
     [Fact]
+    public void CreateHost_reads_the_silences()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret")
+            .With("Controller:Alerting:Silences:0:Rule", "service-down")
+            .With("Controller:Alerting:Silences:0:Subject", "shop/")
+            .With("Controller:Alerting:Silences:0:Until", "2026-11-02T06:00:00Z")
+            .With("Controller:Alerting:Silences:0:Reason", "maintenance")
+            .Build();
+
+        // Act
+        var silence = host.Services.GetRequiredService<AlertingOptions>().Silences.Single();
+
+        // Assert
+        silence.Rule.ShouldBe("service-down");
+        silence.SubjectPrefix.ShouldBe("shop/");
+        silence.Until.ShouldBe(new DateTimeOffset(2026, 11, 2, 6, 0, 0, TimeSpan.Zero));
+        silence.Reason.ShouldBe("maintenance");
+    }
+
+    [Fact]
+    public void CreateHost_refuses_a_silence_without_an_end()
+    {
+        // Arrange
+        var settings = new ControllerSettings().WithToken("shop", "secret").With("Controller:Alerting:Silences:0:Rule", "service-down");
+
+        // Act
+        var build = () => settings.Build();
+
+        // Assert
+        build.ShouldThrow<ConfigurationException>().Message.ShouldContain("Controller:Alerting:Silences:0:Until");
+    }
+
+    [Fact]
     public void CreateHost_hands_the_listener_settings_to_the_agent_link()
     {
         // Arrange

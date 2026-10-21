@@ -28,6 +28,38 @@ public class AlertEvaluatorTests
     }
 
     [Fact]
+    public void GetActiveAlerts_leaves_out_the_alerts_a_silence_covers()
+    {
+        // Arrange
+        var fixture = new EvaluatorFixture().WithRule("r", 0).Failing("r", "shop/a", "other/b").Silencing("r", "shop/", TimeSpan.FromHours(1));
+        var evaluator = fixture.Build();
+        evaluator.Evaluate();
+
+        // Act
+        var alerts = evaluator.GetActiveAlerts();
+
+        // Assert
+        alerts.Select(a => a.Subject).ShouldBe(["other/b"]);
+    }
+
+    [Fact]
+    public void GetActiveAlerts_shows_an_alert_again_when_its_silence_ends_and_it_still_holds()
+    {
+        // Arrange
+        var fixture = new EvaluatorFixture().WithRule("r", 0).Failing("r", "shop/a").Silencing("r", "", TimeSpan.FromHours(1));
+        var evaluator = fixture.Build();
+        evaluator.Evaluate();
+        fixture.Clock.Advance(TimeSpan.FromHours(1));
+        evaluator.Evaluate();
+
+        // Act
+        var alerts = evaluator.GetActiveAlerts();
+
+        // Assert: it kept counting while silenced
+        alerts.Single().Since.ShouldBe(fixture.Clock.GetUtcNow() - TimeSpan.FromHours(1));
+    }
+
+    [Fact]
     public void GetActiveAlerts_describes_the_alert_with_a_stable_key_and_the_time_the_condition_began()
     {
         // Arrange
@@ -169,16 +201,23 @@ public class AlertEvaluatorTests
     private sealed class EvaluatorFixture
     {
         private readonly List<FakeRule> _rules = [];
+        private readonly List<AlertSilence> _silences = [];
         private TimeSpan _grace = TimeSpan.Zero;
 
         public FakeTimeProvider Clock { get; } = new();
 
         /// <summary>Creates the evaluator; its startup grace period begins at the current time of <see cref="Clock"/>.</summary>
-        public AlertEvaluator Build() => new(_rules, new AlertingOptions { StartupGrace = _grace }, Clock);
+        public AlertEvaluator Build() => new(_rules, new AlertingOptions { StartupGrace = _grace, Silences = _silences }, Clock);
 
         public EvaluatorFixture WithGrace(TimeSpan grace)
         {
             _grace = grace;
+            return this;
+        }
+
+        public EvaluatorFixture Silencing(string rule, string subjectPrefix, TimeSpan forHowLong)
+        {
+            _silences.Add(new AlertSilence(rule, subjectPrefix, Clock.GetUtcNow() + forHowLong));
             return this;
         }
 

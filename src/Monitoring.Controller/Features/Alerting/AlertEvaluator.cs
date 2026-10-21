@@ -15,6 +15,7 @@ internal sealed class AlertEvaluator : IAlertEvaluator, IAlertState
     private readonly IReadOnlyList<IAlertRule> _rules;
     private readonly TimeProvider _time;
     private readonly DateTimeOffset _graceEnds;
+    private readonly IReadOnlyList<AlertSilence> _silences;
 
     /// <summary>Conditions currently true, by alert key; guarded by <see cref="_gate"/>.</summary>
     private Dictionary<string, Condition> _conditions = [];
@@ -27,6 +28,7 @@ internal sealed class AlertEvaluator : IAlertEvaluator, IAlertState
     {
         _rules = [.. rules];
         _time = time;
+        _silences = [.. options.Silences];
         _graceEnds = time.GetUtcNow() + options.StartupGrace;
     }
 
@@ -69,6 +71,7 @@ internal sealed class AlertEvaluator : IAlertEvaluator, IAlertState
             [
                 .. _conditions
                     .Where(pair => now - pair.Value.Since >= pair.Value.Rule.Wait)
+                    .Where(pair => !_silences.Any(silence => silence.Covers(pair.Value.Rule.Name, pair.Value.Subject, now)))
                     .Select(pair => new Alert(pair.Key, pair.Value.Rule.Name, pair.Value.Subject, pair.Value.Rule.Severity, pair.Value.Since))
                     .OrderByDescending(alert => alert.Severity)
                     .ThenBy(alert => alert.Since)

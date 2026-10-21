@@ -54,6 +54,17 @@ Logging is controlled by the usual `Logging:LogLevel` settings, for example `MON
 | `Controller:Alerting:ServiceDownWait` | `00:00:00` | How long a service must have no instance able to serve before its alert fires |
 | `Controller:Alerting:EvaluationInterval` | `00:00:05` | How often the alert rules run |
 
+### Silences
+
+A silence keeps alerts out of the dashboard until it ends, for example during planned maintenance. The conditions are still checked, so an alert that is still true when the silence ends appears at once. A silence has to end: `Until` is required, and an expired silence does nothing.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Controller:Alerting:Silences:<n>:Until` | required | When the silence ends, as a date and time such as `2026-11-02T06:00:00Z` |
+| `Controller:Alerting:Silences:<n>:Rule` | `*` | The rule to silence, such as `service-down`, or `*` for all |
+| `Controller:Alerting:Silences:<n>:Subject` | all | Silences subjects starting with this text, such as `shop/` for a whole scope or `shop/orders/` for one service |
+| `Controller:Alerting:Silences:<n>:Reason` | none | Why, for whoever reads the file |
+
 ### When an agent goes away
 
 The controller judges from its own connections whether the agent of each scope is alive. An agent is alive while its connection is open and something, usually a heartbeat, was heard within the timeout. When it is not:

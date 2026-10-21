@@ -24,6 +24,9 @@ public sealed class AlertingOptions
     /// <summary>The time within which <see cref="RestartLoopCount"/> restarts count as a loop.</summary>
     public TimeSpan RestartLoopWindow { get; set; } = TimeSpan.FromMinutes(10);
 
+    /// <summary>Silences that keep matching alerts out of the active list. The conditions are still evaluated, so an alert reappears when its silence ends.</summary>
+    public List<AlertSilence> Silences { get; set; } = [];
+
     /// <summary>How often the rules are evaluated.</summary>
     public TimeSpan EvaluationInterval { get; set; } = TimeSpan.FromSeconds(5);
 }
