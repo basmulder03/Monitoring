@@ -14,6 +14,8 @@ internal sealed class ControllerHost : IAsyncDisposable
     {
         ["Controller:Listen:Address"] = "127.0.0.1",
         ["Controller:Listen:Port"] = "0",
+        ["Controller:Web:Address"] = "127.0.0.1",
+        ["Controller:Web:Port"] = "0",
     };
 
     private int _tokens;

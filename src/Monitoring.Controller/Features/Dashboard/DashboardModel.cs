@@ -1,0 +1,76 @@
+using Monitoring.Controller.Features.Alerting;
+using Monitoring.Controller.Features.Health;
+using Monitoring.Controller.Features.Registry;
+using Monitoring.Protocol.Health;
+using Monitoring.Protocol.Instances;
+
+namespace Monitoring.Controller.Features.Dashboard;
+
+/// <summary>Reads the controller's state through the public contracts of the other slices and shapes it for the pages.</summary>
+/// <param name="registry">The instances per scope.</param>
+/// <param name="health">The health roll-up per service and scope.</param>
+/// <param name="alerts">The alerts that are firing.</param>
+internal sealed class DashboardModel(IScopeRegistry registry, IHealthRollup health, IAlertState alerts)
+{
+    /// <summary>Builds the overview: a summary per scope and the alerts that are firing.</summary>
+    /// <returns>The overview.</returns>
+    public Overview BuildOverview()
+    {
+        var scopes = registry.GetScopeNames().Select(Summarize)
+            .OrderByDescending(scope => scope.Health)
+            .ThenBy(scope => scope.Name, StringComparer.Ordinal)
+            .ToList();
+
+        // GetActiveAlerts already returns the most severe first.
+        var firing = alerts.GetActiveAlerts()
+            .Select(a => new AlertSummary(a.Key, a.RuleName, a.Subject, a.Severity, a.Since))
+            .ToList();
+
+        return new Overview(scopes, firing);
+    }
+
+    /// <summary>Builds the detail of one scope.</summary>
+    /// <param name="scopeName">Name of the scope.</param>
+    /// <returns>The scope with its services and instances, or <see langword="null"/> when no such scope is known.</returns>
+    public ScopeDetail? BuildScope(string scopeName)
+    {
+        if (!registry.GetScopeNames().Contains(scopeName))
+        {
+            return null;
+        }
+
+        var instancesByService = registry.GetInstances(scopeName)
+            .GroupBy(i => i.ServiceName)
+            .ToDictionary(group => group.Key, group => group.ToList());
+
+        var services = health.GetServiceHealth(scopeName)
+            .Select(service => new ServiceDetail(
+                service.ServiceName,
+                service.Health,
+                service.LiveInstances,
+                service.HealthyInstances,
+                [.. instancesByService[service.ServiceName].OrderBy(i => i.Id, StringComparer.Ordinal).Select(ToDetail)]))
+            .OrderByDescending(service => service.Health)
+            .ThenBy(service => service.Name, StringComparer.Ordinal)
+            .ToList();
+
+        return new ScopeDetail(scopeName, health.GetScopeHealth(scopeName), services);
+    }
+
+    private ScopeSummary Summarize(string scopeName)
+    {
+        var live = registry.GetInstances(scopeName).Where(IsLive).ToList();
+        return new ScopeSummary(
+            scopeName,
+            health.GetScopeHealth(scopeName),
+            health.GetServiceHealth(scopeName).Count,
+            live.Count,
+            live.Count(instance => instance.Health != HealthState.Healthy));
+    }
+
+    private static bool IsLive(InstanceInfo instance) =>
+        instance.Lifecycle is InstanceLifecycle.Starting or InstanceLifecycle.Running;
+
+    private static InstanceDetail ToDetail(InstanceInfo instance) =>
+        new(instance.Id, instance.Lifecycle, instance.Health, instance.Labels);
+}

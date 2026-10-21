@@ -1,7 +1,11 @@
+using System.Net;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monitoring.Controller.Features.AgentLink;
 using Monitoring.Controller.Features.Alerting;
+using Monitoring.Controller.Features.Dashboard;
 using Monitoring.Controller.Features.Health;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Features.Security;
@@ -22,7 +26,7 @@ internal static class ControllerComposition
     /// <param name="settings">The root of the configuration.</param>
     /// <exception cref="ConfigurationException">A setting is missing or cannot be read.</exception>
     /// <exception cref="ArgumentException">A setting has a value that a slice rejects.</exception>
-    public static void Compose(HostApplicationBuilder builder, SettingsReader settings)
+    public static void Compose(IHostApplicationBuilder builder, SettingsReader settings)
     {
         var controller = settings.Section("Controller");
         var tokens = ReadAgentTokens(controller);
@@ -43,6 +47,7 @@ internal static class ControllerComposition
                 options.ServiceDownWait = alerting.Duration("ServiceDownWait", options.ServiceDownWait);
                 options.EvaluationInterval = alerting.Duration("EvaluationInterval", options.EvaluationInterval);
             })
+            .AddDashboard()
             .AddSecurity(options => options.AgentTokens.AddRange(tokens))
             .AddAgentLink(options =>
             {
@@ -54,17 +59,48 @@ internal static class ControllerComposition
             });
     }
 
-    /// <summary>Builds a controller host from settings; used by tests to start a whole controller in process.</summary>
+    /// <summary>Builds the controller: the slices, the web server for the dashboard and the dashboard's endpoints.</summary>
     /// <param name="args">Command line arguments.</param>
-    /// <param name="overrides">Settings that win over every other source.</param>
+    /// <param name="overrides">Settings that win over every other source; used by tests.</param>
     /// <param name="configFile">The configuration file to read instead of the default.</param>
     /// <returns>The host, not yet started.</returns>
+    /// <exception cref="ConfigurationException">A setting is missing or cannot be read.</exception>
     public static IHost CreateHost(
         string[] args, IEnumerable<KeyValuePair<string, string?>>? overrides = null, string? configFile = null)
     {
-        var builder = MonitoringHost.CreateBuilder(args, overrides, configFile);
-        Compose(builder, new SettingsReader(builder.Configuration));
-        return builder.Build();
+        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { Args = args });
+        MonitoringHost.Configure(builder, args, overrides, configFile);
+
+        var settings = new SettingsReader(builder.Configuration);
+        Compose(builder, settings);
+        ListenOn(builder, settings.Section("Controller").Section("Web"));
+
+        var app = builder.Build();
+        app.MapDashboard();
+        return app;
+    }
+
+    /// <summary>Makes the web server listen where the settings say; plain HTTP, as for the agents, until transport security exists.</summary>
+    private static void ListenOn(WebApplicationBuilder builder, SettingsReader web)
+    {
+        var addressText = web.Text("Address", "0.0.0.0");
+        var port = web.Int("Port", 8080);
+
+        if (!IPAddress.TryParse(addressText, out var address))
+        {
+            throw new ConfigurationException($"Setting 'Controller:Web:Address' must be an IP address, but is '{addressText}'.");
+        }
+
+        if (port is < 0 or > 65535)
+        {
+            throw new ConfigurationException($"Setting 'Controller:Web:Port' must be between 0 and 65535, but is {port}.");
+        }
+
+        builder.WebHost.ConfigureKestrel(kestrel =>
+        {
+            kestrel.AddServerHeader = false;
+            kestrel.Listen(address, port);
+        });
     }
 
     private static List<AgentTokenEntry> ReadAgentTokens(SettingsReader controller)

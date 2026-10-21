@@ -1,4 +1,6 @@
 using System.Net.Sockets;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monitoring.Controller.Features.AgentLink;
@@ -37,7 +39,7 @@ public class ControllerCompositionTests
     }
 
     [Fact]
-    public void CreateHost_runs_the_registry_purge_alert_evaluation_and_listener_in_the_background()
+    public void CreateHost_runs_the_registry_purge_alert_evaluation_listener_and_web_server_in_the_background()
     {
         // Arrange
         using var host = new ControllerSettings().WithToken("shop", "secret").Build();
@@ -46,7 +48,7 @@ public class ControllerCompositionTests
         var hosted = host.Services.GetServices<IHostedService>().Select(s => s.GetType().Name);
 
         // Assert
-        hosted.ShouldBe(["RegistryPurgeService", "AlertEvaluationService", "AgentListenerService"], ignoreOrder: true);
+        hosted.ShouldBe(["RegistryPurgeService", "AlertEvaluationService", "AgentListenerService", "GenericWebHostService"], ignoreOrder: true);
     }
 
     [Fact]
@@ -214,6 +216,53 @@ public class ControllerCompositionTests
     }
 
     [Fact]
+    public async Task A_started_controller_serves_the_dashboard_api()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret").Build();
+        await host.StartAsync(TestContext.Current.CancellationToken);
+        var address = host.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
+        using var http = new HttpClient(new HttpClientHandler { UseProxy = false });
+
+        // Act
+        using var response = await http.GetAsync($"{address}/api/overview", TestContext.Current.CancellationToken);
+
+        // Assert
+        response.IsSuccessStatusCode.ShouldBeTrue();
+        await host.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Theory]
+    [InlineData("localhost")]
+    [InlineData("not an address")]
+    public void CreateHost_names_a_web_address_that_is_not_an_ip_address(string address)
+    {
+        // Arrange
+        var settings = new ControllerSettings().WithToken("shop", "secret").With("Controller:Web:Address", address);
+
+        // Act
+        var build = () => settings.Build();
+
+        // Assert
+        build.ShouldThrow<ConfigurationException>().Message.ShouldContain("'Controller:Web:Address'");
+    }
+
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("65536")]
+    public void CreateHost_names_a_web_port_out_of_range(string port)
+    {
+        // Arrange
+        var settings = new ControllerSettings().WithToken("shop", "secret").With("Controller:Web:Port", port);
+
+        // Act
+        var build = () => settings.Build();
+
+        // Assert
+        build.ShouldThrow<ConfigurationException>().Message.ShouldContain("'Controller:Web:Port'");
+    }
+
+    [Fact]
     public async Task A_started_controller_stops_cleanly()
     {
         // Arrange
@@ -233,7 +282,12 @@ public class ControllerCompositionTests
     /// <summary>Collects controller settings and builds the host from them, ignoring any configuration file on the machine.</summary>
     private sealed class ControllerSettings
     {
-        private readonly Dictionary<string, string?> _settings = [];
+        private readonly Dictionary<string, string?> _settings = new()
+        {
+            ["Controller:Web:Address"] = "127.0.0.1",
+            ["Controller:Web:Port"] = "0",
+        };
+
         private int _tokens;
 
         public ControllerSettings With(string key, string value)
