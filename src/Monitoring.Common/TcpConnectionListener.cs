@@ -80,6 +80,10 @@ public sealed class TcpConnectionListener(
             {
                 await handle(client.GetStream(), ct).ConfigureAwait(false);
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                // The listener is shutting down and the handler ended with it.
+            }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogError(ex, "Unexpected failure while serving a connection from {What}", what);
