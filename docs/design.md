@@ -161,11 +161,11 @@ Two independent settings, each behind its own interface (`ITransportSecurity`, `
 | --- | --- | --- |
 | `token` (default) | Sends a token in `Hello`, together with the scope it reports as | The controller config holds only token hashes, never a list of agents. An enrollment token (scope `*`) lets any agent that holds it register itself under the scope it announces; a token can also be bound to one scope, so its holders can only report as that scope. Two tokens per scope can be valid during rotation |
 | `serviceAccount` | Sends its projected Kubernetes service account token; the controller validates it | No secrets to hand out and automatic rotation; Kubernetes only, and the controller needs access to each cluster's token review or OIDC endpoint |
-| `certificate` | The client certificate from `mtls` | Built-in enrollment: the agent generates a key in memory and the controller signs a short-lived certificate after a token check; or certificates from cert-manager or the company PKI |
+| `certificate` | The client certificate from `mtls` | Built-in enrollment: the agent generates a key in memory and the controller signs a short-lived certificate after a token check; or certificates from cert-manager or an existing PKI |
 
 - Whatever the mode, the controller checks that each `Hello` matches the authenticated identity, so an agent can never report for another scope.
 - With `none`, the token travels in clear text. That is acceptable only where the network itself is trusted, and the configuration warns about it at startup.
-- The certificate for `tls` comes from the company PKI or cert-manager when available, otherwise from a CA created once at install and stored in a Secret that all replicas mount. Certificates are reloaded when the files change.
+- The certificate for `tls` comes from an existing PKI or cert-manager when available, otherwise from a CA created once at install and stored in a Secret that all replicas mount. Certificates are reloaded when the files change.
 - Data protection does not depend on the transport: the library removes query strings and SQL literals from span details by default, and span details travel only when someone opens a drill-down.
 - Everything uses .NET's own `SslStream` and certificate APIs, which work with Native AOT; other modes can be added by implementing the interfaces.
 
@@ -395,7 +395,7 @@ The sidecars, agents and controllers report their own health, metrics and traces
 
 **Export (optional)**
 
-Every component can also expose its own metrics in Prometheus text format on a local port, off by default. This costs little and lets the company's future observability stack scrape the monitoring system without any change to it.
+Every component can also expose its own metrics in Prometheus text format on a local port, off by default. This costs little and lets an observability stack scrape the monitoring system without any change to it.
 
 ## Dashboard UI
 
@@ -540,11 +540,11 @@ Nothing in the design is specific to one organization: everything is named by la
 
 **Publishing**
 
-- License: Apache-2.0 is suggested (patent grant, widely accepted by companies); MIT is the simpler alternative.
+- License: Apache-2.0 is suggested (patent grant, widely accepted in industry); MIT is the simpler alternative.
 - Packages: NuGet for the library and extensions; container images for sidecar, agent, controller and injector; Helm charts as OCI artifacts; the Windows agent as a zip or MSI.
 - Repository: README with a five-minute quickstart (an Aspire sample), this design as architecture docs, contributing guide, security policy, semantic versioning, changelog, and CI that runs the AOT and end-to-end tests.
 - Pick a neutral working name and check trademarks and package-name availability before the first publish.
-- Before publishing, confirm with your employer who owns the code and whether open-sourcing it is allowed, since it is being designed for work.
+- Before publishing, confirm who owns the code and that open-sourcing it is allowed.
 
 ## Code structure
 
