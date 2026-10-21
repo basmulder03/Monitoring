@@ -47,4 +47,45 @@ public class DashboardSliceTests
         // Assert
         add.ShouldThrow<ArgumentOutOfRangeException>();
     }
+
+    [Fact]
+    public void AddDashboard_accepts_an_empty_list_of_labels_to_group_by()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        var add = () => services.AddDashboard(o => o.GroupBy = []);
+
+        // Assert
+        add.ShouldNotThrow();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void AddDashboard_rejects_a_blank_label_name_to_group_by(string name)
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        var add = () => services.AddDashboard(o => o.GroupBy = ["environment", name]);
+
+        // Assert
+        add.ShouldThrow<ArgumentException>();
+    }
+
+    [Fact]
+    public void AddDashboard_rejects_a_label_name_listed_twice()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        var add = () => services.AddDashboard(o => o.GroupBy = ["environment", "environment"]);
+
+        // Assert
+        add.ShouldThrow<ArgumentException>();
+    }
 }

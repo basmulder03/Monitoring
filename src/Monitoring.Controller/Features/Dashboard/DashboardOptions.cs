@@ -4,6 +4,12 @@ namespace Monitoring.Controller.Features.Dashboard;
 public sealed class DashboardOptions
 {
     /// <summary>
+    /// The label names the page groups scopes by, outermost first. Scopes without a label are collected under "not set".
+    /// Empty turns grouping off.
+    /// </summary>
+    public List<string> GroupBy { get; set; } = ["environment", "datacenter"];
+
+    /// <summary>
     /// How often the state is checked for changes to push to open pages. Changes are coalesced into at most one update per interval,
     /// so a burst of changes does not flood the pages.
     /// </summary>

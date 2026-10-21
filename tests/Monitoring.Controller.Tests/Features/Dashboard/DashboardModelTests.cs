@@ -129,6 +129,59 @@ public class DashboardModelTests
     }
 
     [Fact]
+    public void BuildOverview_carries_the_labels_of_each_scope()
+    {
+        // Arrange
+        var model = new ModelFixture().WithInstance("shop", "orders", Running, Healthy).WithLabel("shop", "environment", "prod").Build();
+
+        // Act
+        var scope = model.BuildOverview().Scopes.Single();
+
+        // Assert
+        scope.Labels["environment"].ShouldBe("prod");
+        scope.Labels.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void BuildOverview_tells_the_page_which_labels_to_group_by()
+    {
+        // Arrange
+        var model = new ModelFixture().GroupingBy("environment", "site").Build();
+
+        // Act
+        var groupBy = model.BuildOverview().GroupBy;
+
+        // Assert
+        groupBy.ShouldBe(["environment", "site"]);
+    }
+
+    [Fact]
+    public void BuildOverview_groups_by_environment_and_datacenter_unless_told_otherwise()
+    {
+        // Arrange
+        var model = new ModelFixture().Build();
+
+        // Act
+        var groupBy = model.BuildOverview().GroupBy;
+
+        // Assert
+        groupBy.ShouldBe(["environment", "datacenter"]);
+    }
+
+    [Fact]
+    public void BuildScope_carries_the_labels_of_the_scope()
+    {
+        // Arrange
+        var model = new ModelFixture().WithInstance("shop", "orders", Running, Healthy).WithLabel("shop", "datacenter", "a").Build();
+
+        // Act
+        var scope = model.BuildScope("shop")!;
+
+        // Assert
+        scope.Labels["datacenter"].ShouldBe("a");
+    }
+
+    [Fact]
     public void BuildScope_is_null_for_a_scope_that_is_not_known()
     {
         // Arrange
@@ -160,6 +213,7 @@ public class DashboardModelTests
     {
         private readonly FakeScopeRegistry _registry = new();
         private readonly List<Alert> _alerts = [];
+        private readonly DashboardOptions _options = new();
 
         public ModelFixture WithInstance(string scope, string service, InstanceLifecycle lifecycle, HealthState health, string? id = null)
         {
@@ -173,13 +227,25 @@ public class DashboardModelTests
             return this;
         }
 
+        public ModelFixture WithLabel(string scope, string key, string value)
+        {
+            _registry.WithLabel(scope, key, value);
+            return this;
+        }
+
+        public ModelFixture GroupingBy(params string[] keys)
+        {
+            _options.GroupBy = [.. keys];
+            return this;
+        }
+
         public ModelFixture WithAlert(Alert alert)
         {
             _alerts.Add(alert);
             return this;
         }
 
-        public DashboardModel Build() => new(_registry, new HealthRollup(_registry), new FixedAlerts(_alerts));
+        public DashboardModel Build() => new(_registry, new HealthRollup(_registry), new FixedAlerts(_alerts), _options);
     }
 
     /// <summary>Alert state that returns the alerts it was given.</summary>

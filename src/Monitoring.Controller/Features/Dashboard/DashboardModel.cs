@@ -10,7 +10,8 @@ namespace Monitoring.Controller.Features.Dashboard;
 /// <param name="registry">The instances per scope.</param>
 /// <param name="health">The health roll-up per service and scope.</param>
 /// <param name="alerts">The alerts that are firing.</param>
-internal sealed class DashboardModel(IScopeRegistry registry, IHealthRollup health, IAlertState alerts)
+/// <param name="options">Provides the label names to group by.</param>
+internal sealed class DashboardModel(IScopeRegistry registry, IHealthRollup health, IAlertState alerts, DashboardOptions options)
 {
     /// <summary>Builds the overview: a summary per scope and the alerts that are firing.</summary>
     /// <returns>The overview.</returns>
@@ -26,7 +27,7 @@ internal sealed class DashboardModel(IScopeRegistry registry, IHealthRollup heal
             .Select(a => new AlertSummary(a.Key, a.RuleName, a.Subject, a.Severity, a.Since))
             .ToList();
 
-        return new Overview(scopes, firing);
+        return new Overview(scopes, firing, [.. options.GroupBy]);
     }
 
     /// <summary>Builds the detail of one scope.</summary>
@@ -54,7 +55,7 @@ internal sealed class DashboardModel(IScopeRegistry registry, IHealthRollup heal
             .ThenBy(service => service.Name, StringComparer.Ordinal)
             .ToList();
 
-        return new ScopeDetail(scopeName, health.GetScopeHealth(scopeName), services);
+        return new ScopeDetail(scopeName, health.GetScopeHealth(scopeName), services, new Dictionary<string, string>(registry.GetScopeLabels(scopeName)));
     }
 
     private ScopeSummary Summarize(string scopeName)
@@ -65,7 +66,8 @@ internal sealed class DashboardModel(IScopeRegistry registry, IHealthRollup heal
             health.GetScopeHealth(scopeName),
             health.GetServiceHealth(scopeName).Count,
             live.Count,
-            live.Count(instance => instance.Health != HealthState.Healthy));
+            live.Count(instance => instance.Health != HealthState.Healthy),
+            new Dictionary<string, string>(registry.GetScopeLabels(scopeName)));
     }
 
     private static bool IsLive(InstanceInfo instance) =>

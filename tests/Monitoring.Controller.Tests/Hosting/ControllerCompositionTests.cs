@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monitoring.Controller.Features.AgentLink;
 using Monitoring.Controller.Features.Alerting;
+using Monitoring.Controller.Features.Dashboard;
 using Monitoring.Controller.Features.Health;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Features.Security;
@@ -149,6 +150,53 @@ public class ControllerCompositionTests
         options.Port.ShouldBe(9555);
         options.HelloTimeout.ShouldBe(TimeSpan.FromSeconds(3));
         options.ControllerReplicas.ShouldBe(["c1:9440", "c2:9440"]);
+    }
+
+    [Fact]
+    public void CreateHost_hands_the_dashboard_settings_to_the_dashboard()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret")
+            .With("Controller:Dashboard:PushInterval", "00:00:02")
+            .With("Controller:Dashboard:KeepAliveInterval", "00:00:07")
+            .With("Controller:Dashboard:GroupBy", "environment, site")
+            .Build();
+
+        // Act
+        var options = host.Services.GetRequiredService<DashboardOptions>();
+
+        // Assert
+        options.PushInterval.ShouldBe(TimeSpan.FromSeconds(2));
+        options.KeepAliveInterval.ShouldBe(TimeSpan.FromSeconds(7));
+        options.GroupBy.ShouldBe(["environment", "site"]);
+    }
+
+    [Fact]
+    public void CreateHost_groups_by_environment_and_datacenter_when_nothing_is_set()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret").Build();
+
+        // Act
+        var options = host.Services.GetRequiredService<DashboardOptions>();
+
+        // Assert
+        options.GroupBy.ShouldBe(["environment", "datacenter"]);
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("None")]
+    public void CreateHost_turns_grouping_off_when_asked_to(string value)
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret").With("Controller:Dashboard:GroupBy", value).Build();
+
+        // Act
+        var options = host.Services.GetRequiredService<DashboardOptions>();
+
+        // Assert
+        options.GroupBy.ShouldBeEmpty();
     }
 
     [Fact]

@@ -48,6 +48,20 @@ public class DashboardEndpointsTests
         scope.GetProperty("health").GetString().ShouldBe("Unhealthy");
         scope.GetProperty("instances").GetInt32().ShouldBe(1);
         json.RootElement.GetProperty("alerts").GetArrayLength().ShouldBe(0);
+        json.RootElement.GetProperty("groupBy").EnumerateArray().Select(k => k.GetString()).ShouldBe(["environment", "datacenter"]);
+    }
+
+    [Fact]
+    public async Task Overview_gives_each_scope_its_labels()
+    {
+        // Arrange
+        await using var server = await new ApiFixture().WithInstance("shop", "orders", InstanceLifecycle.Running, HealthState.Healthy).WithLabel("shop", "environment", "prod").StartAsync();
+
+        // Act
+        using var json = await server.GetJsonAsync("/api/overview");
+
+        // Assert
+        json.RootElement.GetProperty("scopes")[0].GetProperty("labels").GetProperty("environment").GetString().ShouldBe("prod");
     }
 
     [Fact]
@@ -166,6 +180,12 @@ public class DashboardEndpointsTests
         public ApiFixture WithInstance(string scope, string service, InstanceLifecycle lifecycle, HealthState health, string? id = null)
         {
             _registry.WithInstance(scope, service, lifecycle, health, id);
+            return this;
+        }
+
+        public ApiFixture WithLabel(string scope, string key, string value)
+        {
+            _registry.WithLabel(scope, key, value);
             return this;
         }
 

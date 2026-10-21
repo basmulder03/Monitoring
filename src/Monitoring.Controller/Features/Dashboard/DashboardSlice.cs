@@ -14,12 +14,18 @@ public static class DashboardSlice
     /// <param name="configure">Optionally changes the <see cref="DashboardOptions"/>.</param>
     /// <returns>The same collection, for chaining.</returns>
     /// <exception cref="ArgumentOutOfRangeException">An interval is not positive.</exception>
+    /// <exception cref="ArgumentException">A label name to group by is blank or listed twice.</exception>
     public static IServiceCollection AddDashboard(this IServiceCollection services, Action<DashboardOptions>? configure = null)
     {
         var options = new DashboardOptions();
         configure?.Invoke(options);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.PushInterval, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.KeepAliveInterval, TimeSpan.Zero);
+        if (options.GroupBy.Any(string.IsNullOrWhiteSpace) || options.GroupBy.Distinct(StringComparer.Ordinal).Count() != options.GroupBy.Count)
+        {
+            throw new ArgumentException("The label names to group by must be non-blank and different from each other.", nameof(configure));
+        }
+
 
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton(options);

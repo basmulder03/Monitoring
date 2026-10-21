@@ -8,4 +8,11 @@ namespace Monitoring.Controller.Features.Dashboard;
 /// <param name="Services">Number of services in the scope.</param>
 /// <param name="Instances">Number of live instances (Starting or Running).</param>
 /// <param name="Problems">Number of live instances that are not Healthy.</param>
-public sealed record ScopeSummary(string Name, HealthState Health, int Services, int Instances, int Problems);
+/// <param name="Labels">Labels of the scope, such as its environment, which the page groups and filters by.</param>
+public sealed record ScopeSummary(
+    string Name,
+    HealthState Health,
+    int Services,
+    int Instances,
+    int Problems,
+    IReadOnlyDictionary<string, string> Labels);

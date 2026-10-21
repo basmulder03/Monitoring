@@ -53,6 +53,13 @@ internal static class ControllerComposition
                 var dashboard = controller.Section("Dashboard");
                 options.PushInterval = dashboard.Duration("PushInterval", options.PushInterval);
                 options.KeepAliveInterval = dashboard.Duration("KeepAliveInterval", options.KeepAliveInterval);
+
+                // Unset keeps the default; "none" turns grouping off.
+                var groupBy = dashboard.List("GroupBy");
+                if (groupBy.Count > 0)
+                {
+                    options.GroupBy = groupBy is [var only] && only.Equals("none", StringComparison.OrdinalIgnoreCase) ? [] : [.. groupBy];
+                }
             })
             .AddSecurity(options => options.AgentTokens.AddRange(tokens))
             .AddAgentLink(options =>
