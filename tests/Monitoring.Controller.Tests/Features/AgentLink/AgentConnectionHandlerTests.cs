@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Monitoring.Controller.Features.AgentLink;
+using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Features.Security;
 using Monitoring.Controller.Tests.Shared;
@@ -284,13 +285,171 @@ public class AgentConnectionHandlerTests
         await session.Handling.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
+    [Fact]
+    public async Task HandleAsync_tells_the_agent_which_heartbeat_interval_to_use()
+    {
+        // Arrange
+        var session = new HandlerFixture().WithToken(Token, Scope).WithHeartbeat(TimeSpan.FromSeconds(2.2), 3).Build();
+
+        // Act
+        await session.SendAsync(HandlerFixture.Hello(Token));
+        var reply = await session.ReceiveAsync();
+
+        // Assert: rounded up, so the agent is never slower than the controller expects
+        reply.ShouldBeOfType<Config>().HeartbeatSeconds.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task HandleAsync_reports_the_agent_as_connected_once_it_is_accepted()
+    {
+        // Arrange
+        var session = new HandlerFixture().WithToken(Token, Scope).Build();
+
+        // Act
+        await session.HandshakeAsync(Token);
+
+        // Assert
+        session.Liveness.Events.ShouldBe(["connected:shop"]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_does_not_report_an_agent_that_was_refused()
+    {
+        // Arrange
+        var session = new HandlerFixture().WithToken(Token, Scope).Build();
+
+        // Act
+        await session.SendAsync(HandlerFixture.Hello("wrong"));
+        await session.ReceiveAsync();
+        await session.Handling.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // Assert
+        session.Liveness.Events.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task HandleAsync_reports_the_agent_as_heard_from_for_a_heartbeat()
+    {
+        // Arrange
+        var session = await new HandlerFixture().WithToken(Token, Scope).Build().HandshakeAsync(Token);
+
+        // Act: the snapshot that follows is answered, which shows the heartbeat before it was handled
+        await session.SendAsync(new Heartbeat(1, HealthState.Healthy));
+        await session.SendAsync(new Snapshot(1, Scope, []));
+        await session.ReceiveAsync();
+
+        // Assert: one for the heartbeat, one for the snapshot
+        session.Liveness.Events.Count(e => e == "seen:shop").ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task HandleAsync_reports_the_agent_as_heard_from_for_a_snapshot()
+    {
+        // Arrange
+        var session = await new HandlerFixture().WithToken(Token, Scope).Build().HandshakeAsync(Token);
+
+        // Act
+        await session.SendAsync(new Snapshot(1, Scope, []));
+        await session.ReceiveAsync();
+
+        // Assert
+        session.Liveness.Events.Count(e => e == "seen:shop").ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task HandleAsync_reports_the_agent_as_gone_when_it_disconnects()
+    {
+        // Arrange
+        var session = await new HandlerFixture().WithToken(Token, Scope).Build().HandshakeAsync(Token);
+
+        // Act
+        session.Disconnect();
+        await session.Handling.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // Assert
+        session.Liveness.Events.ShouldBe(["connected:shop", "disconnected:shop"]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_reports_the_agent_as_gone_when_the_connection_breaks()
+    {
+        // Arrange
+        var session = await new HandlerFixture().WithToken(Token, Scope).Build().HandshakeAsync(Token);
+
+        // Act
+        await session.SendRawAsync(HandlerFixture.FrameOf("not json"));
+        await session.Handling.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // Assert
+        session.Liveness.Events.Last().ShouldBe("disconnected:shop");
+    }
+
+    [Fact]
+    public async Task HandleAsync_reports_the_agent_as_gone_when_the_controller_shuts_down()
+    {
+        // Arrange
+        var session = await new HandlerFixture().WithToken(Token, Scope).Build().HandshakeAsync(Token);
+
+        // Act
+        session.Shutdown();
+        await session.Handling.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // Assert
+        session.Liveness.Events.Last().ShouldBe("disconnected:shop");
+    }
+
+    [Fact]
+    public async Task HandleAsync_closes_a_connection_that_stays_silent_for_the_heartbeat_timeout()
+    {
+        // Arrange
+        var session = await new HandlerFixture().WithToken(Token, Scope).WithHeartbeat(TimeSpan.FromSeconds(5), 3).Build().HandshakeAsync(Token);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+
+        // Act
+        session.Clock.Advance(TimeSpan.FromSeconds(15));
+        var reply = await session.ReceiveAsync();
+
+        // Assert
+        reply.ShouldBeNull();
+        session.Liveness.Events.Last().ShouldBe("disconnected:shop");
+    }
+
+    [Fact]
+    public async Task HandleAsync_keeps_a_connection_open_that_keeps_sending_heartbeats()
+    {
+        // Arrange
+        var session = await new HandlerFixture().WithToken(Token, Scope).WithHeartbeat(TimeSpan.FromSeconds(5), 3).Build().HandshakeAsync(Token);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+
+        // Act
+        session.Clock.Advance(TimeSpan.FromSeconds(10));
+        await session.SendAsync(new Heartbeat(1, HealthState.Healthy));
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+        session.Clock.Advance(TimeSpan.FromSeconds(10));
+        await session.SendAsync(new Snapshot(1, Scope, []));
+        var reply = await session.ReceiveAsync();
+
+        // Assert: 20 s passed in total, but never 15 s without a message
+        reply.ShouldBe(new Ack(1));
+    }
+
     /// <summary>Builds a handler served over an in-memory connection, with a fake authenticator and a real registry.</summary>
     private sealed class HandlerFixture
     {
         private readonly Dictionary<string, string> _scopeByToken = [];
         private readonly AgentLinkOptions _options = new();
+        private readonly LivenessOptions _livenessOptions = new();
 
         public FakeTimeProvider Clock { get; } = new();
+
+        public FakeAgentLiveness Liveness { get; } = new();
+
+        public HandlerFixture WithHeartbeat(TimeSpan interval, int missed)
+        {
+            _livenessOptions.HeartbeatInterval = interval;
+            _livenessOptions.MissedHeartbeats = missed;
+            return this;
+        }
 
         public HandlerFixture WithToken(string token, string scope)
         {
@@ -315,13 +474,13 @@ public class AgentConnectionHandlerTests
         {
             var registry = new ScopeRegistry(new RegistryOptions(), Clock);
             var handler = new AgentConnectionHandler(
-                new FakeAuthenticator(_scopeByToken), registry, _options, Clock, NullLogger<AgentConnectionHandler>.Instance);
+                new FakeAuthenticator(_scopeByToken), registry, Liveness, _livenessOptions, _options, Clock, NullLogger<AgentConnectionHandler>.Instance);
             var (server, client) = DuplexStream.CreatePair();
             var shutdown = new CancellationTokenSource();
 
             // Starts running on this thread up to its first await, so its hello timer exists when this returns.
             var handling = ServeAsync(handler, server, shutdown.Token);
-            return new Session(client, registry, handling, shutdown);
+            return new Session(client, registry, handling, shutdown, Liveness, Clock);
         }
 
         public static Hello Hello(string? token, int version = ProtocolVersion.Current) =>
@@ -355,8 +514,13 @@ public class AgentConnectionHandlerTests
     }
 
     /// <summary>The agent's end of a connection being served by the handler under test.</summary>
-    private sealed class Session(DuplexStream client, ScopeRegistry registry, Task handling, CancellationTokenSource shutdown)
+    private sealed class Session(
+        DuplexStream client, ScopeRegistry registry, Task handling, CancellationTokenSource shutdown, FakeAgentLiveness liveness, FakeTimeProvider clock)
     {
+        public FakeAgentLiveness Liveness { get; } = liveness;
+
+        public FakeTimeProvider Clock { get; } = clock;
+
         public ScopeRegistry Registry { get; } = registry;
 
         public Task Handling { get; } = handling;

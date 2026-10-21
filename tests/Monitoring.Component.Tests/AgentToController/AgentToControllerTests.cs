@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Monitoring.Agent.Features.ControllerLink;
 using Monitoring.Agent.Features.ScopeState;
 using Monitoring.Controller.Features.AgentLink;
+using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Features.Security;
 using Monitoring.Protocol.Health;
@@ -145,6 +146,7 @@ public class AgentToControllerTests
         {
             _provider = new ServiceCollection()
                 .AddRegistry()
+                .AddLiveness()
                 .AddSecurity(o => o.AgentTokens.Add(new AgentTokenEntry(Scope, AgentTokenHash.Compute(Token))))
                 .AddAgentLink(o =>
                 {

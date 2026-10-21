@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Features.Security;
 using Monitoring.Protocol.Framing;
@@ -17,12 +18,16 @@ namespace Monitoring.Controller.Features.AgentLink;
 /// </remarks>
 /// <param name="authenticator">Decides who the agent is.</param>
 /// <param name="registry">Receives the agent's state.</param>
+/// <param name="liveness">Told when the agent connects, is heard from and goes away.</param>
+/// <param name="livenessOptions">Provides the heartbeat interval agents are told to use and how long silence is tolerated.</param>
 /// <param name="options">Timeouts, limits and the configuration handed to agents.</param>
 /// <param name="time">Clock for the hello timeout.</param>
 /// <param name="logger">Receives the reasons a connection was refused or ended.</param>
 internal sealed class AgentConnectionHandler(
     IAgentAuthenticator authenticator,
     IScopeRegistry registry,
+    IAgentLiveness liveness,
+    LivenessOptions livenessOptions,
     AgentLinkOptions options,
     TimeProvider time,
     ILogger<AgentConnectionHandler> logger)
@@ -38,9 +43,19 @@ internal sealed class AgentConnectionHandler(
             var identity = await HandshakeAsync(stream, ct).ConfigureAwait(false);
             if (identity is not null)
             {
+                var connection = Guid.NewGuid();
+                liveness.Connected(identity.ScopeName, connection);
                 logger.LogInformation("Agent for scope '{Scope}' connected", identity.ScopeName);
-                await ReceiveAsync(stream, identity, ct).ConfigureAwait(false);
-                logger.LogInformation("Agent for scope '{Scope}' disconnected", identity.ScopeName);
+                try
+                {
+                    await ReceiveAsync(stream, identity, connection, ct).ConfigureAwait(false);
+                }
+                finally
+                {
+                    // However the connection ended, the scope no longer has this agent.
+                    liveness.Disconnected(identity.ScopeName, connection);
+                    logger.LogInformation("Agent for scope '{Scope}' disconnected", identity.ScopeName);
+                }
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -93,16 +108,27 @@ internal sealed class AgentConnectionHandler(
             return null;
         }
 
-        var config = new Config(options.ConfigVersion, options.ControllerReplicas);
+        var config = new Config(
+            options.ConfigVersion,
+            options.ControllerReplicas,
+            HeartbeatSeconds: Math.Max(1, (int)Math.Ceiling(livenessOptions.HeartbeatInterval.TotalSeconds)));
         await FrameCodec.WriteAsync(stream, config, options.MaxFrameBytes, ct).ConfigureAwait(false);
         return identity;
     }
 
-    /// <summary>Applies messages until the agent disconnects or sends something it must not.</summary>
-    private async Task ReceiveAsync(Stream stream, AgentIdentity identity, CancellationToken ct)
+    /// <summary>Applies messages until the agent disconnects, goes silent or sends something it must not.</summary>
+    private async Task ReceiveAsync(Stream stream, AgentIdentity identity, Guid connection, CancellationToken ct)
     {
-        while (await FrameCodec.ReadAsync(stream, options.MaxFrameBytes, ct).ConfigureAwait(false) is { } message)
+        while (true)
         {
+            var message = await ReadAsync(stream, ct).ConfigureAwait(false);
+            if (message is null)
+            {
+                return;
+            }
+
+            liveness.Seen(identity.ScopeName, connection);
+
             switch (message)
             {
                 case Snapshot snapshot when snapshot.ScopeName != identity.ScopeName:
@@ -122,7 +148,7 @@ internal sealed class AgentConnectionHandler(
                     break;
 
                 case Heartbeat:
-                    // Liveness tracking belongs to a later slice; the heartbeat only needs to be accepted.
+                    // Hearing from the agent is all a heartbeat is for; that was recorded above.
                     break;
 
                 case Goodbye:
@@ -132,6 +158,23 @@ internal sealed class AgentConnectionHandler(
                     logger.LogWarning("Closing agent connection: unexpected {Type} message", message.GetType().Name);
                     return;
             }
+        }
+    }
+
+    /// <summary>Reads the next message; null when the agent closed the connection or stayed silent for too long.</summary>
+    private async Task<Message?> ReadAsync(Stream stream, CancellationToken ct)
+    {
+        // A connection can die without being closed. Heartbeats arrive well within this time, so silence means it is gone.
+        using var silence = new CancellationTokenSource(livenessOptions.Timeout, time);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, silence.Token);
+        try
+        {
+            return await FrameCodec.ReadAsync(stream, options.MaxFrameBytes, linked.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (silence.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            logger.LogWarning("Closing agent connection: nothing heard for {Timeout}", livenessOptions.Timeout);
+            return null;
         }
     }
 

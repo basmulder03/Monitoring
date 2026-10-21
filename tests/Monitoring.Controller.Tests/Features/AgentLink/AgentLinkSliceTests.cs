@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Monitoring.Controller.Features.AgentLink;
+using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Features.Security;
 using Shouldly;
@@ -13,7 +14,7 @@ public class AgentLinkSliceTests
     public void AddAgentLink_makes_the_listener_resolvable_together_with_its_dependencies()
     {
         // Arrange
-        using var provider = new ServiceCollection().AddRegistry().AddSecurity(_ => { }).AddAgentLink().BuildServiceProvider();
+        using var provider = new ServiceCollection().AddRegistry().AddLiveness().AddSecurity(_ => { }).AddAgentLink().BuildServiceProvider();
 
         // Act
         var listener = provider.GetService<IAgentListener>();
@@ -86,7 +87,7 @@ public class AgentLinkSliceTests
     public void AddAgentLink_registers_the_listener_service_as_a_hosted_service()
     {
         // Arrange
-        using var provider = new ServiceCollection().AddRegistry().AddSecurity(_ => { }).AddAgentLink().BuildServiceProvider();
+        using var provider = new ServiceCollection().AddRegistry().AddLiveness().AddSecurity(_ => { }).AddAgentLink().BuildServiceProvider();
 
         // Act
         var hosted = provider.GetServices<Microsoft.Extensions.Hosting.IHostedService>();

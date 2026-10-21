@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Monitoring.Controller.Features.AgentLink;
 using Monitoring.Controller.Features.Alerting;
 using Monitoring.Controller.Features.Dashboard;
+using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Health;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Features.Security;
@@ -38,6 +39,12 @@ internal static class ControllerComposition
                 var registry = controller.Section("Registry");
                 options.GoneRetention = registry.Duration("GoneRetention", options.GoneRetention);
                 options.PurgeInterval = registry.Duration("PurgeInterval", options.PurgeInterval);
+            })
+            .AddLiveness(options =>
+            {
+                var liveness = controller.Section("Liveness");
+                options.HeartbeatInterval = liveness.Duration("HeartbeatInterval", options.HeartbeatInterval);
+                options.MissedHeartbeats = liveness.Int("MissedHeartbeats", options.MissedHeartbeats);
             })
             .AddHealth()
             .AddAlerting(options =>

@@ -9,7 +9,7 @@ public static class AgentLinkSlice
 {
     /// <summary>
     /// Adds the listener for agent connections and the background service that runs it. It needs the registry and an <see cref="Security.IAgentAuthenticator"/>,
-    /// so <c>AddRegistry</c> and <c>AddSecurity</c> must be called as well.
+    /// so <c>AddRegistry</c>, <c>AddSecurity</c> and <c>AddLiveness</c> must be called as well.
     /// </summary>
     /// <param name="services">The service collection to extend.</param>
     /// <param name="configure">Optionally changes the <see cref="AgentLinkOptions"/>.</param>
