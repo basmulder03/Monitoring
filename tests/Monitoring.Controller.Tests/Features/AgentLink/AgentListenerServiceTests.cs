@@ -60,6 +60,8 @@ public class AgentListenerServiceTests
 
         public bool Started { get; private set; }
 
+        public IPEndPoint? LocalEndPoint => Started ? new IPEndPoint(IPAddress.Loopback, 1) : null;
+
         public bool Stopped { get; private set; }
 
         /// <summary>Completes once <see cref="RunAsync"/> has been entered.</summary>

@@ -1,2 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
-Console.WriteLine("Hello, World!");
+using Monitoring.Controller.Hosting;
+using Monitoring.Hosting;
+
+return await MonitoringHost.RunAsync(args, ControllerComposition.Compose);

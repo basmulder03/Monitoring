@@ -33,6 +33,21 @@ public class AgentListenerTests
     }
 
     [Fact]
+    public async Task LocalEndPoint_is_null_until_started_and_then_the_bound_endpoint()
+    {
+        // Arrange
+        await using var fixture = new ListenerFixture().Build();
+        var before = fixture.Listener.LocalEndPoint;
+
+        // Act
+        var started = fixture.Start();
+
+        // Assert
+        before.ShouldBeNull();
+        fixture.Listener.LocalEndPoint.ShouldBe(started);
+    }
+
+    [Fact]
     public async Task Start_rejects_a_second_call()
     {
         // Arrange

@@ -16,6 +16,9 @@ internal sealed class AgentListener(
     private TcpListener? _listener;
 
     /// <inheritdoc />
+    public IPEndPoint? LocalEndPoint => (IPEndPoint?)_listener?.LocalEndpoint;
+
+    /// <inheritdoc />
     public IPEndPoint Start()
     {
         if (_listener is not null)
