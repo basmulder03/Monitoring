@@ -10,12 +10,15 @@ namespace Monitoring.Agent.Features.Discovery.Kubernetes;
 /// does not work in a Native AOT executable.
 /// </summary>
 /// <param name="http">Client whose base address is the API server and which adds the credentials.</param>
-internal sealed class HttpKubernetesApi(HttpClient http) : IKubernetesApi
+internal sealed class HttpKubernetesApi(HttpClient http) : IKubernetesApi, IDisposable
 {
     private static readonly TimeSpan ListTimeout = TimeSpan.FromSeconds(30);
 
     /// <summary>Extra time given to a watch beyond the duration the server was asked for, before the client gives up on a silent connection.</summary>
     private static readonly TimeSpan WatchGrace = TimeSpan.FromSeconds(30);
+
+    /// <summary>Releases the HTTP client.</summary>
+    public void Dispose() => http.Dispose();
 
     /// <inheritdoc />
     public async Task<PodListResult> ListPodsAsync(string namespaceName, CancellationToken ct)
