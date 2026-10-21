@@ -17,5 +17,6 @@
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Monitoring.Agent.Tests" />
+    <InternalsVisibleTo Include="Monitoring.Component.Tests" />
   </ItemGroup>
 </Project>
