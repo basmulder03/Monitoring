@@ -1,25 +1,33 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Monitoring.Ui;
 using Shouldly;
 using Xunit;
 
 namespace Monitoring.Ui.Tests;
 
-/// <summary>Runs the page script in a stand-in DOM with Node and checks what it renders for different overviews.</summary>
+/// <summary>Runs the real page and its script in jsdom (installed with npm) and checks what it renders for different overviews.</summary>
 public class ScriptBehaviourTests
 {
     [Fact]
-    public async Task The_page_script_renders_groups_filters_alerts_and_announcements_correctly()
+    public async Task The_page_script_renders_groups_filters_alerts_announcements_and_themes_correctly()
     {
         // Arrange
-        Assert.SkipUnless(NodeIsInstalled(), "Node is needed to run the page script; install it to run this test.");
-        var script = Path.Combine(Path.GetTempPath(), $"monitoring-app-{Guid.NewGuid():N}.js");
-        await File.WriteAllTextAsync(script, UiAssets.ReadText("app.js")!, TestContext.Current.CancellationToken);
+        var directory = SourceDirectory();
+        Assert.SkipUnless(NodeIsInstalled(), "Node is needed to run the page script tests. See docs/testing.md.");
+        Assert.SkipUnless(
+            Directory.Exists(Path.Combine(directory, "node_modules", "jsdom")),
+            "The dependencies of the page script tests are not installed. Run 'npm ci' in tests/Monitoring.Ui.Tests; see docs/testing.md.");
+
+        // The files under test are the ones embedded in the controller, written out for the script to read.
+        var page = Directory.CreateTempSubdirectory("monitoring-ui-");
+        await File.WriteAllTextAsync(Path.Combine(page.FullName, "index.html"), UiAssets.ReadText("index.html")!, TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(page.FullName, "app.js"), UiAssets.ReadText("app.js")!, TestContext.Current.CancellationToken);
 
         try
         {
             // Act
-            var (exitCode, output) = await RunNodeAsync(Path.Combine(AppContext.BaseDirectory, "Script", "check.js"), script);
+            var (exitCode, output) = await RunNodeAsync(directory, page.FullName);
 
             // Assert: every scenario is listed, so a failure names the scenario that broke
             exitCode.ShouldBe(0, output);
@@ -27,9 +35,11 @@ public class ScriptBehaviourTests
         }
         finally
         {
-            File.Delete(script);
+            page.Delete(recursive: true);
         }
     }
+
+    private static string SourceDirectory([CallerFilePath] string file = "") => Path.GetDirectoryName(file)!;
 
     private static bool NodeIsInstalled()
     {
@@ -45,15 +55,16 @@ public class ScriptBehaviourTests
         }
     }
 
-    private static async Task<(int ExitCode, string Output)> RunNodeAsync(string checkScript, string pageScript)
+    private static async Task<(int ExitCode, string Output)> RunNodeAsync(string directory, string pageDirectory)
     {
-        var start = new ProcessStartInfo("node", $"\"{checkScript}\"")
+        var start = new ProcessStartInfo("node", $"\"{Path.Combine(directory, "Script", "check.js")}\"")
         {
+            WorkingDirectory = directory,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
         };
-        start.Environment["MONITORING_UI_SCRIPT"] = pageScript;
+        start.Environment["MONITORING_UI_DIR"] = pageDirectory;
 
         using var process = Process.Start(start)!;
         var output = await process.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
