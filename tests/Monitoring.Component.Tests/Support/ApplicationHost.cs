@@ -18,6 +18,7 @@ internal sealed class ApplicationHost(string instanceId) : IAsyncDisposable
         ["Sidecar:Probe:Interval"] = "00:00:00.100",
     };
 
+    private readonly List<string> _traceSources = [];
     private IHost? _application;
     private IHost? _sidecar;
 
@@ -25,6 +26,13 @@ internal sealed class ApplicationHost(string instanceId) : IAsyncDisposable
     public ApplicationHost WithCheck(string name, HealthStatus status)
     {
         _checks[name] = status;
+        return this;
+    }
+
+    /// <summary>Makes the application listen to an activity source, so operations of that source count as its calls.</summary>
+    public ApplicationHost WithTraceSource(string name)
+    {
+        _traceSources.Add(name);
         return this;
     }
 
@@ -38,6 +46,7 @@ internal sealed class ApplicationHost(string instanceId) : IAsyncDisposable
             o.SocketPath = _socket;
             o.ServiceName = "orders";
             o.Version = "1.2.3";
+            o.TraceSources = [.. o.TraceSources, .. _traceSources];
         });
         foreach (var (name, status) in _checks)
         {

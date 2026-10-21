@@ -42,6 +42,7 @@ internal static class InstanceMerger
             Health = platform.Health.Worst(application.Health),
             Checks = application.Checks,
             Metrics = application.Metrics,
+            Edges = application.Edges,
         };
     }
 }

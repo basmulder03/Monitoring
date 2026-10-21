@@ -9,4 +9,5 @@ namespace Monitoring.Agent.Features.ScopeState;
 /// <param name="Health">The worst result of the application's health checks.</param>
 /// <param name="Checks">The result of each health check.</param>
 /// <param name="Metrics">The latest value of each metric; <see langword="null"/> until the application has been asked.</param>
-public sealed record ApplicationReport(string ServiceName, string? Version, HealthState Health, IReadOnlyList<HealthCheckResult> Checks, IReadOnlyList<MetricSeries>? Metrics = null);
+/// <param name="Edges">The calls to dependencies, counted since the application started; <see langword="null"/> until it has been asked.</param>
+public sealed record ApplicationReport(string ServiceName, string? Version, HealthState Health, IReadOnlyList<HealthCheckResult> Checks, IReadOnlyList<MetricSeries>? Metrics = null, IReadOnlyList<EdgeReport>? Edges = null);

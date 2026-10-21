@@ -130,9 +130,9 @@ internal sealed class SidecarConnectionHandler(
                     {
                         await PullAsync(stream, PullKind.Health, pulls, ct).ConfigureAwait(false);
                     }
-                    else if (ShouldPullMetrics(pulls))
+                    else if (NextDue(pulls) is { } kind)
                     {
-                        await PullAsync(stream, PullKind.Metrics, pulls, ct).ConfigureAwait(false);
+                        await PullAsync(stream, kind, pulls, ct).ConfigureAwait(false);
                     }
 
                     break;
@@ -145,6 +145,11 @@ internal sealed class SidecarConnectionHandler(
                 case PullResult { Kind: PullKind.Metrics } result when result.RequestId == pulls.Metrics.Request:
                     pulls.Metrics.Outstanding = false;
                     ApplyMetrics(hello, result, pulls);
+                    break;
+
+                case PullResult { Kind: PullKind.Edges } result when result.RequestId == pulls.Edges.Request:
+                    pulls.Edges.Outstanding = false;
+                    ApplyEdges(hello, result, pulls);
                     break;
 
                 case Goodbye:
@@ -170,14 +175,31 @@ internal sealed class SidecarConnectionHandler(
         return due || heartbeatHealth != pulls.Report?.Health;
     }
 
-    /// <summary>Metrics are pulled on a timer, once the application has reported its health, which shows that it is up.</summary>
-    private bool ShouldPullMetrics(PullState pulls) =>
-        pulls.Report is not null
-        && time.GetUtcNow() - pulls.Metrics.LastPullAt >= options.MetricsPullInterval;
+    /// <summary>
+    /// Metrics and edges are pulled on timers, once the application has reported its health, which shows that it is up.
+    /// With one pull per heartbeat, of the kinds that are due the one pulled longest ago goes first, so a short interval of one kind cannot starve the other.
+    /// </summary>
+    private PullKind? NextDue(PullState pulls)
+    {
+        if (pulls.Report is null)
+        {
+            return null;
+        }
+
+        var now = time.GetUtcNow();
+        var metricsDue = now - pulls.Metrics.LastPullAt >= options.MetricsPullInterval;
+        var edgesDue = now - pulls.Edges.LastPullAt >= options.EdgesPullInterval;
+        if (metricsDue && edgesDue)
+        {
+            return pulls.Metrics.LastPullAt <= pulls.Edges.LastPullAt ? PullKind.Metrics : PullKind.Edges;
+        }
+
+        return metricsDue ? PullKind.Metrics : edgesDue ? PullKind.Edges : null;
+    }
 
     private async Task PullAsync(Stream stream, PullKind kind, PullState pulls, CancellationToken ct)
     {
-        var pull = kind == PullKind.Health ? pulls.Health : pulls.Metrics;
+        var pull = kind switch { PullKind.Health => pulls.Health, PullKind.Metrics => pulls.Metrics, _ => pulls.Edges };
         pull.Request = ++pulls.LastRequestId;
         pull.Outstanding = true;
         pull.LastPullAt = time.GetUtcNow();
@@ -193,7 +215,7 @@ internal sealed class SidecarConnectionHandler(
             return;
         }
 
-        pulls.Report = new ApplicationReport(hello.ServiceName, hello.Version, health.Health, health.Checks, pulls.Report?.Metrics);
+        pulls.Report = new ApplicationReport(hello.ServiceName, hello.Version, health.Health, health.Checks, pulls.Report?.Metrics, pulls.Report?.Edges);
         Publish(hello, pulls);
     }
 
@@ -207,6 +229,18 @@ internal sealed class SidecarConnectionHandler(
         }
 
         pulls.Report = pulls.Report with { Metrics = metrics.Series };
+        Publish(hello, pulls);
+    }
+
+    private void ApplyEdges(Hello hello, PullResult result, PullState pulls)
+    {
+        var edges = ReportPayload.ReadEdges(result.PayloadJson);
+        if (edges is null || pulls.Report is null)
+        {
+            return;
+        }
+
+        pulls.Report = pulls.Report with { Edges = edges.Edges };
         Publish(hello, pulls);
     }
 
@@ -263,6 +297,8 @@ internal sealed class SidecarConnectionHandler(
         public PullProgress Health { get; } = new();
 
         public PullProgress Metrics { get; } = new();
+
+        public PullProgress Edges { get; } = new();
 
         /// <summary>What was last reported to the scope state; <see langword="null"/> before the first health answer.</summary>
         public ApplicationReport? Report { get; set; }

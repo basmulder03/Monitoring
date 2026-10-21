@@ -29,6 +29,9 @@ public sealed class SidecarConnectionsOptions
     /// <summary>How often the metrics of an application are pulled.</summary>
     public TimeSpan MetricsPullInterval { get; set; } = TimeSpan.FromSeconds(15);
 
+    /// <summary>How often the dependency edges of an application are pulled.</summary>
+    public TimeSpan EdgesPullInterval { get; set; } = TimeSpan.FromSeconds(10);
+
     /// <summary>Largest frame accepted from a sidecar, which bounds the memory one connection can claim.</summary>
     public int MaxFrameBytes { get; set; } = FrameCodec.DefaultMaxFrameBytes;
 }

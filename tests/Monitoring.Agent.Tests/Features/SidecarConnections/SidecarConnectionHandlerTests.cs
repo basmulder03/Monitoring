@@ -266,6 +266,47 @@ public class SidecarConnectionHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_pulls_the_edges_after_the_metrics()
+    {
+        // Arrange
+        var session = await new HandlerFixture().WithInstance("pod-1").Build().RegisterAsync("pod-1");
+        await session.AnswerHealthAsync(HealthState.Healthy);
+        await session.SendAsync(new Heartbeat(1, HealthState.Healthy));
+        (await session.ReceiveAsync()).ShouldBeOfType<Pull>().Kind.ShouldBe(PullKind.Metrics);
+
+        // Act
+        await session.SendAsync(new Heartbeat(2, HealthState.Healthy));
+        var pull = await session.ReceiveAsync();
+
+        // Assert
+        pull.ShouldBeOfType<Pull>().Kind.ShouldBe(PullKind.Edges);
+    }
+
+    [Fact]
+    public async Task HandleAsync_reports_the_edges_the_application_answers_with()
+    {
+        // Arrange
+        var fixture = new HandlerFixture().WithInstance("pod-1");
+        var session = await fixture.Build().RegisterAsync("pod-1");
+        await session.AnswerHealthAsync(HealthState.Healthy);
+        await session.SendAsync(new Heartbeat(1, HealthState.Healthy));
+        (await session.ReceiveAsync()).ShouldBeOfType<Pull>().Kind.ShouldBe(PullKind.Metrics);
+        await session.SendAsync(new Heartbeat(2, HealthState.Healthy));
+        var edgesPull = (await session.ReceiveAsync()).ShouldBeOfType<Pull>();
+        edgesPull.Kind.ShouldBe(PullKind.Edges);
+        var edges = new EdgesReport([new EdgeReport("HTTP", "shop:80", 5, 1, 40, [5, 0])]);
+
+        // Act
+        await session.SendAsync(new PullResult(edgesPull.RequestId, PullKind.Edges, 0, ReportPayload.Write(edges)));
+        await session.SyncAsync(HealthState.Healthy);
+
+        // Assert
+        var edge = fixture.Store.CreateSnapshot().Instances.Single().Edges!.Single();
+        edge.Target.ShouldBe("shop:80");
+        edge.Calls.ShouldBe(5);
+    }
+
+    [Fact]
     public async Task HandleAsync_ignores_an_answer_that_is_not_readable()
     {
         // Arrange

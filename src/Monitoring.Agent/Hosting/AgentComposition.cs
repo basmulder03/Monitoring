@@ -75,6 +75,7 @@ internal static class AgentComposition
         options.MissedHeartbeats = sidecars.Int("MissedHeartbeats", options.MissedHeartbeats);
         options.HealthPullInterval = sidecars.Duration("HealthPullInterval", options.HealthPullInterval);
         options.MetricsPullInterval = sidecars.Duration("MetricsPullInterval", options.MetricsPullInterval);
+        options.EdgesPullInterval = sidecars.Duration("EdgesPullInterval", options.EdgesPullInterval);
     }
 
     private static void ReadDiscovery(SettingsReader discovery, DiscoveryOptions options)

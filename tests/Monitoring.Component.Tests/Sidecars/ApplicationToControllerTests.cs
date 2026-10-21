@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Monitoring.Component.Tests.Support;
 using Monitoring.Protocol.Health;
@@ -47,6 +48,38 @@ public class ApplicationToControllerTests
         // Assert
         await Eventually.AssertAsync(() =>
             controller.Registry.GetInstances("shop").Single().Metrics!.ShouldContain(s => s.Name == "dotnet.process.memory.working_set"));
+    }
+
+    [Fact]
+    public async Task The_calls_of_the_application_to_its_dependencies_show_on_the_controller()
+    {
+        // Arrange
+        var sourceName = $"app-{Guid.NewGuid():N}";
+        using var source = new ActivitySource(sourceName);
+        await using var cluster = new FakeKubernetesApiServer().WithPod("orders-1").Start();
+        await using var controller = new ControllerHost().AcceptingEnrollment(Token).Start();
+        await using var agent = new AgentHost("shop", Token).ConnectingTo(controller).DiscoveringIn(cluster)
+            .With("Agent:Sidecars:HeartbeatInterval", "00:00:01")
+            .With("Agent:Sidecars:MetricsPullInterval", "00:00:00.100")
+            .With("Agent:Sidecars:EdgesPullInterval", "00:00:00.100").Start();
+        await using var application = new ApplicationHost("orders-1").WithTraceSource(sourceName).Start(agent);
+
+        // Act
+        for (var i = 0; i < 3; i++)
+        {
+            using var call = source.StartActivity("GET", ActivityKind.Client);
+            call!.SetTag("http.request.method", "GET");
+            call.SetTag("server.address", "payments");
+            call.SetTag("server.port", 8080);
+        }
+
+        // Assert
+        await Eventually.AssertAsync(() =>
+        {
+            var edge = controller.Registry.GetInstances("shop").Single().Edges!.Single(e => e.Target == "payments:8080");
+            edge.Target.ShouldBe("payments:8080");
+            edge.Calls.ShouldBe(3);
+        });
     }
 
     [Fact]

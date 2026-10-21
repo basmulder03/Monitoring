@@ -234,6 +234,7 @@ The sidecar next to each application connects to the agent, registers its applic
 | `Agent:Sidecars:HeartbeatInterval` | `00:00:05` | How often sidecars are told to send a heartbeat |
 | `Agent:Sidecars:MissedHeartbeats` | `3` | How many heartbeats in a row may be missing before the sidecar counts as gone and its connection is closed |
 | `Agent:Sidecars:HealthPullInterval` | `00:00:15` | How often the health checks of an application are read even when its health did not change |
+| `Agent:Sidecars:EdgesPullInterval` | `00:00:10` | How often the calls an application made to its dependencies are read. They are running totals, so nothing is lost between pulls |
 | `Agent:Sidecars:MetricsPullInterval` | `00:00:15` | How often the metrics of an application are read. They travel to the controller as the latest value per series |
 
 An instance whose sidecar is gone is shown as Unhealthy until the sidecar returns. A sidecar that says goodbye on purpose, as during a rollout, does not cause that: the agent only forgets what the application reported. A pod that exists but has no sidecar keeps what the platform says about it.
