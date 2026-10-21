@@ -555,7 +555,7 @@ The code is organized in vertical (functional) slices: each feature owns everyth
 | Executable | Slices |
 | --- | --- |
 | Controller | `AgentLink` (accepts agent connections, applies their snapshots and deltas, acknowledges them), `Registry`, `Health`, `Topology`, `Metrics`, `Alerting`, `Configuration`, `Security`, `Replication` (replica state and lag), `Dashboard` (API and event stream), `SystemMonitoring` |
-| Agent | `Discovery` (Kubernetes or Service Control Manager), `SidecarConnections`, `Collection`, `ControllerLink`, `Configuration`, `Security`, `SystemMonitoring` |
+| Agent | `ScopeState` (the in-memory record of the scope and the source of snapshots and deltas), `Discovery` (Kubernetes or Service Control Manager), `SidecarConnections`, `Collection`, `ControllerLink`, `Configuration`, `Security`, `SystemMonitoring` |
 | Sidecar | `Registration`, `Probing`, `LibraryLink`, `AgentLink` |
 | Library | `Health`, `Metrics`, `Tracing`, `Edges`, `Instrumentation` (HTTP, database, ActiveMQ), `LocalServer` |
 
