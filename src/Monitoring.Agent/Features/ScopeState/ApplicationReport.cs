@@ -1,4 +1,5 @@
 using Monitoring.Protocol.Health;
+using Monitoring.Protocol.Reports;
 
 namespace Monitoring.Agent.Features.ScopeState;
 
@@ -7,4 +8,5 @@ namespace Monitoring.Agent.Features.ScopeState;
 /// <param name="Version">Version of the application; <see langword="null"/> when it does not say.</param>
 /// <param name="Health">The worst result of the application's health checks.</param>
 /// <param name="Checks">The result of each health check.</param>
-public sealed record ApplicationReport(string ServiceName, string? Version, HealthState Health, IReadOnlyList<HealthCheckResult> Checks);
+/// <param name="Metrics">The latest value of each metric; <see langword="null"/> until the application has been asked.</param>
+public sealed record ApplicationReport(string ServiceName, string? Version, HealthState Health, IReadOnlyList<HealthCheckResult> Checks, IReadOnlyList<MetricSeries>? Metrics = null);

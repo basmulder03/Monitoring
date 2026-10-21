@@ -32,6 +32,7 @@ public static class SidecarConnectionsSlice
         ArgumentOutOfRangeException.ThrowIfLessThan(options.HeartbeatInterval, TimeSpan.FromSeconds(1));
         ArgumentOutOfRangeException.ThrowIfLessThan(options.MissedHeartbeats, 1);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.HealthPullInterval, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.MetricsPullInterval, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.MaxFrameBytes, 0);
 
         services.AddLogging();

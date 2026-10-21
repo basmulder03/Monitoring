@@ -33,6 +33,23 @@ public class ApplicationToControllerTests
     }
 
     [Fact]
+    public async Task The_metrics_of_the_application_show_on_the_controller()
+    {
+        // Arrange
+        await using var cluster = new FakeKubernetesApiServer().WithPod("orders-1").Start();
+        await using var controller = new ControllerHost().AcceptingEnrollment(Token).Start();
+        await using var agent = new AgentHost("shop", Token).ConnectingTo(controller).DiscoveringIn(cluster)
+            .With("Agent:Sidecars:MetricsPullInterval", "00:00:00.100").Start();
+
+        // Act
+        await using var application = new ApplicationHost("orders-1").Start(agent);
+
+        // Assert
+        await Eventually.AssertAsync(() =>
+            controller.Registry.GetInstances("shop").Single().Metrics!.ShouldContain(s => s.Name == "dotnet.process.memory.working_set"));
+    }
+
+    [Fact]
     public async Task An_application_whose_sidecar_says_goodbye_stays_as_healthy_as_the_platform_says()
     {
         // Arrange

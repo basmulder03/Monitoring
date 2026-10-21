@@ -191,6 +191,81 @@ public class SidecarConnectionHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_pulls_the_metrics_once_the_application_has_reported_its_health()
+    {
+        // Arrange
+        var session = await new HandlerFixture().WithInstance("pod-1").Build().RegisterAsync("pod-1");
+        await session.AnswerHealthAsync(HealthState.Healthy);
+
+        // Act
+        await session.SendAsync(new Heartbeat(1, HealthState.Healthy));
+        var pull = await session.ReceiveAsync();
+
+        // Assert
+        pull.ShouldBeOfType<Pull>().Kind.ShouldBe(PullKind.Metrics);
+    }
+
+    [Fact]
+    public async Task HandleAsync_does_not_pull_metrics_before_the_application_has_reported_its_health()
+    {
+        // Arrange
+        var session = await new HandlerFixture().WithInstance("pod-1").Build().RegisterAsync("pod-1");
+
+        // Act
+        await session.SendAsync(new Heartbeat(1, HealthState.Healthy));
+        await session.SendAsync(new Goodbye("pod-1"));
+        var rest = await session.ReadUntilClosedAsync();
+
+        // Assert
+        rest.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task HandleAsync_reports_the_metrics_the_application_answers_with()
+    {
+        // Arrange
+        var fixture = new HandlerFixture().WithInstance("pod-1");
+        var session = await fixture.Build().RegisterAsync("pod-1");
+        await session.AnswerHealthAsync(HealthState.Healthy);
+        await session.SendAsync(new Heartbeat(1, HealthState.Healthy));
+        var metricsPull = (await session.ReceiveAsync()).ShouldBeOfType<Pull>();
+        var metrics = new MetricsReport([new MetricSeries("orders.placed", new Dictionary<string, string>(), 7)]);
+
+        // Act
+        await session.SendAsync(new PullResult(metricsPull.RequestId, PullKind.Metrics, 0, ReportPayload.Write(metrics)));
+        await session.SyncAsync(HealthState.Healthy);
+
+        // Assert
+        var instance = fixture.Store.CreateSnapshot().Instances.Single();
+        instance.Metrics!.Single().Name.ShouldBe("orders.placed");
+        instance.Metrics!.Single().Value.ShouldBe(7);
+        instance.Health.ShouldBe(HealthState.Healthy);
+    }
+
+    [Fact]
+    public async Task HandleAsync_keeps_the_metrics_when_the_health_is_reported_again()
+    {
+        // Arrange
+        var fixture = new HandlerFixture().WithInstance("pod-1");
+        var session = await fixture.Build().RegisterAsync("pod-1");
+        await session.AnswerHealthAsync(HealthState.Healthy);
+        await session.SendAsync(new Heartbeat(1, HealthState.Healthy));
+        var metricsPull = (await session.ReceiveAsync()).ShouldBeOfType<Pull>();
+        await session.SendAsync(new PullResult(metricsPull.RequestId, PullKind.Metrics, 0,
+            ReportPayload.Write(new MetricsReport([new MetricSeries("orders.placed", new Dictionary<string, string>(), 7)]))));
+        await session.SyncAsync(HealthState.Healthy);
+
+        // Act
+        await session.AnswerHealthAsync(HealthState.Degraded);
+        await session.SyncAsync(HealthState.Degraded);
+
+        // Assert
+        var instance = fixture.Store.CreateSnapshot().Instances.Single();
+        instance.Health.ShouldBe(HealthState.Degraded);
+        instance.Metrics!.Single().Value.ShouldBe(7);
+    }
+
+    [Fact]
     public async Task HandleAsync_ignores_an_answer_that_is_not_readable()
     {
         // Arrange

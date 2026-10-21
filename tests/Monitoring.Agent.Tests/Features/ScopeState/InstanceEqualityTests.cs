@@ -1,6 +1,7 @@
 using Monitoring.Agent.Features.ScopeState;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Instances;
+using Monitoring.Protocol.Reports;
 using Shouldly;
 using Xunit;
 
@@ -15,8 +16,12 @@ public class InstanceEqualityTests
         HealthState health = HealthState.Healthy,
         string? version = "1.0",
         Dictionary<string, string>? labels = null,
-        IReadOnlyList<HealthCheckResult>? checks = null) =>
-        new(id, service, lifecycle, health, labels ?? new Dictionary<string, string> { ["k"] = "v" }, version, checks);
+        IReadOnlyList<HealthCheckResult>? checks = null,
+        IReadOnlyList<MetricSeries>? metrics = null) =>
+        new(id, service, lifecycle, health, labels ?? new Dictionary<string, string> { ["k"] = "v" }, version, checks, metrics);
+
+    private static MetricSeries Series(string name, double value, string? label = null) =>
+        new(name, label is null ? new Dictionary<string, string>() : new Dictionary<string, string> { ["l"] = label }, value);
 
     [Fact]
     public void AreEqual_is_true_for_instances_that_say_the_same_even_with_separate_dictionaries_and_lists()
@@ -87,5 +92,51 @@ public class InstanceEqualityTests
 
         // Assert
         equal.ShouldBe(expected);
+    }
+
+    [Fact]
+    public void AreEqual_is_true_for_the_same_metrics_in_separate_lists()
+    {
+        // Arrange
+        var a = Instance(metrics: [Series("x", 1, "a")]);
+        var b = Instance(metrics: [Series("x", 1, "a")]);
+
+        // Act
+        var equal = InstanceEquality.AreEqual(a, b);
+
+        // Assert
+        equal.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("x", 2, "a")]
+    [InlineData("y", 1, "a")]
+    [InlineData("x", 1, "b")]
+    [InlineData("x", 1, null)]
+    public void AreEqual_is_false_when_a_metric_differs(string name, double value, string? label)
+    {
+        // Arrange
+        var a = Instance(metrics: [Series("x", 1, "a")]);
+        var b = Instance(metrics: [Series(name, value, label)]);
+
+        // Act
+        var equal = InstanceEquality.AreEqual(a, b);
+
+        // Assert
+        equal.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void AreEqual_is_false_when_only_one_instance_has_metrics()
+    {
+        // Arrange
+        var a = Instance(metrics: [Series("x", 1)]);
+        var b = Instance(metrics: null);
+
+        // Act
+        var equal = InstanceEquality.AreEqual(a, b);
+
+        // Assert
+        equal.ShouldBeFalse();
     }
 }

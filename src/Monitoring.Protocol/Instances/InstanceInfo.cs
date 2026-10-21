@@ -1,4 +1,5 @@
 using Monitoring.Protocol.Health;
+using Monitoring.Protocol.Reports;
 
 namespace Monitoring.Protocol.Instances;
 
@@ -10,6 +11,7 @@ namespace Monitoring.Protocol.Instances;
 /// <param name="Labels">Free-form labels of the instance.</param>
 /// <param name="Version">Version of the application, as it reports itself; <see langword="null"/> while unknown.</param>
 /// <param name="Checks">Results of the application's own health checks; <see langword="null"/> when it reports none.</param>
+/// <param name="Metrics">The latest value of each metric of the application; <see langword="null"/> when it reports none.</param>
 public sealed record InstanceInfo(
     string Id,
     string ServiceName,
@@ -17,4 +19,5 @@ public sealed record InstanceInfo(
     HealthState Health,
     IReadOnlyDictionary<string, string> Labels,
     string? Version = null,
-    IReadOnlyList<HealthCheckResult>? Checks = null);
+    IReadOnlyList<HealthCheckResult>? Checks = null,
+    IReadOnlyList<MetricSeries>? Metrics = null);

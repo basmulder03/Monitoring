@@ -114,7 +114,7 @@ internal sealed class SidecarConnectionHandler(
     private async Task<bool> FollowAsync(Stream stream, Hello hello, CancellationToken ct)
     {
         var pulls = new PullState();
-        await PullHealthAsync(stream, pulls, ct).ConfigureAwait(false);
+        await PullAsync(stream, PullKind.Health, pulls, ct).ConfigureAwait(false);
 
         while (true)
         {
@@ -125,16 +125,26 @@ internal sealed class SidecarConnectionHandler(
                     return false;
 
                 case Heartbeat heartbeat:
-                    if (ShouldPull(pulls, heartbeat.Health))
+                    // One pull per heartbeat at most, health first: it is what the controller reacts to.
+                    if (ShouldPullHealth(pulls, heartbeat.Health))
                     {
-                        await PullHealthAsync(stream, pulls, ct).ConfigureAwait(false);
+                        await PullAsync(stream, PullKind.Health, pulls, ct).ConfigureAwait(false);
+                    }
+                    else if (ShouldPullMetrics(pulls))
+                    {
+                        await PullAsync(stream, PullKind.Metrics, pulls, ct).ConfigureAwait(false);
                     }
 
                     break;
 
-                case PullResult { Kind: PullKind.Health } result when result.RequestId == pulls.LastRequestId:
-                    pulls.Outstanding = false;
-                    Report(hello, result, pulls);
+                case PullResult { Kind: PullKind.Health } result when result.RequestId == pulls.Health.Request:
+                    pulls.Health.Outstanding = false;
+                    ApplyHealth(hello, result, pulls);
+                    break;
+
+                case PullResult { Kind: PullKind.Metrics } result when result.RequestId == pulls.Metrics.Request:
+                    pulls.Metrics.Outstanding = false;
+                    ApplyMetrics(hello, result, pulls);
                     break;
 
                 case Goodbye:
@@ -148,27 +158,33 @@ internal sealed class SidecarConnectionHandler(
     }
 
     /// <summary>A pull is needed when the health differs from what was last reported, or the checks have not been read for a while.</summary>
-    private bool ShouldPull(PullState pulls, HealthState heartbeatHealth)
+    private bool ShouldPullHealth(PullState pulls, HealthState heartbeatHealth)
     {
-        var due = time.GetUtcNow() - pulls.LastPullAt >= options.HealthPullInterval;
-        if (pulls.Outstanding)
+        var due = time.GetUtcNow() - pulls.Health.LastPullAt >= options.HealthPullInterval;
+        if (pulls.Health.Outstanding)
         {
             // An answer that never came must not stop the pulls for good.
             return due;
         }
 
-        return due || heartbeatHealth != pulls.ReportedHealth;
+        return due || heartbeatHealth != pulls.Report?.Health;
     }
 
-    private async Task PullHealthAsync(Stream stream, PullState pulls, CancellationToken ct)
+    /// <summary>Metrics are pulled on a timer, once the application has reported its health, which shows that it is up.</summary>
+    private bool ShouldPullMetrics(PullState pulls) =>
+        pulls.Report is not null
+        && time.GetUtcNow() - pulls.Metrics.LastPullAt >= options.MetricsPullInterval;
+
+    private async Task PullAsync(Stream stream, PullKind kind, PullState pulls, CancellationToken ct)
     {
-        pulls.LastRequestId++;
-        pulls.Outstanding = true;
-        pulls.LastPullAt = time.GetUtcNow();
-        await FrameCodec.WriteAsync(stream, new Pull(pulls.LastRequestId, PullKind.Health, 0), options.MaxFrameBytes, ct).ConfigureAwait(false);
+        var pull = kind == PullKind.Health ? pulls.Health : pulls.Metrics;
+        pull.Request = ++pulls.LastRequestId;
+        pull.Outstanding = true;
+        pull.LastPullAt = time.GetUtcNow();
+        await FrameCodec.WriteAsync(stream, new Pull(pull.Request, kind, 0), options.MaxFrameBytes, ct).ConfigureAwait(false);
     }
 
-    private void Report(Hello hello, PullResult result, PullState pulls)
+    private void ApplyHealth(Hello hello, PullResult result, PullState pulls)
     {
         var health = ReportPayload.ReadHealth(result.PayloadJson);
         if (health is null)
@@ -177,8 +193,26 @@ internal sealed class SidecarConnectionHandler(
             return;
         }
 
-        pulls.ReportedHealth = health.Health;
-        store.Report(hello.InstanceId, new ApplicationReport(hello.ServiceName, hello.Version, health.Health, health.Checks));
+        pulls.Report = new ApplicationReport(hello.ServiceName, hello.Version, health.Health, health.Checks, pulls.Report?.Metrics);
+        Publish(hello, pulls);
+    }
+
+    private void ApplyMetrics(Hello hello, PullResult result, PullState pulls)
+    {
+        var metrics = ReportPayload.ReadMetrics(result.PayloadJson);
+        if (metrics is null || pulls.Report is null)
+        {
+            // An application that has no metrics, or sent rubbish, is not worth a warning on every pull.
+            return;
+        }
+
+        pulls.Report = pulls.Report with { Metrics = metrics.Series };
+        Publish(hello, pulls);
+    }
+
+    private void Publish(Hello hello, PullState pulls)
+    {
+        store.Report(hello.InstanceId, pulls.Report!);
         store.Publish();
     }
 
@@ -226,10 +260,21 @@ internal sealed class SidecarConnectionHandler(
     {
         public long LastRequestId { get; set; }
 
+        public PullProgress Health { get; } = new();
+
+        public PullProgress Metrics { get; } = new();
+
+        /// <summary>What was last reported to the scope state; <see langword="null"/> before the first health answer.</summary>
+        public ApplicationReport? Report { get; set; }
+    }
+
+    /// <summary>Where one kind of pull stands.</summary>
+    private sealed class PullProgress
+    {
+        public long Request { get; set; }
+
         public bool Outstanding { get; set; }
 
         public DateTimeOffset LastPullAt { get; set; }
-
-        public HealthState? ReportedHealth { get; set; }
     }
 }
