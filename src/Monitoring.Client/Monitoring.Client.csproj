@@ -13,6 +13,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Ships with the package, so every application that references the client lists what it is built from. -->
+    <None Include="build/Monitoring.Client.targets" Pack="true" PackagePath="build;buildTransitive" />
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="Monitoring.Client.Tests" />
   </ItemGroup>
 </Project>

@@ -5,6 +5,7 @@ using Monitoring.Client.Features.Health;
 using Monitoring.Client.Features.Info;
 using Monitoring.Client.Features.LocalServer;
 using Monitoring.Client.Features.Metrics;
+using Monitoring.Client.Features.Packages;
 using Monitoring.Client.Features.Tracing;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -43,6 +44,7 @@ public static class MonitoringExtensions
         services.AddHostedService(provider => provider.GetRequiredService<TraceCollector>());
         services.AddSingleton<IPullSource, EdgesPullSource>();
         services.AddSingleton<IPullSource, SpansPullSource>();
+        services.AddSingleton<IPullSource, PackagesPullSource>();
         services.TryAddSingleton<PullHandler>();
         services.AddHostedService<LocalServer>();
         return services;

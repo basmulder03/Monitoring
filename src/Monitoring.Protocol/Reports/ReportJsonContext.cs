@@ -12,4 +12,5 @@ namespace Monitoring.Protocol.Reports;
 [JsonSerializable(typeof(MetricsReport))]
 [JsonSerializable(typeof(EdgesReport))]
 [JsonSerializable(typeof(SpansReport))]
+[JsonSerializable(typeof(PackagesReport))]
 public sealed partial class ReportJsonContext : JsonSerializerContext;

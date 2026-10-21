@@ -43,6 +43,7 @@ internal static class InstanceMerger
             Checks = application.Checks,
             Metrics = application.Metrics,
             Edges = application.Edges,
+            Packages = application.Packages,
         };
     }
 }

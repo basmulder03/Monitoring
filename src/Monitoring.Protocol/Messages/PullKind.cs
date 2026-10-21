@@ -17,4 +17,7 @@ public enum PullKind : byte
 
     /// <summary>Aggregated caller-to-callee edge counters.</summary>
     Edges,
+
+    /// <summary>The packages the application is built from; changes only with a new version of the application.</summary>
+    Packages,
 }

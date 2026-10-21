@@ -1,0 +1,28 @@
+<Project>
+  <!--
+    Lists the packages an application is built from and embeds the list in the application, so the monitoring client can report it.
+    A Native AOT binary cannot ask NuGet what it contains, so this is done at build time, from what NuGet resolved.
+    Turn it off with <MonitoringReportPackages>false</MonitoringReportPackages>.
+    The file has one package per line: "D name" for a package the project asks for itself, "P name version" for every package built in.
+  -->
+  <PropertyGroup>
+    <MonitoringReportPackages Condition="'$(MonitoringReportPackages)' == ''">true</MonitoringReportPackages>
+    <MonitoringPackagesFile>$(IntermediateOutputPath)monitoring.packages.txt</MonitoringPackagesFile>
+  </PropertyGroup>
+
+  <Target Name="MonitoringWritePackages" BeforeTargets="AssignTargetPaths" DependsOnTargets="ResolvePackageAssets"
+          Condition="'$(MonitoringReportPackages)' == 'true' And '$(OutputType)' != 'Library'">
+    <ItemGroup>
+      <_MonitoringResolved Include="@(RuntimeCopyLocalItems);@(ResolvedCompileFileDefinitions)" Condition="'%(NuGetPackageId)' != ''" />
+      <_MonitoringPackage Include="@(_MonitoringResolved->'P %(NuGetPackageId) %(NuGetPackageVersion)')" />
+      <_MonitoringDirect Include="@(PackageReference->'D %(Identity)')" />
+    </ItemGroup>
+    <RemoveDuplicates Inputs="@(_MonitoringPackage)">
+      <Output TaskParameter="Filtered" ItemName="_MonitoringPackageUnique" />
+    </RemoveDuplicates>
+    <WriteLinesToFile File="$(MonitoringPackagesFile)" Lines="@(_MonitoringDirect);@(_MonitoringPackageUnique)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <EmbeddedResource Include="$(MonitoringPackagesFile)" LogicalName="Monitoring.Packages" />
+    </ItemGroup>
+  </Target>
+</Project>

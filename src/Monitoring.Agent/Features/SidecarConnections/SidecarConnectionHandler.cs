@@ -146,6 +146,19 @@ internal sealed class SidecarConnectionHandler(
                 case PullResult { Kind: PullKind.Health } result when result.RequestId == pulls.Health.Request:
                     pulls.Health.Outstanding = false;
                     ApplyHealth(hello, result, pulls);
+
+                    // What the application is built from does not change while it runs, so it is asked once, as soon as it is known to be up.
+                    if (!pulls.PackagesAsked && pulls.Report is not null)
+                    {
+                        pulls.PackagesAsked = true;
+                        await PullAsync(stream, PullKind.Packages, pulls, ct).ConfigureAwait(false);
+                    }
+
+                    break;
+
+                case PullResult { Kind: PullKind.Packages } result when result.RequestId == pulls.Packages.Request:
+                    pulls.Packages.Outstanding = false;
+                    ApplyPackages(hello, result, pulls);
                     break;
 
                 case PullResult { Kind: PullKind.Metrics } result when result.RequestId == pulls.Metrics.Request:
@@ -206,7 +219,7 @@ internal sealed class SidecarConnectionHandler(
 
     private async Task PullAsync(Stream stream, PullKind kind, PullState pulls, CancellationToken ct)
     {
-        var pull = kind switch { PullKind.Health => pulls.Health, PullKind.Metrics => pulls.Metrics, _ => pulls.Edges };
+        var pull = kind switch { PullKind.Health => pulls.Health, PullKind.Metrics => pulls.Metrics, PullKind.Packages => pulls.Packages, _ => pulls.Edges };
         pull.Request = ++pulls.LastRequestId;
         pull.Outstanding = true;
         pull.LastPullAt = time.GetUtcNow();
@@ -222,7 +235,7 @@ internal sealed class SidecarConnectionHandler(
             return;
         }
 
-        pulls.Report = new ApplicationReport(hello.ServiceName, hello.Version, health.Health, health.Checks, pulls.Report?.Metrics, pulls.Report?.Edges);
+        pulls.Report = new ApplicationReport(hello.ServiceName, hello.Version, health.Health, health.Checks, pulls.Report?.Metrics, pulls.Report?.Edges, pulls.Report?.Packages);
         Publish(hello, pulls);
     }
 
@@ -236,6 +249,19 @@ internal sealed class SidecarConnectionHandler(
         }
 
         pulls.Report = pulls.Report with { Metrics = metrics.Series };
+        Publish(hello, pulls);
+    }
+
+    // shortcut: the list travels with every instance, so a service with many replicas repeats it; send it once per distinct list when snapshots get large.
+    private void ApplyPackages(Hello hello, PullResult result, PullState pulls)
+    {
+        var packages = ReportPayload.ReadPackages(result.PayloadJson);
+        if (packages is null || pulls.Report is null)
+        {
+            return;
+        }
+
+        pulls.Report = pulls.Report with { Packages = packages.Packages };
         Publish(hello, pulls);
     }
 
@@ -306,6 +332,11 @@ internal sealed class SidecarConnectionHandler(
         public PullProgress Metrics { get; } = new();
 
         public PullProgress Edges { get; } = new();
+
+        public PullProgress Packages { get; } = new();
+
+        /// <summary>Whether the packages were asked for on this connection.</summary>
+        public bool PackagesAsked { get; set; }
 
         /// <summary>What was last reported to the scope state; <see langword="null"/> before the first health answer.</summary>
         public ApplicationReport? Report { get; set; }

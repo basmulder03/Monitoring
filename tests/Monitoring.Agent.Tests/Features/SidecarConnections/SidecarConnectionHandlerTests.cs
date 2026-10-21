@@ -290,6 +290,59 @@ public class SidecarConnectionHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_asks_for_the_packages_once_after_the_first_health_answer()
+    {
+        // Arrange
+        var session = await new HandlerFixture().WithInstance("pod-1").Build().RegisterAsync("pod-1");
+
+        // Act
+        await session.SendAsync(new PullResult(session.LastPullId, PullKind.Health, 0, ReportPayload.Write(new HealthReport(HealthState.Healthy, []))));
+        var asked = await session.ReceiveAsync();
+        await session.SendAsync(new PullResult(((Pull)asked!).RequestId, PullKind.Packages, 0, ReportPayload.Write(new PackagesReport(".NET 10", []))));
+        await session.SendAsync(new Heartbeat(1, HealthState.Healthy));
+        var next = await session.ReceiveAsync();
+
+        // Assert
+        asked.ShouldBeOfType<Pull>().Kind.ShouldBe(PullKind.Packages);
+        next.ShouldBeOfType<Pull>().Kind.ShouldBe(PullKind.Metrics);
+    }
+
+    [Fact]
+    public async Task HandleAsync_reports_the_packages_the_application_answers_with()
+    {
+        // Arrange
+        var fixture = new HandlerFixture().WithInstance("pod-1");
+        var session = await fixture.Build().RegisterAsync("pod-1");
+        session.Packages = [new PackageReport("Serilog", "4.0.0", Direct: true), new PackageReport("Serilog.Sinks.File", "6.0.0", Direct: false)];
+
+        // Act
+        await session.AnswerHealthAsync(HealthState.Healthy);
+        await session.SyncAsync(HealthState.Healthy);
+
+        // Assert
+        var packages = fixture.Store.CreateSnapshot().Instances.Single().Packages!;
+        packages.Select(p => (p.Name, p.Version, p.Direct)).ShouldBe([("Serilog", "4.0.0", true), ("Serilog.Sinks.File", "6.0.0", false)]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_keeps_the_packages_when_the_health_is_reported_again()
+    {
+        // Arrange
+        var fixture = new HandlerFixture().WithInstance("pod-1");
+        var session = await fixture.Build().RegisterAsync("pod-1");
+        session.Packages = [new PackageReport("Serilog", "4.0.0", Direct: true)];
+        await session.AnswerHealthAsync(HealthState.Healthy);
+        await session.SyncAsync(HealthState.Healthy);
+
+        // Act
+        await session.AnswerHealthAsync(HealthState.Degraded);
+        await session.SyncAsync(HealthState.Degraded);
+
+        // Assert
+        fixture.Store.CreateSnapshot().Instances.Single().Packages!.Single().Name.ShouldBe("Serilog");
+    }
+
+    [Fact]
     public async Task HandleAsync_pulls_the_edges_after_the_metrics()
     {
         // Arrange
@@ -522,9 +575,26 @@ public class SidecarConnectionHandlerTests
             return this;
         }
 
-        /// <summary>Answers the outstanding health pull.</summary>
-        public Task AnswerHealthAsync(HealthState health, params HealthCheckResult[] checks) =>
-            SendAsync(new PullResult(LastPullId, PullKind.Health, 0, ReportPayload.Write(new HealthReport(health, checks))));
+        /// <summary>
+        /// Answers the outstanding health pull. The first time, the agent then asks for the packages of the application, which this
+        /// answers as well (with none), so what follows is only what a test is about.
+        /// </summary>
+        public async Task AnswerHealthAsync(HealthState health, params HealthCheckResult[] checks)
+        {
+            await SendAsync(new PullResult(LastPullId, PullKind.Health, 0, ReportPayload.Write(new HealthReport(health, checks))));
+            if (!_packagesAnswered)
+            {
+                _packagesAnswered = true;
+                var ask = (await ReceiveAsync()).ShouldBeOfType<Pull>();
+                ask.Kind.ShouldBe(PullKind.Packages);
+                await SendAsync(new PullResult(ask.RequestId, PullKind.Packages, 0, ReportPayload.Write(new PackagesReport(".NET 10", Packages ?? []))));
+            }
+        }
+
+        /// <summary>What the application says it is built from, when it is asked; none unless set.</summary>
+        public IReadOnlyList<PackageReport>? Packages { get; set; }
+
+        private bool _packagesAnswered;
 
         /// <summary>
         /// Waits until the handler has dealt with everything sent so far. A heartbeat whose health differs from the last reported one

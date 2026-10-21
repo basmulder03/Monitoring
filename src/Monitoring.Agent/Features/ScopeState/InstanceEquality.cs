@@ -21,7 +21,8 @@ internal static class InstanceEquality
         && ChecksAreEqual(a.Checks, b.Checks)
         && MetricsAreEqual(a.Metrics, b.Metrics)
         && ContainersAreEqual(a.Containers, b.Containers)
-        && EdgesAreEqual(a.Edges, b.Edges);
+        && EdgesAreEqual(a.Edges, b.Edges)
+        && PackagesAreEqual(a.Packages, b.Packages);
 
     private static bool ChecksAreEqual(IReadOnlyList<Monitoring.Protocol.Health.HealthCheckResult>? a, IReadOnlyList<Monitoring.Protocol.Health.HealthCheckResult>? b)
     {
@@ -71,5 +72,15 @@ internal static class InstanceEquality
             && pair.First.Errors == pair.Second.Errors
             && pair.First.DurationSumMs.Equals(pair.Second.DurationSumMs)
             && pair.First.Buckets.SequenceEqual(pair.Second.Buckets));
+    }
+
+    private static bool PackagesAreEqual(IReadOnlyList<PackageReport>? a, IReadOnlyList<PackageReport>? b)
+    {
+        if (a is null || b is null)
+        {
+            return a is null && b is null;
+        }
+
+        return a.SequenceEqual(b);
     }
 }

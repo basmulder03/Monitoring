@@ -35,6 +35,12 @@ public static class ReportPayload
     public static string Write(SpansReport report) =>
         JsonSerializer.Serialize(report, ReportJsonContext.Default.SpansReport);
 
+    /// <summary>Writes the packages of an application.</summary>
+    /// <param name="report">The report.</param>
+    /// <returns>The JSON text.</returns>
+    public static string Write(PackagesReport report) =>
+        JsonSerializer.Serialize(report, ReportJsonContext.Default.PackagesReport);
+
     /// <summary>Reads a description of an application.</summary>
     /// <param name="json">The JSON text of a pull result.</param>
     /// <returns>The description, or <see langword="null"/> when the text is not one.</returns>
@@ -64,6 +70,12 @@ public static class ReportPayload
     /// <returns>The report, or <see langword="null"/> when the text is not one.</returns>
     public static SpansReport? ReadSpans(string? json) =>
         Read(json, ReportJsonContext.Default.SpansReport);
+
+    /// <summary>Reads the packages of an application.</summary>
+    /// <param name="json">The JSON text of a pull result.</param>
+    /// <returns>The report, or <see langword="null"/> when the text is not one.</returns>
+    public static PackagesReport? ReadPackages(string? json) =>
+        Read(json, ReportJsonContext.Default.PackagesReport);
 
     private static T? Read<T>(string? json, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> type)
         where T : class

@@ -174,7 +174,7 @@ internal sealed class AgentSession(
             case PullKind.Health:
                 return new PullResult(pull.RequestId, pull.Kind, pull.Cursor, ReportPayload.Write(status.Health));
 
-            case PullKind.Metrics or PullKind.Edges or PullKind.Spans:
+            case PullKind.Metrics or PullKind.Edges or PullKind.Spans or PullKind.Packages:
                 // The sidecar only passes these on, so it needs no idea of what they contain; the cursor is the application's own.
                 var answer = await link.PullAsync(pull.Kind, pull.Cursor, ct).ConfigureAwait(false);
                 return new PullResult(pull.RequestId, pull.Kind, answer?.Cursor ?? pull.Cursor, answer?.PayloadJson);

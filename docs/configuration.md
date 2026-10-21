@@ -305,3 +305,12 @@ Each pod is shown down to its containers, taken from the same pod watch, so no e
 | Exited with an error | Unhealthy |
 
 Each container also carries its restart count, image, image digest, the reason and message of what it waits for, and the reason and exit code of its previous run, for example `OOMKilled`.
+
+### Packages of an application
+
+An application that references the monitoring client lists the packages it is built from, so the dashboard can show what each service contains. A Native AOT binary cannot ask NuGet at run time, so the list is written during the build: the client package ships MSBuild targets (`build/Monitoring.Client.targets`) that read what NuGet restored (direct and transitive packages with their versions) and embed it in the application. Nothing needs to be configured.
+
+- The list is only made for executables (applications and services), not for libraries.
+- Turn it off for a project with `<MonitoringReportPackages>false</MonitoringReportPackages>`; the application then reports an empty list.
+- The agent asks for the list once per sidecar connection, as soon as the application has reported its health, because it can only change with a new version of the application.
+

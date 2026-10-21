@@ -13,6 +13,7 @@ namespace Monitoring.Protocol.Instances;
 /// <param name="Checks">Results of the application's own health checks; <see langword="null"/> when it reports none.</param>
 /// <param name="Metrics">The latest value of each metric of the application; <see langword="null"/> when it reports none.</param>
 /// <param name="Edges">The calls the application made to its dependencies, counted since it started; <see langword="null"/> when it reports none.</param>
+/// <param name="Packages">The packages the application is built from; <see langword="null"/> until it has said.</param>
 /// <param name="Containers">The containers of a pod; <see langword="null"/> for instances that are not pods.</param>
 public sealed record InstanceInfo(
     string Id,
@@ -24,4 +25,5 @@ public sealed record InstanceInfo(
     IReadOnlyList<HealthCheckResult>? Checks = null,
     IReadOnlyList<MetricSeries>? Metrics = null,
     IReadOnlyList<ContainerInfo>? Containers = null,
-    IReadOnlyList<EdgeReport>? Edges = null);
+    IReadOnlyList<EdgeReport>? Edges = null,
+    IReadOnlyList<PackageReport>? Packages = null);
