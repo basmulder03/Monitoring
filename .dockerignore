@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+artifacts/
+**/node_modules/
+src/Monitoring.Ui/wwwroot/
+.git/
+.github/
+docs/
+tests/
+published/

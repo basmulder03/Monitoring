@@ -54,3 +54,18 @@ jobs:
         run: scripts/aot-smoke.sh published
       - name: Sizes
         run: ls -l published/*/Monitoring.Controller published/*/Monitoring.Agent published/*/Monitoring.Sidecar | awk '{ print $5, $9 }'
+
+  # The images are built, not pushed: a Dockerfile that no longer builds should fail the change that broke it.
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        project: [Controller, Agent, Sidecar]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build --build-arg PROJECT=${{ matrix.project }} -t monitoring-${{ matrix.project }}:ci -f deploy/Dockerfile .
+      - name: Size
+        run: docker images monitoring-${{ matrix.project }}:ci --format '{{.Repository}} {{.Size}}'
+
