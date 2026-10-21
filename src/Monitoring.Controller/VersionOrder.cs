@@ -1,4 +1,4 @@
-namespace Monitoring.Controller.Features.Packages;
+namespace Monitoring.Controller;
 
 /// <summary>Orders package versions: by their numbers first, and a pre-release such as <c>1.0.0-beta</c> before the release it leads up to.</summary>
 internal sealed class VersionOrder : IComparer<string>

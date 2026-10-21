@@ -147,3 +147,20 @@ export interface TopologyNode {
   scope: string | null;
   health: HealthState | null;
 }
+
+export interface VulnerabilityFinding {
+  advisory: string;
+  aliases: string[];
+  summary: string | null;
+  severity: string;
+  package: string;
+  version: string;
+  fixedIn: string | null;
+  usedBy: PackageUsage[];
+}
+
+export interface VulnerabilityReport {
+  findings: VulnerabilityFinding[];
+  advisories: number;
+  loadedAt: string | null;
+}

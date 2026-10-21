@@ -96,6 +96,18 @@ Different services may use different versions of a library, and often that is fi
 
 Pre-release labels do not count: `10.0.0-rc.1` and `10.0.0` are the same version for `minor` and `major`, but not for `exact`.
 
+### Vulnerable packages
+
+The controller checks every package version in use against advisories in the [OSV format](https://ossf.github.io/osv-schema/), for example an export of the GitHub Advisory Database for NuGet. It does not fetch advisories itself, so it can run in a closed network and its answer does not depend on an outside service: you provide the file or folder, and a scheduled job of your own keeps it current. A change is picked up without a restart; a file that cannot be read is logged and the advisories that were loaded stay in force.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Controller:Vulnerabilities:Advisories` | none | A JSON file (one advisory or a list) or a folder of such files, read including subfolders. Without it nothing is checked, and the page says so |
+| `Controller:Vulnerabilities:PollInterval` | `00:01:00` | How often the file or folder is looked at for a change |
+| `Controller:Alerting:VulnerablePackageWait` | `00:00:00` | How long a vulnerable version must be in use before its alert fires |
+
+A finding is raised for each advisory, package and version in use. Versions match through the ranges of the advisory (`introduced`, `fixed`, `last_affected`) or its list of versions; only the NuGet ecosystem is used. Advisories with severity HIGH or CRITICAL raise the critical alert `vulnerable-package-critical`; the rest, including advisories that do not give a severity, raise the warning `vulnerable-package`. Silences work as for any other alert.
+
 ### Silences
 
 A silence keeps alerts out of the dashboard until it ends, for example during planned maintenance. The conditions are still checked, so an alert that is still true when the silence ends appears at once. A silence has to end: `Until` is required, and an expired silence does nothing.
@@ -198,6 +210,7 @@ The controller serves the dashboard itself, so there is nothing else to install.
 | `/api/packages/<name>` | One package, with every version in use and by whom |
 | `/api/sbom` | The packages of the whole landscape as a CycloneDX 1.5 bill of materials (JSON), each package and version once |
 | `/api/sbom/<scope>/<service>` | The bill of materials of one service, which vulnerability scanners and licence checks can read |
+| `/api/vulnerabilities` | The package versions in use that the loaded advisories say are vulnerable, most severe first, with the fix and the services affected, and how many advisories were checked against |
 | `/api/events` | The overview as Server-Sent Events: the current one at once, then one per change, plus a keep-alive event while nothing changes |
 
 The page has no login yet; reach it only over a network you trust.

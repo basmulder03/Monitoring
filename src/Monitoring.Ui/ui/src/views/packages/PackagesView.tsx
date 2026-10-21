@@ -3,6 +3,7 @@ import type { PackageCatalog, PackageEntry } from "../../api/contracts";
 import { plural } from "../../format";
 import { useDisclosure } from "../../state/OpenState";
 import { useJson } from "../../state/useJson";
+import { VulnerabilitiesSection } from "./VulnerabilitiesSection";
 
 function PackageRow({ entry }: { entry: PackageEntry }) {
   const differs = entry.versions.length > 1;
@@ -57,6 +58,7 @@ export function PackagesView({ refresh }: { refresh: unknown }) {
   return (
     <div>
       <h2>Packages</h2>
+      <VulnerabilitiesSection refresh={refresh} />
       {catalog.packages.length === 0 ? (
         <p class="muted">No service has reported what it is built from yet.</p>
       ) : (

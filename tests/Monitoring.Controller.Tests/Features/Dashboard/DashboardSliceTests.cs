@@ -6,6 +6,7 @@ using Monitoring.Controller.Features.Health;
 using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Packages;
 using Monitoring.Controller.Features.Registry;
+using Monitoring.Controller.Features.Vulnerabilities;
 using Shouldly;
 using Xunit;
 
@@ -17,7 +18,7 @@ public class DashboardSliceTests
     public void AddDashboard_makes_the_model_resolvable_together_with_what_it_reads_from()
     {
         // Arrange
-        using var provider = new ServiceCollection().AddRegistry().AddLiveness().AddHealth().AddPackages().AddAlerting().AddConfiguration().AddDashboard().BuildServiceProvider();
+        using var provider = new ServiceCollection().AddRegistry().AddLiveness().AddHealth().AddPackages().AddVulnerabilities().AddAlerting().AddConfiguration().AddDashboard().BuildServiceProvider();
 
         // Act
         var model = provider.GetService<DashboardModel>();

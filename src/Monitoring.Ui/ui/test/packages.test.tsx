@@ -1,5 +1,5 @@
 import { act } from "preact/test-utils";
-import type { PackageCatalog } from "../src/api/contracts";
+import type { PackageCatalog, VulnerabilityReport } from "../src/api/contracts";
 import { all, mount, overview, scope } from "./harness";
 
 const catalog: PackageCatalog = {
@@ -107,5 +107,55 @@ describe("the packages view", () => {
     await openPackages();
     const current = [...document.querySelectorAll("nav a[aria-current='page']")].map((a) => a.textContent);
     expect(current).toEqual(["Packages"]);
+  });
+});
+
+describe("the vulnerabilities in the packages view", () => {
+  const finding = {
+    advisory: "GHSA-1",
+    aliases: ["CVE-2026-1"],
+    summary: "Remote code <b>execution</b>",
+    severity: "CRITICAL",
+    package: "Serilog",
+    version: "3.1.0",
+    fixedIn: "4.0.0",
+    usedBy: [{ scope: "billing", service: "invoices", instances: 1, direct: false }],
+  };
+
+  async function openWith(vulnerabilities: VulnerabilityReport) {
+    const page = mount("/#/packages", (services) => {
+      services.packages = catalog;
+      services.vulnerabilities = vulnerabilities;
+    });
+    page.services.send(overview([scope("shop", "Healthy")], []));
+    await page.settle();
+    return page;
+  }
+
+  it("lists the findings with severity in words, the fix and who is affected", async () => {
+    const page = await openWith({ findings: [finding], advisories: 12, loadedAt: null });
+    const text = page.main.querySelector(".finding")!.textContent!;
+    for (const expected of ["Critical", "Serilog 3.1.0", "GHSA-1 (CVE-2026-1)", "Fixed in 4.0.0.", "Used by billing/invoices"]) expect(text).toContain(expected);
+  });
+
+  it("says when no fix is known", async () => {
+    const page = await openWith({ findings: [{ ...finding, fixedIn: null }], advisories: 1, loadedAt: null });
+    expect(page.main.textContent).toContain("No fix is known.");
+  });
+
+  it("shows what an advisory says as text, never as markup", async () => {
+    const page = await openWith({ findings: [finding], advisories: 1, loadedAt: null });
+    expect(page.main.querySelectorAll(".finding b")).toHaveLength(0);
+    expect(page.main.textContent).toContain("Remote code <b>execution</b>");
+  });
+
+  it("says when no advisories are loaded, so a clean list is not mistaken for a clean landscape", async () => {
+    const page = await openWith({ findings: [], advisories: 0, loadedAt: null });
+    expect(page.main.textContent).toContain("No advisories are loaded, so nothing was checked.");
+  });
+
+  it("says when nothing in use is affected", async () => {
+    const page = await openWith({ findings: [], advisories: 3, loadedAt: null });
+    expect(page.main.textContent).toContain("No package in use is affected by the 3 advisories that are loaded.");
   });
 });

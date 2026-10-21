@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Monitoring.Controller.Features.Vulnerabilities;
 
 namespace Monitoring.Controller.Features.Alerting;
 
@@ -7,7 +8,7 @@ namespace Monitoring.Controller.Features.Alerting;
 public static class AlertingSlice
 {
     /// <summary>
-    /// Adds the default rules, the evaluator and the background service that runs it. It reads from the registry and the liveness tracking, so <c>AddRegistry</c>, <c>AddLiveness</c> and <c>AddPackages</c> must be called as well.
+    /// Adds the default rules, the evaluator and the background service that runs it. It reads from the registry and the liveness tracking, so <c>AddRegistry</c>, <c>AddLiveness</c>, <c>AddPackages</c> and <c>AddVulnerabilities</c> must be called as well.
     /// </summary>
     /// <param name="services">The service collection to extend.</param>
     /// <param name="configure">Optionally changes the <see cref="AlertingOptions"/>.</param>
@@ -22,6 +23,7 @@ public static class AlertingSlice
         ArgumentOutOfRangeException.ThrowIfLessThan(options.ServiceDownWait, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.ScopeUnknownWait, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.PackageDriftWait, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.VulnerablePackageWait, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.RestartLoopCount, 1);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.RestartLoopWindow, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.EvaluationInterval, TimeSpan.Zero);
@@ -38,6 +40,10 @@ public static class AlertingSlice
         services.AddSingleton<IAlertRule, ScopeUnknownRule>();
         services.AddSingleton<IAlertRule, RestartLoopRule>();
         services.AddSingleton<IAlertRule, PackageDriftRule>();
+        services.AddSingleton<IAlertRule>(provider => new VulnerablePackageRule(
+            "vulnerable-package-critical", AlertSeverity.Critical, serious: true, provider.GetRequiredService<IVulnerabilities>(), options));
+        services.AddSingleton<IAlertRule>(provider => new VulnerablePackageRule(
+            "vulnerable-package", AlertSeverity.Warning, serious: false, provider.GetRequiredService<IVulnerabilities>(), options));
         services.AddSingleton<AlertEvaluator>();
         services.AddSingleton<IAlertEvaluator>(provider => provider.GetRequiredService<AlertEvaluator>());
         services.AddSingleton<IAlertState>(provider => provider.GetRequiredService<AlertEvaluator>());

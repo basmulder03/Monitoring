@@ -27,6 +27,9 @@ public sealed class AlertingOptions
     /// <summary>Silences that keep matching alerts out of the active list. The conditions are still evaluated, so an alert reappears when its silence ends.</summary>
     public List<AlertSilence> Silences { get; set; } = [];
 
+    /// <summary>How long a vulnerable package version must be in use before its alert fires; zero fires at once.</summary>
+    public TimeSpan VulnerablePackageWait { get; set; } = TimeSpan.Zero;
+
     /// <summary>
     /// How long a package must stay in versions its alignment rule does not allow before the alert fires. A rollout that updates a library
     /// across services passes through such a state, so this is long by default.

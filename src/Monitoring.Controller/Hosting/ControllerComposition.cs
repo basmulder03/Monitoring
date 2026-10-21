@@ -12,6 +12,7 @@ using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Health;
 using Monitoring.Controller.Features.Packages;
 using Monitoring.Controller.Features.Registry;
+using Monitoring.Controller.Features.Vulnerabilities;
 using Monitoring.Controller.Features.Security;
 using Monitoring.Controller.Features.Topology;
 using Monitoring.Hosting;
@@ -56,6 +57,12 @@ internal static class ControllerComposition
                 options.PollInterval = configuration.Duration("PollInterval", options.PollInterval);
             })
             .AddHealth()
+            .AddVulnerabilities(options =>
+            {
+                var vulnerabilities = controller.Section("Vulnerabilities");
+                options.Advisories = vulnerabilities.Optional("Advisories");
+                options.PollInterval = vulnerabilities.Duration("PollInterval", options.PollInterval);
+            })
             .AddPackages(options => options.Aligned = [.. controller.Section("Packages").Items("Aligned").Select(ReadAlignment)])
             .AddTopology(options =>
             {
@@ -69,6 +76,7 @@ internal static class ControllerComposition
                 options.StartupGrace = alerting.Duration("StartupGrace", options.StartupGrace);
                 options.InstanceUnhealthyWait = alerting.Duration("InstanceUnhealthyWait", options.InstanceUnhealthyWait);
                 options.PackageDriftWait = alerting.Duration("PackageDriftWait", options.PackageDriftWait);
+                options.VulnerablePackageWait = alerting.Duration("VulnerablePackageWait", options.VulnerablePackageWait);
                 options.RestartLoopCount = alerting.Int("RestartLoopCount", options.RestartLoopCount);
                 options.RestartLoopWindow = alerting.Duration("RestartLoopWindow", options.RestartLoopWindow);
                 options.ServiceDownWait = alerting.Duration("ServiceDownWait", options.ServiceDownWait);
@@ -123,6 +131,7 @@ internal static class ControllerComposition
         var app = builder.Build();
         app.MapDashboard();
         app.MapPackages();
+        app.MapVulnerabilities();
         return app;
     }
 

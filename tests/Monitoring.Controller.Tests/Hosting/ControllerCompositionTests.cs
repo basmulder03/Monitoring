@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Monitoring.Controller.Features.AgentLink;
 using Monitoring.Controller.Features.Alerting;
 using Monitoring.Controller.Features.Packages;
+using Monitoring.Controller.Features.Vulnerabilities;
 using Monitoring.Controller.Features.Dashboard;
 using Monitoring.Controller.Features.Health;
 using Monitoring.Controller.Features.Registry;
@@ -50,7 +51,7 @@ public class ControllerCompositionTests
         var hosted = host.Services.GetServices<IHostedService>().Select(s => s.GetType().Name);
 
         // Assert
-        hosted.ShouldBe(["RegistryPurgeService", "AlertEvaluationService", "AgentListenerService", "GenericWebHostService", "PlainTransportWarning", "TopologySampleService", "ConfigurationReloadService"], ignoreOrder: true);
+        hosted.ShouldBe(["RegistryPurgeService", "AlertEvaluationService", "AgentListenerService", "GenericWebHostService", "PlainTransportWarning", "TopologySampleService", "ConfigurationReloadService", "AdvisoryReloadService"], ignoreOrder: true);
     }
 
     [Fact]
@@ -164,6 +165,25 @@ public class ControllerCompositionTests
 
         // Assert
         build.ShouldThrow<ConfigurationException>().Message.ShouldContain("Controller:Packages:Aligned:0:Spread");
+    }
+
+    [Fact]
+    public void CreateHost_reads_the_vulnerability_settings()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret")
+            .With("Controller:Vulnerabilities:Advisories", "/advisories")
+            .With("Controller:Vulnerabilities:PollInterval", "00:05:00")
+            .With("Controller:Alerting:VulnerablePackageWait", "00:10:00")
+            .Build();
+
+        // Act
+        var options = host.Services.GetRequiredService<VulnerabilitiesOptions>();
+
+        // Assert
+        options.Advisories.ShouldBe("/advisories");
+        options.PollInterval.ShouldBe(TimeSpan.FromMinutes(5));
+        host.Services.GetRequiredService<AlertingOptions>().VulnerablePackageWait.ShouldBe(TimeSpan.FromMinutes(10));
     }
 
     [Fact]

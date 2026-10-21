@@ -1,8 +1,8 @@
-using Monitoring.Controller.Features.Packages;
+using Monitoring.Controller;
 using Shouldly;
 using Xunit;
 
-namespace Monitoring.Controller.Tests.Features.Packages;
+namespace Monitoring.Controller.Tests;
 
 public class VersionOrderTests
 {
