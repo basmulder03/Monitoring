@@ -299,4 +299,175 @@ public class PodMapperTests
         // Assert
         pod.Metadata.Labels.ShouldBe(new Dictionary<string, string> { ["team"] = "payments" });
     }
+
+    [Fact]
+    public void Map_lists_the_application_and_its_sidecars_with_their_roles()
+    {
+        // Arrange
+        var pod = new PodBuilder()
+            .WithRunningContainer("orders", ready: true)
+            .WithRunningContainer("monitoring-sidecar", ready: true)
+            .WithRunningContainer("proxy", ready: true)
+            .PodReady()
+            .Build();
+
+        // Act
+        var containers = PodMapper.Map(pod)!.Containers!;
+
+        // Assert
+        containers.Select(c => (c.Name, c.Role)).ShouldBe(
+            [("orders", ContainerRole.App), ("monitoring-sidecar", ContainerRole.MonitoringSidecar), ("proxy", ContainerRole.OtherSidecar)]);
+    }
+
+    [Fact]
+    public void Map_reports_the_state_of_each_container()
+    {
+        // Arrange
+        var pod = new PodBuilder()
+            .WithRunningContainer("orders", ready: false, restarts: 3, lastReason: "OOMKilled", lastExitCode: 137, digest: "sha256:abc")
+            .Build();
+
+        // Act
+        var container = PodMapper.Map(pod)!.Containers!.Single();
+
+        // Assert
+        container.Phase.ShouldBe(ContainerPhase.Running);
+        container.Health.ShouldBe(HealthState.Degraded);
+        container.Restarts.ShouldBe(3);
+        container.LastReason.ShouldBe("OOMKilled");
+        container.LastExitCode.ShouldBe(137);
+        container.Image.ShouldBe("orders:1");
+        container.ImageDigest.ShouldBe("sha256:abc");
+    }
+
+    [Fact]
+    public void Map_gives_a_waiting_container_its_reason_and_message()
+    {
+        // Arrange
+        var pod = new PodBuilder().WithWaitingContainer("orders", "ImagePullBackOff", "no such image").Build();
+
+        // Act
+        var container = PodMapper.Map(pod)!.Containers!.Single();
+
+        // Assert
+        container.Phase.ShouldBe(ContainerPhase.Waiting);
+        container.Health.ShouldBe(HealthState.Unhealthy);
+        container.Reason.ShouldBe("ImagePullBackOff");
+        container.Message.ShouldBe("no such image");
+    }
+
+    [Fact]
+    public void Map_shows_a_container_that_is_still_being_created_as_unknown()
+    {
+        // Arrange
+        var pod = new PodBuilder().InPhase("Pending").WithWaitingContainer("orders", "ContainerCreating").Build();
+
+        // Act
+        var container = PodMapper.Map(pod)!.Containers!.Single();
+
+        // Assert
+        container.Health.ShouldBe(HealthState.Unknown);
+    }
+
+    [Fact]
+    public void Map_lists_the_containers_of_a_pod_that_has_no_status_yet_as_waiting()
+    {
+        // Arrange
+        var pod = new PodBuilder().InPhase("Pending").Build();
+
+        // Act
+        var container = PodMapper.Map(pod)!.Containers!.Single();
+
+        // Assert
+        container.Name.ShouldBe("app");
+        container.Phase.ShouldBe(ContainerPhase.Waiting);
+    }
+
+    [Fact]
+    public void Map_shows_an_init_container_only_while_it_has_not_finished_well()
+    {
+        // Arrange
+        var pod = new PodBuilder()
+            .WithInitContainer("migrate", terminatedExitCode: 0)
+            .WithInitContainer("wait-for-db")
+            .WithInitContainer("broken", terminatedExitCode: 1)
+            .WithRunningContainer("orders", ready: true)
+            .Build();
+
+        // Act
+        var containers = PodMapper.Map(pod)!.Containers!;
+
+        // Assert
+        containers.Where(c => c.Role == ContainerRole.Init).Select(c => c.Name).ShouldBe(["wait-for-db", "broken"]);
+    }
+
+    [Fact]
+    public void Map_treats_an_init_container_that_keeps_running_as_a_sidecar()
+    {
+        // Arrange
+        var pod = new PodBuilder()
+            .WithInitContainer("monitoring-sidecar", nativeSidecar: true)
+            .WithInitContainer("proxy", nativeSidecar: true)
+            .WithRunningContainer("orders", ready: true)
+            .Build();
+
+        // Act
+        var containers = PodMapper.Map(pod)!.Containers!;
+
+        // Assert
+        containers.Single(c => c.Name == "monitoring-sidecar").Role.ShouldBe(ContainerRole.MonitoringSidecar);
+        containers.Single(c => c.Name == "proxy").Role.ShouldBe(ContainerRole.OtherSidecar);
+    }
+
+    [Fact]
+    public void Map_shows_a_failing_monitoring_sidecar_as_degraded_instead_of_unhealthy()
+    {
+        // Arrange
+        var pod = new PodBuilder()
+            .WithRunningContainer("orders", ready: true)
+            .WithWaitingContainer("monitoring-sidecar", "CrashLoopBackOff")
+            .Build();
+
+        // Act
+        var instance = PodMapper.Map(pod)!;
+
+        // Assert
+        instance.Health.ShouldBe(HealthState.Degraded);
+        instance.Checks!.Single().Name.ShouldBe("monitoring sidecar");
+        instance.Checks!.Single().Description.ShouldBe("CrashLoopBackOff");
+    }
+
+    [Fact]
+    public void Map_still_shows_a_failing_application_as_unhealthy_next_to_a_good_sidecar()
+    {
+        // Arrange
+        var pod = new PodBuilder()
+            .WithWaitingContainer("orders", "CrashLoopBackOff")
+            .WithRunningContainer("monitoring-sidecar", ready: true)
+            .Build();
+
+        // Act
+        var instance = PodMapper.Map(pod)!;
+
+        // Assert
+        instance.Health.ShouldBe(HealthState.Unhealthy);
+        instance.Checks.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Map_uses_the_configured_name_of_the_monitoring_sidecar()
+    {
+        // Arrange
+        var pod = new PodBuilder()
+            .WithRunningContainer("orders", ready: true)
+            .WithWaitingContainer("mon", "CrashLoopBackOff")
+            .Build();
+
+        // Act
+        var instance = PodMapper.Map(pod, "mon")!;
+
+        // Assert
+        instance.Health.ShouldBe(HealthState.Degraded);
+        instance.Containers!.Single(c => c.Name == "mon").Role.ShouldBe(ContainerRole.MonitoringSidecar);
+    }
 }

@@ -54,6 +54,35 @@ public class HttpKubernetesApiTests
     }
 
     [Fact]
+    public async Task ListPodsAsync_reads_what_the_api_says_about_each_container()
+    {
+        // Arrange
+        const string json = """
+            {"metadata":{"resourceVersion":"7"},"items":[{"metadata":{"name":"orders-1"},
+              "spec":{"containers":[{"name":"orders","image":"orders:1"}],"initContainers":[{"name":"proxy","restartPolicy":"Always"}]},
+              "status":{"phase":"Running",
+                "initContainerStatuses":[{"name":"proxy","ready":true,"state":{"running":{"startedAt":"2026-10-21T10:00:00Z"}}}],
+                "containerStatuses":[{"name":"orders","ready":false,"restartCount":2,"image":"orders:1","imageID":"docker://sha256:abc",
+                  "state":{"running":{"startedAt":"2026-10-21T10:00:00Z"}},
+                  "lastState":{"terminated":{"exitCode":137,"reason":"OOMKilled"}}}]}}]}
+            """;
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, json);
+
+        // Act
+        var result = await server.Api.ListPodsAsync("shop", Ct);
+
+        // Assert
+        var pod = result.Pods.Single();
+        var container = pod.Status!.ContainerStatuses!.Single();
+        container.ImageID.ShouldBe("docker://sha256:abc");
+        container.State!.Running!.StartedAt.ShouldBe("2026-10-21T10:00:00Z");
+        container.LastState!.Terminated!.Reason.ShouldBe("OOMKilled");
+        container.LastState.Terminated.ExitCode.ShouldBe(137);
+        pod.Spec!.InitContainers!.Single().RestartPolicy.ShouldBe("Always");
+        pod.Status.InitContainerStatuses!.Single().Name.ShouldBe("proxy");
+    }
+
+    [Fact]
     public async Task ListPodsAsync_returns_no_pods_when_the_list_has_no_items()
     {
         // Arrange

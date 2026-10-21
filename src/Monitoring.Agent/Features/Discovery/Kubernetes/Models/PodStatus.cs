@@ -5,8 +5,10 @@ namespace Monitoring.Agent.Features.Discovery.Kubernetes.Models;
 /// <param name="PodIP">IP address of the pod.</param>
 /// <param name="Conditions">Conditions such as Ready.</param>
 /// <param name="ContainerStatuses">State of each container.</param>
+/// <param name="InitContainerStatuses">State of each init container.</param>
 internal sealed record PodStatus(
     string? Phase = null,
     string? PodIP = null,
     List<PodCondition>? Conditions = null,
-    List<ContainerStatus>? ContainerStatuses = null);
+    List<ContainerStatus>? ContainerStatuses = null,
+    List<ContainerStatus>? InitContainerStatuses = null);

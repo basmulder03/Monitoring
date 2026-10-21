@@ -126,6 +126,7 @@ The agent learns which instances exist from the platform it runs on. `Agent:Disc
 | `Agent:Discovery:Kubernetes:TokenFile` | in-cluster token file | File with the service account token, read again for every request because Kubernetes rotates it |
 | `Agent:Discovery:Kubernetes:Token` | none | A fixed token instead of a token file; meant for development |
 | `Agent:Discovery:Kubernetes:CaFile` | in-cluster certificate authority | PEM file with the certificate authority that signed the API server's certificate |
+| `Agent:Discovery:Kubernetes:MonitoringSidecarContainer` | `monitoring-sidecar` | Name of this system's own sidecar container. When it fails, the instance is shown as Degraded with the cause, not Unhealthy |
 | `Agent:Discovery:Kubernetes:ResyncInterval` | `00:01:00` | How long a watch stays open before the pods are listed again in full, which repairs a missed event |
 | `Agent:Discovery:Kubernetes:RetryMinDelay` | `00:00:01` | Shortest wait before retrying after a failure |
 | `Agent:Discovery:Kubernetes:RetryMaxDelay` | `00:00:30` | Longest wait; repeated failures grow the wait up to this |
@@ -157,6 +158,7 @@ How a pod becomes an instance:
 | Being deleted, or Failed | Terminating |
 | Succeeded (a finished job) | Not shown |
 | All containers ready | Healthy |
+| Only the monitoring sidecar is failing or not ready | Degraded, with a check named `monitoring sidecar` |
 | Running but not ready | Degraded |
 | A container stuck in `CrashLoopBackOff`, an image pull error, a configuration error, or exited with an error | Unhealthy |
 | Pending without a problem, or phase Unknown | Unknown |
@@ -189,3 +191,24 @@ The sidecar next to each application connects to the agent, registers its applic
 | `Agent:Sidecars:MetricsPullInterval` | `00:00:15` | How often the metrics of an application are read. They travel to the controller as the latest value per series |
 
 An instance whose sidecar is gone is shown as Unhealthy until the sidecar returns. A sidecar that says goodbye on purpose, as during a rollout, does not cause that: the agent only forgets what the application reported. A pod that exists but has no sidecar keeps what the platform says about it.
+
+### Containers
+
+Each pod is shown down to its containers, taken from the same pod watch, so no extra permission is needed.
+
+| Container | Role |
+| --- | --- |
+| The first container that is not the monitoring sidecar | Application |
+| The container named by `MonitoringSidecarContainer` | Monitoring sidecar |
+| Any other container, and init containers that keep running (native sidecars) | Other sidecar |
+| Init containers | Init: shown while they run or after they failed, and left out once they finished without error |
+
+| Container state | Health |
+| --- | --- |
+| Running and ready | Healthy |
+| Running, not ready | Degraded |
+| Waiting for a reason such as `CrashLoopBackOff` or an image pull error | Unhealthy |
+| Waiting while it is created | Unknown |
+| Exited with an error | Unhealthy |
+
+Each container also carries its restart count, image, image digest, the reason and message of what it waits for, and the reason and exit code of its previous run, for example `OOMKilled`.

@@ -12,6 +12,7 @@ namespace Monitoring.Protocol.Instances;
 /// <param name="Version">Version of the application, as it reports itself; <see langword="null"/> while unknown.</param>
 /// <param name="Checks">Results of the application's own health checks; <see langword="null"/> when it reports none.</param>
 /// <param name="Metrics">The latest value of each metric of the application; <see langword="null"/> when it reports none.</param>
+/// <param name="Containers">The containers of a pod; <see langword="null"/> for instances that are not pods.</param>
 public sealed record InstanceInfo(
     string Id,
     string ServiceName,
@@ -20,4 +21,5 @@ public sealed record InstanceInfo(
     IReadOnlyDictionary<string, string> Labels,
     string? Version = null,
     IReadOnlyList<HealthCheckResult>? Checks = null,
-    IReadOnlyList<MetricSeries>? Metrics = null);
+    IReadOnlyList<MetricSeries>? Metrics = null,
+    IReadOnlyList<ContainerInfo>? Containers = null);

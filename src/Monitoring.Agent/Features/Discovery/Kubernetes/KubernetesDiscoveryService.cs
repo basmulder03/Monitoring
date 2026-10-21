@@ -86,7 +86,7 @@ internal sealed class KubernetesDiscoveryService(
         var current = new Dictionary<string, InstanceInfo>();
         foreach (var pod in list.Pods)
         {
-            if (PodMapper.Map(pod) is { } instance)
+            if (PodMapper.Map(pod, options.MonitoringSidecarContainer) is { } instance)
             {
                 current[instance.Id] = instance;
             }
@@ -121,7 +121,7 @@ internal sealed class KubernetesDiscoveryService(
             switch (podEvent.Type)
             {
                 case PodEventType.Added or PodEventType.Modified when podEvent.Pod is { } pod:
-                    if (PodMapper.Map(pod) is { } instance)
+                    if (PodMapper.Map(pod, options.MonitoringSidecarContainer) is { } instance)
                     {
                         Upsert(instance);
                     }

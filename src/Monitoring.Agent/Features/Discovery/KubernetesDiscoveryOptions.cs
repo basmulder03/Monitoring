@@ -24,6 +24,12 @@ public sealed class KubernetesDiscoveryOptions
     public string? CaFile { get; set; }
 
     /// <summary>
+    /// Name of the container that is this system's own sidecar. When it fails the instance is shown as Degraded with the cause,
+    /// instead of Unhealthy, because it says nothing about the application.
+    /// </summary>
+    public string MonitoringSidecarContainer { get; set; } = "monitoring-sidecar";
+
+    /// <summary>
     /// How long a watch stays open before the pods are listed again in full, which repairs any event that was missed.
     /// </summary>
     public TimeSpan ResyncInterval { get; set; } = TimeSpan.FromSeconds(60);

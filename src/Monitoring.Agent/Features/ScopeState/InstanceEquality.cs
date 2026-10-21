@@ -19,7 +19,8 @@ internal static class InstanceEquality
         && a.Labels.Count == b.Labels.Count
         && a.Labels.All(label => b.Labels.TryGetValue(label.Key, out var value) && value == label.Value)
         && ChecksAreEqual(a.Checks, b.Checks)
-        && MetricsAreEqual(a.Metrics, b.Metrics);
+        && MetricsAreEqual(a.Metrics, b.Metrics)
+        && ContainersAreEqual(a.Containers, b.Containers);
 
     private static bool ChecksAreEqual(IReadOnlyList<Monitoring.Protocol.Health.HealthCheckResult>? a, IReadOnlyList<Monitoring.Protocol.Health.HealthCheckResult>? b)
     {
@@ -43,5 +44,15 @@ internal static class InstanceEquality
             && pair.First.Value.Equals(pair.Second.Value)
             && pair.First.Labels.Count == pair.Second.Labels.Count
             && pair.First.Labels.All(label => pair.Second.Labels.TryGetValue(label.Key, out var value) && value == label.Value));
+    }
+
+    private static bool ContainersAreEqual(IReadOnlyList<ContainerInfo>? a, IReadOnlyList<ContainerInfo>? b)
+    {
+        if (a is null || b is null)
+        {
+            return a is null && b is null;
+        }
+
+        return a.Count == b.Count && a.Zip(b).All(pair => pair.First == pair.Second);
     }
 }
