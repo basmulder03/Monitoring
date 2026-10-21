@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Monitoring.Agent.Features.ControllerLink;
 using Monitoring.Agent.Features.Discovery;
 using Monitoring.Agent.Features.ScopeState;
+using Monitoring.Agent.Features.SidecarConnections;
 using Monitoring.Agent.Hosting;
 using Monitoring.Hosting;
 using Monitoring.Protocol.Framing;
@@ -116,7 +117,49 @@ public class AgentCompositionTests
         var hosted = host.Services.GetServices<IHostedService>().Select(s => s.GetType().Name);
 
         // Assert
-        hosted.ShouldBe(["ControllerLinkHostedService", "KubernetesDiscoveryService"], ignoreOrder: true);
+        hosted.ShouldBe(["ControllerLinkHostedService", "KubernetesDiscoveryService", "SidecarListenerService"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public void CreateHost_reads_the_sidecar_settings()
+    {
+        // Arrange
+        using var host = new AgentSettings().Valid().Kubernetes("kubernetes")
+            .With("Agent:Sidecars:Listen:Address", "127.0.0.1")
+            .With("Agent:Sidecars:Listen:Port", "0")
+            .With("Agent:Sidecars:HelloTimeout", "00:00:03")
+            .With("Agent:Sidecars:HeartbeatInterval", "00:00:02")
+            .With("Agent:Sidecars:MissedHeartbeats", "4")
+            .With("Agent:Sidecars:HealthPullInterval", "00:00:20")
+            .Build();
+
+        // Act
+        var options = host.Services.GetRequiredService<SidecarConnectionsOptions>();
+
+        // Assert
+        options.ListenAddress.ShouldBe("127.0.0.1");
+        options.Port.ShouldBe(0);
+        options.HelloTimeout.ShouldBe(TimeSpan.FromSeconds(3));
+        options.HeartbeatInterval.ShouldBe(TimeSpan.FromSeconds(2));
+        options.MissedHeartbeats.ShouldBe(4);
+        options.HealthPullInterval.ShouldBe(TimeSpan.FromSeconds(20));
+    }
+
+    [Theory]
+    [InlineData("none", "true", true)]
+    [InlineData("none", "false", false)]
+    [InlineData("kubernetes", "false", false)]
+    [InlineData("kubernetes", "true", true)]
+    public void CreateHost_listens_for_sidecars_when_enabled_whatever_the_discovery(string kind, string enabled, bool listens)
+    {
+        // Arrange
+        using var host = new AgentSettings().Valid().Kubernetes(kind).With("Agent:Sidecars:Enabled", enabled).Build();
+
+        // Act
+        var hosted = host.Services.GetServices<IHostedService>().Select(s => s.GetType().Name);
+
+        // Assert
+        hosted.Contains("SidecarListenerService").ShouldBe(listens);
     }
 
     [Theory]

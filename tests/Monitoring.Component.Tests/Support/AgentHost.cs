@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monitoring.Agent.Features.ScopeState;
+using Monitoring.Agent.Features.SidecarConnections;
 using Monitoring.Agent.Hosting;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Instances;
@@ -17,6 +18,9 @@ internal sealed class AgentHost(string scope, string token) : IAsyncDisposable
     };
 
     private IHost? _host;
+
+    /// <summary>The address sidecars connect to; only available when the agent listens for sidecars.</summary>
+    public string SidecarAddress => $"127.0.0.1:{_host!.Services.GetRequiredService<ISidecarListener>().LocalEndPoint!.Port}";
 
     /// <summary>Adds or replaces a setting.</summary>
     /// <param name="key">The setting.</param>
@@ -37,7 +41,9 @@ internal sealed class AgentHost(string scope, string token) : IAsyncDisposable
             .With("Agent:Discovery:Kubernetes:ApiServer", cluster.Address)
             .With("Agent:Discovery:Kubernetes:Token", "cluster-token")
             .With("Agent:Discovery:Kubernetes:RetryMinDelay", "00:00:00.050")
-            .With("Agent:Discovery:Kubernetes:RetryMaxDelay", "00:00:00.200");
+            .With("Agent:Discovery:Kubernetes:RetryMaxDelay", "00:00:00.200")
+            .With("Agent:Sidecars:Listen:Address", "127.0.0.1")
+            .With("Agent:Sidecars:Listen:Port", "0");
 
     public AgentHost ConnectingTo(ControllerHost controller)
     {

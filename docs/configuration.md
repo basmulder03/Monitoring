@@ -172,3 +172,19 @@ How a pod becomes an instance:
 ```
 
 with the token in the environment: `MONITORING_Agent__Token=...`.
+
+### Sidecars
+
+The sidecar next to each application connects to the agent, registers its application and sends heartbeats. The agent follows the health of the application through it. By default the agent listens for sidecars when `Agent:Discovery:Kind` is `kubernetes`, and not otherwise.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Agent:Sidecars:Enabled` | `true` for Kubernetes, else `false` | Whether the agent listens for sidecars |
+| `Agent:Sidecars:Listen:Address` | `0.0.0.0` | IP address sidecars connect to |
+| `Agent:Sidecars:Listen:Port` | `9441` | TCP port sidecars connect to. Plain TCP: keep it inside the namespace, for example behind a Service no one outside can reach |
+| `Agent:Sidecars:HelloTimeout` | `00:00:10` | How long a new connection may stay silent before it must say hello |
+| `Agent:Sidecars:HeartbeatInterval` | `00:00:05` | How often sidecars are told to send a heartbeat |
+| `Agent:Sidecars:MissedHeartbeats` | `3` | How many heartbeats in a row may be missing before the sidecar counts as gone and its connection is closed |
+| `Agent:Sidecars:HealthPullInterval` | `00:00:15` | How often the health checks of an application are read even when its health did not change |
+
+An instance whose sidecar is gone is shown as Unhealthy until the sidecar returns. A sidecar that says goodbye on purpose, as during a rollout, does not cause that: the agent only forgets what the application reported. A pod that exists but has no sidecar keeps what the platform says about it.

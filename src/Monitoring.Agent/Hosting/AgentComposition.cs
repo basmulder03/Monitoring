@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Monitoring.Agent.Features.ControllerLink;
 using Monitoring.Agent.Features.Discovery;
 using Monitoring.Agent.Features.ScopeState;
+using Monitoring.Agent.Features.SidecarConnections;
 using Monitoring.Hosting;
 
 namespace Monitoring.Agent.Hosting;
@@ -53,6 +54,25 @@ internal static class AgentComposition
                 options.SnapshotInterval = agent.Duration("SnapshotInterval", options.SnapshotInterval);
             })
             .AddDiscovery(options => ReadDiscovery(agent.Section("Discovery"), options));
+
+        // Sidecars only exist next to pods, so by default the agent listens for them only when it discovers Kubernetes pods.
+        var sidecars = agent.Section("Sidecars");
+        var kubernetes = agent.Section("Discovery").Text("Kind", "none").Equals("kubernetes", StringComparison.OrdinalIgnoreCase);
+        if (sidecars.Text("Enabled", kubernetes ? "true" : "false").Equals("true", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.Services.AddSidecarConnections(options => ReadSidecars(sidecars, options));
+        }
+    }
+
+    private static void ReadSidecars(SettingsReader sidecars, SidecarConnectionsOptions options)
+    {
+        var listen = sidecars.Section("Listen");
+        options.ListenAddress = listen.Text("Address", options.ListenAddress);
+        options.Port = listen.Int("Port", options.Port);
+        options.HelloTimeout = sidecars.Duration("HelloTimeout", options.HelloTimeout);
+        options.HeartbeatInterval = sidecars.Duration("HeartbeatInterval", options.HeartbeatInterval);
+        options.MissedHeartbeats = sidecars.Int("MissedHeartbeats", options.MissedHeartbeats);
+        options.HealthPullInterval = sidecars.Duration("HealthPullInterval", options.HealthPullInterval);
     }
 
     private static void ReadDiscovery(SettingsReader discovery, DiscoveryOptions options)

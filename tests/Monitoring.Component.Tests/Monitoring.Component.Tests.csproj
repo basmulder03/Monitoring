@@ -11,6 +11,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Monitoring.Agent/Monitoring.Agent.csproj" />
+    <ProjectReference Include="../../src/Monitoring.Client/Monitoring.Client.csproj" />
     <ProjectReference Include="../../src/Monitoring.Controller/Monitoring.Controller.csproj" />
+    <ProjectReference Include="../../src/Monitoring.Sidecar/Monitoring.Sidecar.csproj" />
   </ItemGroup>
 </Project>
