@@ -27,6 +27,8 @@ internal sealed class KubernetesDiscoveryService(
     /// <summary>The instances currently in the store because of this service, by id.</summary>
     private readonly Dictionary<string, InstanceInfo> _known = [];
 
+    private bool _listedBefore;
+
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -101,6 +103,13 @@ internal sealed class KubernetesDiscoveryService(
         }
 
         store.Publish();
+
+        if (!_listedBefore)
+        {
+            _listedBefore = true;
+            logger.LogInformation("Following {Count} pods in namespace '{Namespace}'", current.Count, target.Namespace);
+        }
+
         return list.ResourceVersion;
     }
 

@@ -28,6 +28,17 @@ internal sealed class AgentHost(string scope, string token) : IAsyncDisposable
         return this;
     }
 
+    /// <summary>Makes the agent discover the pods of the (fake) cluster instead of waiting for instances to be reported.</summary>
+    /// <param name="cluster">The fake API server.</param>
+    /// <returns>This host, for chaining.</returns>
+    public AgentHost DiscoveringIn(FakeKubernetesApiServer cluster) =>
+        With("Agent:Discovery:Kind", "kubernetes")
+            .With("Agent:Discovery:Kubernetes:Namespace", "shop")
+            .With("Agent:Discovery:Kubernetes:ApiServer", cluster.Address)
+            .With("Agent:Discovery:Kubernetes:Token", "cluster-token")
+            .With("Agent:Discovery:Kubernetes:RetryMinDelay", "00:00:00.050")
+            .With("Agent:Discovery:Kubernetes:RetryMaxDelay", "00:00:00.200");
+
     public AgentHost ConnectingTo(ControllerHost controller)
     {
         _settings["Agent:Controllers"] = controller.Address;

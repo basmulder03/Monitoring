@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monitoring.Agent.Features.ControllerLink;
+using Monitoring.Agent.Features.Discovery;
 using Monitoring.Agent.Features.ScopeState;
 using Monitoring.Hosting;
 
@@ -46,7 +47,28 @@ internal static class AgentComposition
                 options.ReconnectMaxDelay = reconnect.Duration("MaxDelay", options.ReconnectMaxDelay);
                 options.ConfigReplyTimeout = agent.Duration("ConfigReplyTimeout", options.ConfigReplyTimeout);
                 options.SnapshotInterval = agent.Duration("SnapshotInterval", options.SnapshotInterval);
-            });
+            })
+            .AddDiscovery(options => ReadDiscovery(agent.Section("Discovery"), options));
+    }
+
+    private static void ReadDiscovery(SettingsReader discovery, DiscoveryOptions options)
+    {
+        options.Kind = discovery.Text("Kind", "none").ToLowerInvariant() switch
+        {
+            "none" => DiscoveryKind.None,
+            "kubernetes" => DiscoveryKind.Kubernetes,
+            var other => throw new ConfigurationException($"Setting 'Agent:Discovery:Kind' must be 'none' or 'kubernetes', but is '{other}'."),
+        };
+
+        var kubernetes = discovery.Section("Kubernetes");
+        options.Kubernetes.Namespace = kubernetes.Optional("Namespace");
+        options.Kubernetes.ApiServer = kubernetes.Optional("ApiServer");
+        options.Kubernetes.TokenFile = kubernetes.Optional("TokenFile");
+        options.Kubernetes.Token = kubernetes.Optional("Token");
+        options.Kubernetes.CaFile = kubernetes.Optional("CaFile");
+        options.Kubernetes.ResyncInterval = kubernetes.Duration("ResyncInterval", options.Kubernetes.ResyncInterval);
+        options.Kubernetes.RetryMinDelay = kubernetes.Duration("RetryMinDelay", options.Kubernetes.RetryMinDelay);
+        options.Kubernetes.RetryMaxDelay = kubernetes.Duration("RetryMaxDelay", options.Kubernetes.RetryMaxDelay);
     }
 
     /// <summary>Builds an agent host from settings; used by tests to start a whole agent in process.</summary>

@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monitoring.Agent.Features.ControllerLink;
+using Monitoring.Agent.Features.Discovery;
 using Monitoring.Agent.Features.ScopeState;
 using Monitoring.Agent.Hosting;
 using Monitoring.Hosting;
@@ -102,6 +103,81 @@ public class AgentCompositionTests
         options.SnapshotInterval.ShouldBe(TimeSpan.FromMinutes(10));
     }
 
+    [Theory]
+    [InlineData("kubernetes")]
+    [InlineData("Kubernetes")]
+    [InlineData("KUBERNETES")]
+    public void CreateHost_runs_kubernetes_discovery_in_the_background_when_asked_for(string kind)
+    {
+        // Arrange
+        using var host = new AgentSettings().Valid().Kubernetes(kind).Build();
+
+        // Act
+        var hosted = host.Services.GetServices<IHostedService>().Select(s => s.GetType().Name);
+
+        // Assert
+        hosted.ShouldBe(["ControllerLinkHostedService", "KubernetesDiscoveryService"], ignoreOrder: true);
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("None")]
+    public void CreateHost_discovers_nothing_when_asked_for_none(string kind)
+    {
+        // Arrange
+        using var host = new AgentSettings().Valid().With("Agent:Discovery:Kind", kind).Build();
+
+        // Act
+        var hosted = host.Services.GetServices<IHostedService>().Select(s => s.GetType().Name);
+
+        // Assert
+        hosted.ShouldBe(["ControllerLinkHostedService"]);
+    }
+
+    [Fact]
+    public void CreateHost_names_a_kind_of_discovery_it_does_not_know()
+    {
+        // Arrange
+        var settings = new AgentSettings().Valid().With("Agent:Discovery:Kind", "docker");
+
+        // Act
+        var build = () => settings.Build();
+
+        // Assert
+        var message = build.ShouldThrow<ConfigurationException>().Message;
+        message.ShouldContain("'Agent:Discovery:Kind'");
+        message.ShouldContain("'docker'");
+    }
+
+    [Fact]
+    public void CreateHost_hands_the_kubernetes_settings_to_discovery()
+    {
+        // Arrange
+        using var host = new AgentSettings().Valid().Kubernetes("kubernetes")
+            .With("Agent:Discovery:Kubernetes:Namespace", "orders")
+            .With("Agent:Discovery:Kubernetes:ApiServer", "https://10.0.0.1:443")
+            .With("Agent:Discovery:Kubernetes:TokenFile", "/tokens/t")
+            .With("Agent:Discovery:Kubernetes:Token", "dev")
+            .With("Agent:Discovery:Kubernetes:CaFile", "/tokens/ca.crt")
+            .With("Agent:Discovery:Kubernetes:ResyncInterval", "00:02:00")
+            .With("Agent:Discovery:Kubernetes:RetryMinDelay", "00:00:02")
+            .With("Agent:Discovery:Kubernetes:RetryMaxDelay", "00:01:00")
+            .Build();
+
+        // Act
+        var options = host.Services.GetRequiredService<KubernetesDiscoveryOptions>();
+
+        // Assert
+        options.Namespace.ShouldBe("orders");
+        options.ApiServer.ShouldBe("https://10.0.0.1:443");
+        options.TokenFile.ShouldBe("/tokens/t");
+        options.Token.ShouldBe("dev");
+        options.CaFile.ShouldBe("/tokens/ca.crt");
+        options.ResyncInterval.ShouldBe(TimeSpan.FromMinutes(2));
+        options.RetryMinDelay.ShouldBe(TimeSpan.FromSeconds(2));
+        options.RetryMaxDelay.ShouldBe(TimeSpan.FromMinutes(1));
+    }
+
     [Fact]
     public void CreateHost_rejects_a_controller_address_that_is_not_host_and_port()
     {
@@ -157,6 +233,12 @@ public class AgentCompositionTests
             _settings.Remove(key);
             return this;
         }
+
+        /// <summary>Turns on Kubernetes discovery against a plain-http API server, so no pod environment is needed.</summary>
+        public AgentSettings Kubernetes(string kind) =>
+            With("Agent:Discovery:Kind", kind)
+                .With("Agent:Discovery:Kubernetes:Namespace", "shop")
+                .With("Agent:Discovery:Kubernetes:ApiServer", "http://127.0.0.1:8001");
 
         /// <summary>The smallest set of settings that starts an agent.</summary>
         public AgentSettings Valid() =>
