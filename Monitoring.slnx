@@ -10,6 +10,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Monitoring.Agent.Tests/Monitoring.Agent.Tests.csproj" />
+    <Project Path="tests/Monitoring.Client.Tests/Monitoring.Client.Tests.csproj" />
     <Project Path="tests/Monitoring.Component.Tests/Monitoring.Component.Tests.csproj" />
     <Project Path="tests/Monitoring.Controller.Tests/Monitoring.Controller.Tests.csproj" />
     <Project Path="tests/Monitoring.Hosting.Tests/Monitoring.Hosting.Tests.csproj" />
