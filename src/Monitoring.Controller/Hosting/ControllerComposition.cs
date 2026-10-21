@@ -10,6 +10,7 @@ using Monitoring.Controller.Features.Configuration;
 using Monitoring.Controller.Features.Dashboard;
 using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Health;
+using Monitoring.Controller.Features.Packages;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Features.Security;
 using Monitoring.Controller.Features.Topology;
@@ -55,6 +56,7 @@ internal static class ControllerComposition
                 options.PollInterval = configuration.Duration("PollInterval", options.PollInterval);
             })
             .AddHealth()
+            .AddPackages()
             .AddTopology(options =>
             {
                 var topology = controller.Section("Topology");
@@ -119,6 +121,7 @@ internal static class ControllerComposition
 
         var app = builder.Build();
         app.MapDashboard();
+        app.MapPackages();
         return app;
     }
 

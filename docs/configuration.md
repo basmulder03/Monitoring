@@ -182,6 +182,10 @@ The controller serves the dashboard itself, so there is nothing else to install.
 | `/api/overview` | The overview as JSON |
 | `/api/scopes/<name>` | One scope with its services and instances as JSON, each instance with its version, health checks, containers and latest metrics |
 | `/api/topology` | The dependency graph as JSON: nodes (services, databases, queues, external systems) and the edges between them with calls, errors and time |
+| `/api/packages` | The packages in use anywhere in the landscape, each with its versions (newest first) and the services that use them, and how many services have not reported what they are built from |
+| `/api/packages/<name>` | One package, with every version in use and by whom |
+| `/api/sbom` | The packages of the whole landscape as a CycloneDX 1.5 bill of materials (JSON), each package and version once |
+| `/api/sbom/<scope>/<service>` | The bill of materials of one service, which vulnerability scanners and licence checks can read |
 | `/api/events` | The overview as Server-Sent Events: the current one at once, then one per change, plus a keep-alive event while nothing changes |
 
 The page has no login yet; reach it only over a network you trust.

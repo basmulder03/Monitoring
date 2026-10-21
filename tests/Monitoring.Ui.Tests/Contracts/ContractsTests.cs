@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Monitoring.Controller.Features.Dashboard;
+using Monitoring.Controller.Features.Packages;
 using Monitoring.Controller.Features.Topology;
 using Shouldly;
 using Xunit;
@@ -14,7 +15,7 @@ public class ContractsTests
     {
         // Arrange
         var path = ContractsPath();
-        var expected = new ContractWriter().Add(typeof(Overview)).Add(typeof(ScopeDetail)).Add(typeof(TopologyGraph)).Write();
+        var expected = new ContractWriter().Add(typeof(Overview)).Add(typeof(ScopeDetail)).Add(typeof(TopologyGraph)).Add(typeof(PackageCatalog)).Write();
 
         if (Environment.GetEnvironmentVariable("UPDATE_CONTRACTS") == "1")
         {

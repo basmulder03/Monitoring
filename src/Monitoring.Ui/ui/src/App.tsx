@@ -7,6 +7,7 @@ import { useOverview } from "./state/useOverview";
 import { useRoute } from "./state/useRoute";
 import { useThemeSwitch } from "./state/useTheme";
 import { DependenciesView } from "./views/dependencies/DependenciesView";
+import { PackagesView } from "./views/packages/PackagesView";
 import { OverviewView } from "./views/overview/OverviewView";
 import { ScopeView } from "./views/scope/ScopeView";
 
@@ -30,6 +31,7 @@ export function App() {
         {route.name === "overview" && <OverviewView overview={overview} now={halfMinutes} />}
         {route.name === "scope" && <ScopeView name={route.scope} refresh={overview} now={halfMinutes} />}
         {route.name === "dependencies" && <DependenciesView refresh={overview} />}
+        {route.name === "packages" && <PackagesView refresh={overview} />}
       </main>
     </OpenStateProvider>
   );

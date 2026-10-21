@@ -66,6 +66,29 @@ export interface Overview {
   groupBy: string[];
 }
 
+export interface PackageCatalog {
+  packages: PackageEntry[];
+  services: number;
+  servicesWithoutList: number;
+}
+
+export interface PackageEntry {
+  name: string;
+  versions: PackageVersion[];
+}
+
+export interface PackageUsage {
+  scope: string;
+  service: string;
+  instances: number;
+  direct: boolean;
+}
+
+export interface PackageVersion {
+  version: string;
+  usedBy: PackageUsage[];
+}
+
 export interface ScopeConfiguration {
   applied: string | null;
   expected: string;

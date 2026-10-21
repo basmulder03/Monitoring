@@ -1,5 +1,5 @@
 import { act } from "preact/test-utils";
-import type { AlertSummary, Overview, ScopeDetail, ScopeSummary, TopologyGraph } from "../src/api/contracts";
+import type { AlertSummary, Overview, PackageCatalog, ScopeDetail, ScopeSummary, TopologyGraph } from "../src/api/contracts";
 import type { Services } from "../src/services/Services";
 import { start } from "../src/start";
 
@@ -8,6 +8,7 @@ export class FakeServices implements Services {
   time = Date.parse("2026-10-21T12:00:00Z");
   scopes: Record<string, ScopeDetail> = {};
   topology: TopologyGraph = { nodes: [], edges: [] };
+  packages: PackageCatalog = { packages: [], services: 0, servicesWithoutList: 0 };
   streams = 0;
   private handlers: { onOverview(overview: Overview): void; onKeepAlive(): void } | null = null;
   private readonly timers: (() => void)[] = [];
@@ -15,6 +16,7 @@ export class FakeServices implements Services {
 
   async getJson<T>(path: string) {
     if (path === "/api/topology") return { status: 200, body: this.topology as T };
+    if (path === "/api/packages") return { status: 200, body: this.packages as T };
     const scope = this.scopes[decodeURIComponent(path.replace("/api/scopes/", ""))];
     return scope ? { status: 200, body: scope as T } : { status: 404, body: null };
   }

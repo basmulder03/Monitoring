@@ -3,11 +3,13 @@ import { useEffect, useState } from "preact/hooks";
 export type Route =
   | { name: "overview" }
   | { name: "dependencies" }
+  | { name: "packages" }
   | { name: "scope"; scope: string };
 
 function read(): Route {
   const hash = window.location.hash;
   if (hash === "#/dependencies") return { name: "dependencies" };
+  if (hash === "#/packages") return { name: "packages" };
   const match = /^#\/scopes\/(.+)$/.exec(hash);
   return match?.[1] === undefined ? { name: "overview" } : { name: "scope", scope: decodeURIComponent(match[1]) };
 }
