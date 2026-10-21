@@ -37,12 +37,25 @@ Logging is controlled by the usual `Logging:LogLevel` settings, for example `MON
 | `Controller:Dashboard:PushInterval` | `00:00:01` | How often open pages are checked for changes to push; bursts of changes become one update |
 | `Controller:Dashboard:GroupBy` | `environment,datacenter` | The scope labels the page groups scopes by, outermost first. Scopes without a label are listed last under "not set". `none` turns grouping off |
 | `Controller:Dashboard:KeepAliveInterval` | `00:00:05` | How long a stream may stay silent before a keep-alive event is sent. Keep it well below 15 seconds, after which a page warns that its data is old |
+| `Controller:Liveness:HeartbeatInterval` | `00:00:05` | How often agents are told to send a heartbeat |
+| `Controller:Liveness:MissedHeartbeats` | `3` | How many heartbeats in a row may be missing before an agent counts as gone (15 seconds by default). A connection that is silent that long is closed |
+| `Controller:Alerting:ScopeUnknownWait` | `00:02:00` | How long the agent of a scope must stay gone before the critical `scope-unknown` alert fires |
 | `Controller:Registry:GoneRetention` | `00:10:00` | How long a removed instance stays visible as Gone |
 | `Controller:Registry:PurgeInterval` | `00:01:00` | How often expired Gone instances are dropped |
 | `Controller:Alerting:StartupGrace` | `00:10:00` | After startup no alert rule is evaluated for this long, so agents can send their snapshots first |
 | `Controller:Alerting:InstanceUnhealthyWait` | `00:00:30` | How long an instance must stay Unhealthy before its alert fires |
 | `Controller:Alerting:ServiceDownWait` | `00:00:00` | How long a service must have no instance able to serve before its alert fires |
 | `Controller:Alerting:EvaluationInterval` | `00:00:05` | How often the alert rules run |
+
+### When an agent goes away
+
+The controller judges from its own connections whether the agent of each scope is alive. An agent is alive while its connection is open and something, usually a heartbeat, was heard within the timeout. When it is not:
+
+- The scope turns **Unknown** (grey) at once, instead of keeping its last colour, because its workloads may be fine or down and the controller cannot tell. The tile says "Agent not connected" and when the agent was last heard from; the scope view shows a banner and keeps listing the instances it last reported.
+- After `ScopeUnknownWait` the critical alert `scope-unknown` fires for the scope, so a dead agent does not hide behind a quiet tile. It clears when the agent is back.
+- Scopes stay listed until the controller restarts; a scope that is gone for good keeps its grey tile and its alert until then.
+
+Each controller replica judges for itself, so replicas can briefly disagree.
 
 ### Agent tokens
 

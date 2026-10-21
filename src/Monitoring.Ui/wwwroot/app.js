@@ -95,6 +95,10 @@
       link.appendChild(el("span", "muted",
         plural(scope.services, "service", "services") + ", " + plural(scope.instances, "instance", "instances") +
         (scope.problems > 0 ? ", " + scope.problems + " not healthy" : "")));
+      if (!scope.agentConnected) {
+        // Said in words as well as shown grey: the counts above are the last known, not current.
+        link.appendChild(el("span", "disconnected", "Agent not connected" + (scope.lastSeen ? ", last heard " + age(scope.lastSeen) + " ago" : "")));
+      }
       item.appendChild(link);
       list.appendChild(item);
     }
@@ -214,6 +218,11 @@
     const heading = el("h2", "", scope.name + " ");
     heading.appendChild(status(scope.health));
     root.appendChild(heading);
+
+    if (!scope.agentConnected) {
+      root.appendChild(el("p", "banner", "The agent of this scope is not connected" +
+        (scope.lastSeen ? " (last heard " + age(scope.lastSeen) + " ago)" : "") + ". What is shown is the state it last reported."));
+    }
 
     const labels = Object.entries(scope.labels).map(([key, value]) => key + "=" + value).join(", ");
     if (labels) root.appendChild(el("p", "muted", labels));

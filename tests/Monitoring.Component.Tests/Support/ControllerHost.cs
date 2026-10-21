@@ -30,6 +30,19 @@ internal sealed class ControllerHost : IAsyncDisposable
     /// <summary>The address of the dashboard's web server, such as <c>http://127.0.0.1:5000</c>.</summary>
     public string WebAddress => _host!.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
 
+    /// <summary>Adds or replaces a setting.</summary>
+    /// <param name="key">The setting.</param>
+    /// <param name="value">Its value.</param>
+    /// <returns>This host, for chaining.</returns>
+    public ControllerHost With(string key, string value)
+    {
+        _settings[key] = value;
+        return this;
+    }
+
+    /// <summary>The address agents connect to, as a plain TCP endpoint.</summary>
+    public System.Net.IPEndPoint AgentEndPoint => _host!.Services.GetRequiredService<IAgentListener>().LocalEndPoint!;
+
     /// <summary>Accepts any agent holding the token, whatever scope it announces.</summary>
     public ControllerHost AcceptingEnrollment(string token) => AcceptingScope(AgentTokenEntry.AnyScope, token);
 

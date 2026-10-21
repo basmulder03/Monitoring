@@ -38,25 +38,28 @@ internal sealed class AgentConnectionHandler(
     /// <returns>A task that completes when the connection has ended; it does not throw for connection problems.</returns>
     public async Task HandleAsync(Stream stream, CancellationToken ct)
     {
+        var connection = Guid.NewGuid();
+        AgentIdentity? registered = null;
         try
         {
-            var identity = await HandshakeAsync(stream, ct).ConfigureAwait(false);
-            if (identity is not null)
+            var identity = await AuthenticateAsync(stream, ct).ConfigureAwait(false);
+            if (identity is null)
             {
-                var connection = Guid.NewGuid();
-                liveness.Connected(identity.ScopeName, connection);
-                logger.LogInformation("Agent for scope '{Scope}' connected", identity.ScopeName);
-                try
-                {
-                    await ReceiveAsync(stream, identity, connection, ct).ConfigureAwait(false);
-                }
-                finally
-                {
-                    // However the connection ended, the scope no longer has this agent.
-                    liveness.Disconnected(identity.ScopeName, connection);
-                    logger.LogInformation("Agent for scope '{Scope}' disconnected", identity.ScopeName);
-                }
+                return;
             }
+
+            // Registered before the reply, so the agent never holds its configuration while the controller does not count it as connected.
+            registered = identity;
+            liveness.Connected(identity.ScopeName, connection);
+            logger.LogInformation("Agent for scope '{Scope}' connected", identity.ScopeName);
+
+            var config = new Config(
+                options.ConfigVersion,
+                options.ControllerReplicas,
+                HeartbeatSeconds: Math.Max(1, (int)Math.Ceiling(livenessOptions.HeartbeatInterval.TotalSeconds)));
+            await FrameCodec.WriteAsync(stream, config, options.MaxFrameBytes, ct).ConfigureAwait(false);
+
+            await ReceiveAsync(stream, identity, connection, ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -70,10 +73,19 @@ internal sealed class AgentConnectionHandler(
         {
             logger.LogDebug("Agent connection ended abruptly: {Reason}", ex.Message);
         }
+        finally
+        {
+            // However the connection ended, the scope no longer has this agent.
+            if (registered is not null)
+            {
+                liveness.Disconnected(registered.ScopeName, connection);
+                logger.LogInformation("Agent for scope '{Scope}' disconnected", registered.ScopeName);
+            }
+        }
     }
 
-    /// <summary>Reads and checks the <c>Hello</c> and answers with <c>Config</c>; null when the agent is refused.</summary>
-    private async Task<AgentIdentity?> HandshakeAsync(Stream stream, CancellationToken ct)
+    /// <summary>Reads and checks the <c>Hello</c>; null when the agent is refused.</summary>
+    private async Task<AgentIdentity?> AuthenticateAsync(Stream stream, CancellationToken ct)
     {
         Message? first;
         using var timeout = new CancellationTokenSource(options.HelloTimeout, time);
@@ -108,11 +120,6 @@ internal sealed class AgentConnectionHandler(
             return null;
         }
 
-        var config = new Config(
-            options.ConfigVersion,
-            options.ControllerReplicas,
-            HeartbeatSeconds: Math.Max(1, (int)Math.Ceiling(livenessOptions.HeartbeatInterval.TotalSeconds)));
-        await FrameCodec.WriteAsync(stream, config, options.MaxFrameBytes, ct).ConfigureAwait(false);
         return identity;
     }
 
