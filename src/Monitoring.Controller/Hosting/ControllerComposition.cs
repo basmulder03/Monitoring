@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Monitoring.Controller.Features.AgentLink;
 using Monitoring.Controller.Features.Alerting;
 using Monitoring.Controller.Features.Dashboard;
@@ -75,6 +76,9 @@ internal static class ControllerComposition
     {
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { Args = args });
         MonitoringHost.Configure(builder, args, overrides, configFile);
+
+        // Every page refresh would otherwise log several lines; the Logging settings can still turn this up.
+        builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
 
         var settings = new SettingsReader(builder.Configuration);
         Compose(builder, settings);
