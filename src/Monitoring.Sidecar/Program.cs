@@ -1,2 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
-Console.WriteLine("Hello, World!");
+using Monitoring.Hosting;
+using Monitoring.Sidecar.Hosting;
+
+return await MonitoringHost.RunAsync(args, SidecarComposition.Compose);

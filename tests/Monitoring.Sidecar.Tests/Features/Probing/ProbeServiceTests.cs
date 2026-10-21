@@ -117,6 +117,24 @@ public class ProbeServiceTests
     }
 
     [Fact]
+    public async Task WaitForDescriptionAsync_returns_the_latest_description_not_the_first_one()
+    {
+        // Arrange
+        var fixture = new ProbeFixture().Answering(new InstanceDescription("orders", "1.0.0"), HealthState.Healthy);
+        await fixture.StartAsync();
+        await fixture.Service.WaitForDescriptionAsync(TestContext.Current.CancellationToken);
+        fixture.Link.Description = new InstanceDescription("orders", "2.0.0");
+        fixture.Clock.Advance(TimeSpan.FromSeconds(5));
+        await fixture.WaitUntilAsync(() => fixture.Service.Current.Description!.Version == "2.0.0");
+
+        // Act
+        var description = await fixture.Service.WaitForDescriptionAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        description.Version.ShouldBe("2.0.0");
+    }
+
+    [Fact]
     public async Task WaitForDescriptionAsync_stops_when_asked_to()
     {
         // Arrange

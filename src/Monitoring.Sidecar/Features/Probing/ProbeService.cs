@@ -36,7 +36,13 @@ internal sealed class ProbeService(ILibraryLink link, ProbeOptions options, Time
     }
 
     /// <inheritdoc />
-    public Task<InstanceDescription> WaitForDescriptionAsync(CancellationToken ct) => _introduced.Task.WaitAsync(ct);
+    public async Task<InstanceDescription> WaitForDescriptionAsync(CancellationToken ct)
+    {
+        await _introduced.Task.WaitAsync(ct).ConfigureAwait(false);
+
+        // The current description, not the first one: the application may have restarted with a new version since.
+        return Current.Description!;
+    }
 
     /// <inheritdoc />
     public override Task StartAsync(CancellationToken cancellationToken)
