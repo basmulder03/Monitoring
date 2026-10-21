@@ -20,6 +20,8 @@ internal sealed class AgentHost(string scope, string token) : IAsyncDisposable
 
     private IHost? _host;
 
+    public IServiceProvider Services => _host!.Services;
+
     /// <summary>The address sidecars connect to; only available when the agent listens for sidecars.</summary>
     public string SidecarAddress => $"127.0.0.1:{_host!.Services.GetRequiredService<ISidecarListener>().LocalEndPoint!.Port}";
 

@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Monitoring.Controller.Features.AgentLink;
 using Monitoring.Controller.Features.Alerting;
+using Monitoring.Controller.Features.Configuration;
 using Monitoring.Controller.Features.Dashboard;
 using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Health;
@@ -46,6 +47,12 @@ internal static class ControllerComposition
                 var liveness = controller.Section("Liveness");
                 options.HeartbeatInterval = liveness.Duration("HeartbeatInterval", options.HeartbeatInterval);
                 options.MissedHeartbeats = liveness.Int("MissedHeartbeats", options.MissedHeartbeats);
+            })
+            .AddConfiguration(options =>
+            {
+                var configuration = controller.Section("Configuration");
+                options.File = configuration.Optional("File");
+                options.PollInterval = configuration.Duration("PollInterval", options.PollInterval);
             })
             .AddHealth()
             .AddTopology(options =>

@@ -42,6 +42,8 @@ Logging is controlled by the usual `Logging:LogLevel` settings, for example `MON
 | `Controller:Dashboard:PushInterval` | `00:00:01` | How often open pages are checked for changes to push; bursts of changes become one update |
 | `Controller:Dashboard:GroupBy` | `environment,datacenter` | The scope labels the page groups scopes by, outermost first. Scopes without a label are listed last under "not set". `none` turns grouping off |
 | `Controller:Dashboard:KeepAliveInterval` | `00:00:05` | How long a stream may stay silent before a keep-alive event is sent. Keep it well below 15 seconds, after which a page warns that its data is old |
+| `Controller:Configuration:File` | none | The central configuration file, see below. Without it the built-in defaults apply |
+| `Controller:Configuration:PollInterval` | `00:00:05` | How often the file is looked at for a change |
 | `Controller:Topology:SampleInterval` | `00:00:05` | How often the dependency graph is updated from what the instances report |
 | `Controller:Topology:EdgeFadeAfter` | `00:05:00` | How long an edge may go without a new call before it leaves the graph |
 | `Controller:Liveness:HeartbeatInterval` | `00:00:05` | How often agents are told to send a heartbeat |
@@ -55,6 +57,31 @@ Logging is controlled by the usual `Logging:LogLevel` settings, for example `MON
 | `Controller:Alerting:RestartLoopWindow` | `00:10:00` | The time within which that many restarts count as a loop |
 | `Controller:Alerting:ServiceDownWait` | `00:00:00` | How long a service must have no instance able to serve before its alert fires |
 | `Controller:Alerting:EvaluationInterval` | `00:00:05` | How often the alert rules run |
+
+### Central configuration
+
+How often agents read what their applications report is decided centrally, not on each agent. The controller reads a JSON file (comments and trailing commas are allowed), typically a mounted ConfigMap, and hands each agent its settings when it connects and again whenever the file changes. Nothing is stored: every replica reads the same file, so they agree without talking to each other.
+
+```json
+{
+  "defaults": { "pullSeconds": 15, "edgeFlushSeconds": 10 },
+  "overrides": [
+    { "match": { "labels": { "environment": "prod" } }, "set": { "pullSeconds": 10 } },
+    { "match": { "scope": "orders-platform" }, "set": { "edgeFlushSeconds": 5 } }
+  ]
+}
+```
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `pullSeconds` | `15` | How often an agent reads the metrics of its applications |
+| `edgeFlushSeconds` | `10` | How often an agent reads the calls of its applications to their dependencies |
+
+Layers, the most specific winning: the built-in defaults, then `defaults`, then every override whose `labels` all match the scope, then every override whose `scope` matches (and whose labels, if given, match too). Within the same kind, a later rule wins. A rule has to match on a scope or labels; use `defaults` for everyone.
+
+- Each agent gets a configuration with a version that changes whenever any of its settings does, and applies it without a restart. An agent that cannot reach a controller keeps the last one; after a restart it uses the built-in defaults until a controller answers.
+- A file that cannot be read, is not valid JSON, has a name that is not a setting or a value outside 1 to 3600 seconds is rejected as a whole, the error is logged, and what was in force stays in force. Fix the file and it is picked up at the next look.
+- The heartbeat interval is not part of it: it belongs together with how long silence is tolerated, and is set with `Controller:Liveness`.
 
 ### Silences
 
@@ -252,8 +279,8 @@ The sidecar next to each application connects to the agent, registers its applic
 | `Agent:Sidecars:HeartbeatInterval` | `00:00:05` | How often sidecars are told to send a heartbeat |
 | `Agent:Sidecars:MissedHeartbeats` | `3` | How many heartbeats in a row may be missing before the sidecar counts as gone and its connection is closed |
 | `Agent:Sidecars:HealthPullInterval` | `00:00:15` | How often the health checks of an application are read even when its health did not change |
-| `Agent:Sidecars:EdgesPullInterval` | `00:00:10` | How often the calls an application made to its dependencies are read. They are running totals, so nothing is lost between pulls |
-| `Agent:Sidecars:MetricsPullInterval` | `00:00:15` | How often the metrics of an application are read. They travel to the controller as the latest value per series |
+
+How often metrics and dependency calls are read is not set here but in the controller's central configuration (`pullSeconds`, `edgeFlushSeconds`), so it can be changed for all agents at once.
 
 An instance whose sidecar is gone is shown as Unhealthy until the sidecar returns. A sidecar that says goodbye on purpose, as during a rollout, does not cause that: the agent only forgets what the application reported. A pod that exists but has no sidecar keeps what the platform says about it.
 

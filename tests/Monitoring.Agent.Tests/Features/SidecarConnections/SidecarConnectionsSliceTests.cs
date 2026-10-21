@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Monitoring.Agent.Features.Configuration;
 using Monitoring.Agent.Features.ScopeState;
 using Monitoring.Agent.Features.SidecarConnections;
 using Shouldly;
@@ -15,6 +16,7 @@ public class SidecarConnectionsSliceTests
         // Arrange
         using var provider = new ServiceCollection()
             .AddScopeState(o => o.ScopeName = "shop")
+            .AddAgentConfiguration()
             .AddSidecarConnections()
             .BuildServiceProvider();
 
@@ -31,6 +33,7 @@ public class SidecarConnectionsSliceTests
         // Arrange
         using var provider = new ServiceCollection()
             .AddScopeState(o => o.ScopeName = "shop")
+            .AddAgentConfiguration()
             .AddSidecarConnections()
             .BuildServiceProvider();
 

@@ -1,3 +1,4 @@
+using Monitoring.Agent.Features.Configuration;
 using Monitoring.Common;
 using Monitoring.Common.Transport;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,7 +10,7 @@ namespace Monitoring.Agent.Features.ControllerLink;
 /// <summary>Registers the controller link slice.</summary>
 public static class ControllerLinkSlice
 {
-    /// <summary>Adds the link to the controller replicas and the background service that runs it. It sends the scope state, so <c>AddScopeState</c> must be called as well.</summary>
+    /// <summary>Adds the link to the controller replicas and the background service that runs it. It sends the scope state and hands what the controller says to the agent's configuration, so <c>AddScopeState</c> and <c>AddAgentConfiguration</c> must be called as well.</summary>
     /// <param name="services">The service collection to extend.</param>
     /// <param name="configure">Sets the <see cref="ControllerLinkOptions"/>; at least one controller address and a token are required.</param>
     /// <returns>The same collection, for chaining.</returns>
@@ -40,7 +41,18 @@ public static class ControllerLinkSlice
             provider.GetRequiredService<TimeProvider>(),
             Random.Shared.NextDouble,
             provider.GetRequiredService<ILogger<ControllerConnection>>()));
-        services.AddSingleton<RunReplicaAsync>(provider => provider.GetRequiredService<ControllerConnection>().RunAsync);
+        services.AddSingleton<RunReplicaAsync>(provider =>
+        {
+            var connection = provider.GetRequiredService<ControllerConnection>();
+            var configuration = provider.GetRequiredService<IAgentConfiguration>();
+
+            // Every Config a replica sends is the configuration of the agent first, and only then the business of the link.
+            return (address, onConfig, ct) => connection.RunAsync(address, config =>
+            {
+                configuration.Apply(config);
+                onConfig(config);
+            }, ct);
+        });
         services.AddSingleton<IControllerLink, ControllerLinkService>();
         services.AddHostedService<ControllerLinkHostedService>();
         return services;

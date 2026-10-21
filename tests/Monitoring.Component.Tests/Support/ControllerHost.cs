@@ -23,6 +23,7 @@ internal sealed class ControllerHost : IAsyncDisposable
 
     private int _tokens;
     private IHost? _host;
+    private string? _configFile;
 
     public IServiceProvider Services => _host!.Services;
 
@@ -72,6 +73,19 @@ internal sealed class ControllerHost : IAsyncDisposable
         return this;
     }
 
+    /// <summary>Gives the controller a central configuration file with the text.</summary>
+    public ControllerHost WithCentralConfiguration(string json)
+    {
+        _configFile = Path.Combine(Path.GetTempPath(), $"central-{Guid.NewGuid():N}.json");
+        File.WriteAllText(_configFile, json);
+        _settings["Controller:Configuration:File"] = _configFile;
+        _settings["Controller:Configuration:PollInterval"] = "00:00:00.200";
+        return this;
+    }
+
+    /// <summary>Replaces the content of the central configuration file, as a new version of a ConfigMap does.</summary>
+    public void ChangeCentralConfiguration(string json) => File.WriteAllText(_configFile!, json);
+
     public ControllerHost Start()
     {
         _host = ControllerComposition.CreateHost([], _settings, Files.Missing());
@@ -83,6 +97,11 @@ internal sealed class ControllerHost : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (_configFile is not null)
+        {
+            File.Delete(_configFile);
+        }
+
         if (_host is not null)
         {
             await _host.StopAsync();

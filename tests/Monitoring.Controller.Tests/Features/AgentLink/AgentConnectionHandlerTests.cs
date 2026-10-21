@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Monitoring.Controller.Features.AgentLink;
+using Monitoring.Controller.Features.Configuration;
 using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Features.Security;
@@ -34,6 +35,76 @@ public class AgentConnectionHandlerTests
 
         // Assert
         reply.ShouldBeOfType<Config>().ControllerReplicas.ShouldBe(["tcp://c1:9440", "tcp://c2:9440"]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_answers_a_hello_with_the_settings_of_the_central_configuration_for_that_agent()
+    {
+        // Arrange
+        var fixture = new HandlerFixture().WithToken(Token, Scope);
+        var session = fixture.Build();
+        fixture.Configuration.Replace(ParsedConfiguration.Parse("""{ "defaults": { "pullSeconds": 30 }, "overrides": [ { "match": { "scope": "shop" }, "set": { "edgeFlushSeconds": 20 } } ] }"""));
+
+        // Act
+        await session.SendAsync(HandlerFixture.Hello(Token));
+        var reply = await session.ReceiveAsync();
+
+        // Assert
+        var config = reply.ShouldBeOfType<Config>();
+        config.PullSeconds.ShouldBe(30);
+        config.EdgeFlushSeconds.ShouldBe(20);
+        config.Version.ShouldNotStartWith("built-in");
+    }
+
+    [Fact]
+    public async Task HandleAsync_sends_a_new_config_when_the_central_configuration_changes()
+    {
+        // Arrange
+        var fixture = new HandlerFixture().WithToken(Token, Scope);
+        var session = await fixture.Build().HandshakeAsync(Token);
+
+        // Act
+        fixture.Configuration.Replace(ParsedConfiguration.Parse("""{ "defaults": { "pullSeconds": 99 } }"""));
+        var reply = await session.ReceiveAsync();
+
+        // Assert
+        reply.ShouldBeOfType<Config>().PullSeconds.ShouldBe(99);
+    }
+
+    [Fact]
+    public async Task HandleAsync_keeps_serving_state_after_it_pushed_a_new_config()
+    {
+        // Arrange
+        var fixture = new HandlerFixture().WithToken(Token, Scope);
+        var session = await fixture.Build().HandshakeAsync(Token);
+        fixture.Configuration.Replace(ParsedConfiguration.Parse("""{ "defaults": { "pullSeconds": 99 } }"""));
+        (await session.ReceiveAsync()).ShouldBeOfType<Config>();
+
+        // Act
+        await session.SendAsync(new Snapshot(0, Scope, [HandlerFixture.Instance("pod-1")]));
+        var ack = await session.ReceiveAsync();
+
+        // Assert
+        ack.ShouldBeOfType<Ack>();
+        session.Registry.GetInstances(Scope).Single().Id.ShouldBe("pod-1");
+    }
+
+    [Fact]
+    public async Task HandleAsync_does_not_send_a_config_when_the_configuration_is_replaced_by_the_same_content()
+    {
+        // Arrange
+        var fixture = new HandlerFixture().WithToken(Token, Scope);
+        fixture.Configuration.Replace(ParsedConfiguration.Parse("""{ "defaults": { "pullSeconds": 30 } }"""));
+        var session = await fixture.Build().HandshakeAsync(Token);
+
+        // Act
+        fixture.Configuration.Replace(ParsedConfiguration.Parse("""{ "defaults": { "pullSeconds": 30 } }"""));
+        await session.SendAsync(new Heartbeat(1, HealthState.Healthy));
+        session.Shutdown();
+        var reply = await session.ReceiveAsync();
+
+        // Assert
+        reply.ShouldBeNull();
     }
 
     [Theory]
@@ -444,6 +515,8 @@ public class AgentConnectionHandlerTests
 
         public FakeAgentLiveness Liveness { get; } = new();
 
+        public EffectiveConfiguration Configuration { get; } = new(NullLogger<EffectiveConfiguration>.Instance);
+
         public HandlerFixture WithHeartbeat(TimeSpan interval, int missed)
         {
             _livenessOptions.HeartbeatInterval = interval;
@@ -474,13 +547,13 @@ public class AgentConnectionHandlerTests
         {
             var registry = new ScopeRegistry(new RegistryOptions(), Clock);
             var handler = new AgentConnectionHandler(
-                new FakeAuthenticator(_scopeByToken), registry, Liveness, _livenessOptions, _options, Clock, NullLogger<AgentConnectionHandler>.Instance);
+                new FakeAuthenticator(_scopeByToken), registry, Liveness, _livenessOptions, Configuration, _options, Clock, NullLogger<AgentConnectionHandler>.Instance);
             var (server, client) = DuplexStream.CreatePair();
             var shutdown = new CancellationTokenSource();
 
             // Starts running on this thread up to its first await, so its hello timer exists when this returns.
             var handling = ServeAsync(handler, server, shutdown.Token);
-            return new Session(client, registry, handling, shutdown, Liveness, Clock);
+            return new Session(client, registry, handling, shutdown, Liveness, Clock, Configuration);
         }
 
         public static Hello Hello(string? token, int version = ProtocolVersion.Current) =>
@@ -515,8 +588,10 @@ public class AgentConnectionHandlerTests
 
     /// <summary>The agent's end of a connection being served by the handler under test.</summary>
     private sealed class Session(
-        DuplexStream client, ScopeRegistry registry, Task handling, CancellationTokenSource shutdown, FakeAgentLiveness liveness, FakeTimeProvider clock)
+        DuplexStream client, ScopeRegistry registry, Task handling, CancellationTokenSource shutdown, FakeAgentLiveness liveness, FakeTimeProvider clock, EffectiveConfiguration configuration)
     {
+        public EffectiveConfiguration Configuration { get; } = configuration;
+
         public FakeAgentLiveness Liveness { get; } = liveness;
 
         public FakeTimeProvider Clock { get; } = clock;

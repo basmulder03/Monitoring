@@ -9,7 +9,7 @@ public static class SidecarConnectionsSlice
 {
     /// <summary>
     /// Adds the listener for sidecar connections and the background service that runs it. It reports into the scope state,
-    /// so <c>AddScopeState</c> must be called as well.
+    /// so <c>AddScopeState</c> and <c>AddAgentConfiguration</c> must be called as well.
     /// </summary>
     /// <param name="services">The service collection to extend.</param>
     /// <param name="configure">Optionally changes the <see cref="SidecarConnectionsOptions"/>.</param>
@@ -32,8 +32,6 @@ public static class SidecarConnectionsSlice
         ArgumentOutOfRangeException.ThrowIfLessThan(options.HeartbeatInterval, TimeSpan.FromSeconds(1));
         ArgumentOutOfRangeException.ThrowIfLessThan(options.MissedHeartbeats, 1);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.HealthPullInterval, TimeSpan.Zero);
-        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.MetricsPullInterval, TimeSpan.Zero);
-        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.EdgesPullInterval, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.MaxFrameBytes, 0);
 
         services.AddLogging();

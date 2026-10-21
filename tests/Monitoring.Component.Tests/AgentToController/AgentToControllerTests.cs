@@ -1,8 +1,10 @@
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
+using Monitoring.Agent.Features.Configuration;
 using Monitoring.Agent.Features.ControllerLink;
 using Monitoring.Agent.Features.ScopeState;
 using Monitoring.Controller.Features.AgentLink;
+using Monitoring.Controller.Features.Configuration;
 using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Features.Security;
@@ -147,6 +149,7 @@ public class AgentToControllerTests
             _provider = new ServiceCollection()
                 .AddRegistry()
                 .AddLiveness()
+                .AddConfiguration()
                 .AddSecurity(o => o.AgentTokens.Add(new AgentTokenEntry(Scope, AgentTokenHash.Compute(Token))))
                 .AddAgentLink(o =>
                 {
@@ -214,6 +217,7 @@ public class AgentToControllerTests
         {
             _provider = new ServiceCollection()
                 .AddScopeState(o => o.ScopeName = Scope)
+                .AddAgentConfiguration()
                 .AddControllerLink(o =>
                 {
                     o.ControllerAddresses = [_address];

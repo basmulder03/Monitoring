@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using Microsoft.Extensions.DependencyInjection;
 using Monitoring.Controller.Features.AgentLink;
+using Monitoring.Controller.Features.Configuration;
 using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Features.Security;
@@ -167,6 +168,7 @@ public class AgentListenerTests
             _provider = new ServiceCollection()
                 .AddRegistry()
                 .AddLiveness()
+                .AddConfiguration()
                 .AddSecurity(o => o.AgentTokens.Add(new AgentTokenEntry(Scope, AgentTokenHash.Compute(Token))))
                 .AddAgentLink(o =>
                 {

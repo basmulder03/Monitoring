@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using Monitoring.Agent.Features.Configuration;
 using Monitoring.Agent.Features.ScopeState;
 using Monitoring.Protocol.Framing;
 using Monitoring.Protocol.Health;
@@ -18,11 +19,16 @@ namespace Monitoring.Agent.Features.SidecarConnections;
 /// all connections; a sidecar that reconnects before its old connection is noticed as dead replaces it, so the old one ending later changes nothing.
 /// </remarks>
 /// <param name="store">Receives what each application reports.</param>
+/// <param name="configuration">The intervals the controller asked for.</param>
 /// <param name="options">Timeouts, intervals and limits.</param>
 /// <param name="time">Clock for the timeouts and the pull interval.</param>
 /// <param name="logger">Receives the reasons a connection was refused or ended.</param>
 internal sealed class SidecarConnectionHandler(
-    IScopeStateStore store, SidecarConnectionsOptions options, TimeProvider time, ILogger<SidecarConnectionHandler> logger)
+    IScopeStateStore store,
+    IAgentConfiguration configuration,
+    SidecarConnectionsOptions options,
+    TimeProvider time,
+    ILogger<SidecarConnectionHandler> logger)
 {
     private readonly ConcurrentDictionary<string, Guid> _current = new();
 
@@ -187,8 +193,9 @@ internal sealed class SidecarConnectionHandler(
         }
 
         var now = time.GetUtcNow();
-        var metricsDue = now - pulls.Metrics.LastPullAt >= options.MetricsPullInterval;
-        var edgesDue = now - pulls.Edges.LastPullAt >= options.EdgesPullInterval;
+        var settings = configuration.Current;
+        var metricsDue = now - pulls.Metrics.LastPullAt >= TimeSpan.FromSeconds(settings.PullSeconds);
+        var edgesDue = now - pulls.Edges.LastPullAt >= TimeSpan.FromSeconds(settings.EdgeFlushSeconds);
         if (metricsDue && edgesDue)
         {
             return pulls.Metrics.LastPullAt <= pulls.Edges.LastPullAt ? PullKind.Metrics : PullKind.Edges;

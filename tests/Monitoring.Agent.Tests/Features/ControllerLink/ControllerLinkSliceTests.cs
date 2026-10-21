@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Monitoring.Agent.Features.Configuration;
 using Monitoring.Agent.Features.ControllerLink;
 using Monitoring.Agent.Features.ScopeState;
 using Shouldly;
@@ -20,6 +21,7 @@ public class ControllerLinkSliceTests
         // Arrange
         using var provider = new ServiceCollection()
             .AddScopeState(o => o.ScopeName = "shop")
+            .AddAgentConfiguration()
             .AddControllerLink(Valid)
             .BuildServiceProvider();
 
@@ -137,6 +139,7 @@ public class ControllerLinkSliceTests
         // Arrange
         using var provider = new ServiceCollection()
             .AddScopeState(o => o.ScopeName = "shop")
+            .AddAgentConfiguration()
             .AddControllerLink(Valid)
             .BuildServiceProvider();
 

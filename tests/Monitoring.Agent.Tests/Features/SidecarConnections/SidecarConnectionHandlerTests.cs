@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
+using Monitoring.Agent.Features.Configuration;
 using Monitoring.Agent.Features.ScopeState;
 using Monitoring.Agent.Features.SidecarConnections;
 using Monitoring.Protocol.Framing;
@@ -266,6 +267,29 @@ public class SidecarConnectionHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_follows_the_pull_interval_the_controller_asked_for()
+    {
+        // Arrange
+        var fixture = new HandlerFixture().WithInstance("pod-1");
+        fixture.Configuration.Apply(AgentConfiguration.BuiltIn with { Version = "v2", PullSeconds = 60, EdgeFlushSeconds = 60 });
+        var session = await fixture.Build().RegisterAsync("pod-1");
+        await session.AnswerHealthAsync(HealthState.Healthy);
+        await session.SendAsync(new Heartbeat(1, HealthState.Healthy));
+        (await session.ReceiveAsync()).ShouldBeOfType<Pull>().Kind.ShouldBe(PullKind.Metrics);
+        await session.SendAsync(new Heartbeat(2, HealthState.Healthy));
+        (await session.ReceiveAsync()).ShouldBeOfType<Pull>().Kind.ShouldBe(PullKind.Edges);
+
+        // Act: a minute has not passed, so nothing is due, and a heartbeat gets no pull
+        fixture.Clock.Advance(TimeSpan.FromSeconds(30));
+        await session.SendAsync(new Heartbeat(3, HealthState.Healthy));
+        await session.SendAsync(new Goodbye("pod-1"));
+        var rest = await session.ReadUntilClosedAsync();
+
+        // Assert
+        rest.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task HandleAsync_pulls_the_edges_after_the_metrics()
     {
         // Arrange
@@ -415,6 +439,8 @@ public class SidecarConnectionHandlerTests
 
         public ScopeStateStore Store { get; } = new(new ScopeStateOptions { ScopeName = "shop" });
 
+        public AgentConfiguration Configuration { get; } = new(NullLogger<AgentConfiguration>.Instance);
+
         public HandlerFixture WithHeartbeat(TimeSpan interval, int missed = 3)
         {
             _options.HeartbeatInterval = interval;
@@ -448,7 +474,7 @@ public class SidecarConnectionHandlerTests
         public Session Build()
         {
             // One handler for all connections, as in the agent, so a reconnect can be told from the old connection.
-            _handler ??= new SidecarConnectionHandler(Store, _options, Clock, NullLogger<SidecarConnectionHandler>.Instance);
+            _handler ??= new SidecarConnectionHandler(Store, Configuration, _options, Clock, NullLogger<SidecarConnectionHandler>.Instance);
             var (server, client) = DuplexStream.CreatePair();
             var shutdown = new CancellationTokenSource();
             var handling = ServeAsync(_handler, server, shutdown.Token);

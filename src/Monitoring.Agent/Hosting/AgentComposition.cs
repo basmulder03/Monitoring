@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Monitoring.Agent.Features.Configuration;
 using Monitoring.Agent.Features.ControllerLink;
 using Monitoring.Agent.Features.Discovery;
 using Monitoring.Agent.Features.ScopeState;
@@ -39,6 +40,7 @@ internal static class AgentComposition
                 options.ScopeName = scopeName;
                 options.Labels = new Dictionary<string, string>(agent.Map("Labels"));
             })
+            .AddAgentConfiguration()
             .AddControllerLink(options =>
             {
                 options.ControllerAddresses = [.. controllers];
@@ -74,8 +76,6 @@ internal static class AgentComposition
         options.HeartbeatInterval = sidecars.Duration("HeartbeatInterval", options.HeartbeatInterval);
         options.MissedHeartbeats = sidecars.Int("MissedHeartbeats", options.MissedHeartbeats);
         options.HealthPullInterval = sidecars.Duration("HealthPullInterval", options.HealthPullInterval);
-        options.MetricsPullInterval = sidecars.Duration("MetricsPullInterval", options.MetricsPullInterval);
-        options.EdgesPullInterval = sidecars.Duration("EdgesPullInterval", options.EdgesPullInterval);
     }
 
     private static void ReadDiscovery(SettingsReader discovery, DiscoveryOptions options)

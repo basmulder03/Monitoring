@@ -49,7 +49,7 @@ public class ControllerCompositionTests
         var hosted = host.Services.GetServices<IHostedService>().Select(s => s.GetType().Name);
 
         // Assert
-        hosted.ShouldBe(["RegistryPurgeService", "AlertEvaluationService", "AgentListenerService", "GenericWebHostService", "PlainTransportWarning", "TopologySampleService"], ignoreOrder: true);
+        hosted.ShouldBe(["RegistryPurgeService", "AlertEvaluationService", "AgentListenerService", "GenericWebHostService", "PlainTransportWarning", "TopologySampleService", "ConfigurationReloadService"], ignoreOrder: true);
     }
 
     [Fact]

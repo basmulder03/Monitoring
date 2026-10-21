@@ -23,9 +23,6 @@ public sealed class AgentLinkOptions
     /// </summary>
     public List<string> ControllerReplicas { get; set; } = [];
 
-    /// <summary>Version reported in <c>Config</c>; the central configuration replaces this with a content hash.</summary>
-    public string ConfigVersion { get; set; } = "built-in";
-
     /// <summary>How connections of agents are protected; plain TCP by default, which is only for a network you trust.</summary>
     public TransportSecurityOptions Transport { get; set; } = new();
 }
