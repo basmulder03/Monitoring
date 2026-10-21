@@ -16,7 +16,8 @@ public class FrameCodecTests
 
     public static TheoryData<Message> AllMessages() => new()
     {
-        new Hello(1, "pod-1", "orders", "1.2.3", Labels, "secret"),
+        new Hello(1, "pod-1", "orders", "1.2.3", Labels, "secret", "shop"),
+        new Hello(1, "pod-2", "orders", null, Labels),
         new Heartbeat(42, HealthState.Degraded),
         new Pull(7, PullKind.Metrics, 100),
         new PullResult(7, PullKind.Metrics, 120, "{\"a\":1}"),
@@ -55,6 +56,21 @@ public class FrameCodecTests
 
         // Assert: records compare dictionaries and lists by reference, so compare the re-encoded frame instead
         again.ToArray().ShouldBe(original);
+    }
+
+    [Fact]
+    public async Task ReadAsync_accepts_a_hello_from_a_sender_that_does_not_announce_a_scope()
+    {
+        // Arrange: a hello as an older sender wrote it, without a scope field
+        var stream = await new FrameStreamBuilder()
+            .WithRawPayload("""{"type":"hello","protocolVersion":1,"instanceId":"a","serviceName":"s","labels":{}}""")
+            .BuildAsync();
+
+        // Act
+        var read = await FrameCodec.ReadAsync(stream, ct: Ct);
+
+        // Assert
+        read.ShouldBeOfType<Hello>().ScopeName.ShouldBeNull();
     }
 
     [Fact]
