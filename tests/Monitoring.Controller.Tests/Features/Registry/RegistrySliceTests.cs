@@ -34,4 +34,32 @@ public class RegistrySliceTests
         // Assert
         add.ShouldThrow<ArgumentOutOfRangeException>();
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void AddRegistry_rejects_a_purge_interval_that_is_not_positive(int seconds)
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        var add = () => services.AddRegistry(o => o.PurgeInterval = TimeSpan.FromSeconds(seconds));
+
+        // Assert
+        add.ShouldThrow<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void AddRegistry_registers_the_purge_service_as_a_hosted_service()
+    {
+        // Arrange
+        using var provider = new ServiceCollection().AddRegistry().BuildServiceProvider();
+
+        // Act
+        var hosted = provider.GetServices<Microsoft.Extensions.Hosting.IHostedService>();
+
+        // Assert
+        hosted.ShouldContain(service => service.GetType().Name == "RegistryPurgeService");
+    }
 }

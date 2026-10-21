@@ -12,6 +12,18 @@ namespace Monitoring.Controller.Tests.Shared;
 internal sealed class FakeScopeRegistry : IScopeRegistry
 {
     private readonly SortedDictionary<string, List<InstanceInfo>> _scopes = new(StringComparer.Ordinal);
+    private bool _failNextPurge;
+
+    /// <summary>How many times <see cref="PurgeExpired"/> was called.</summary>
+    public int PurgeCalls { get; private set; }
+
+    /// <summary>Makes the next <see cref="PurgeExpired"/> call throw, once.</summary>
+    /// <returns>This fake, for chaining.</returns>
+    public FakeScopeRegistry WithFailingNextPurge()
+    {
+        _failNextPurge = true;
+        return this;
+    }
 
     /// <summary>Adds an instance to a scope, creating the scope when needed.</summary>
     /// <param name="scope">Scope that holds the instance.</param>
@@ -50,5 +62,13 @@ internal sealed class FakeScopeRegistry : IScopeRegistry
 
     public ApplyResult ApplyDelta(string scopeName, Delta delta) => throw new NotSupportedException();
 
-    public void PurgeExpired() => throw new NotSupportedException();
+    public void PurgeExpired()
+    {
+        PurgeCalls++;
+        if (_failNextPurge)
+        {
+            _failNextPurge = false;
+            throw new InvalidOperationException("purge failed");
+        }
+    }
 }
