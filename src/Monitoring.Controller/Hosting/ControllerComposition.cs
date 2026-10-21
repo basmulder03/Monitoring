@@ -11,6 +11,7 @@ using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Health;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Features.Security;
+using Monitoring.Controller.Features.Topology;
 using Monitoring.Hosting;
 
 namespace Monitoring.Controller.Hosting;
@@ -47,6 +48,12 @@ internal static class ControllerComposition
                 options.MissedHeartbeats = liveness.Int("MissedHeartbeats", options.MissedHeartbeats);
             })
             .AddHealth()
+            .AddTopology(options =>
+            {
+                var topology = controller.Section("Topology");
+                options.SampleInterval = topology.Duration("SampleInterval", options.SampleInterval);
+                options.EdgeFadeAfter = topology.Duration("EdgeFadeAfter", options.EdgeFadeAfter);
+            })
             .AddAlerting(options =>
             {
                 var alerting = controller.Section("Alerting");

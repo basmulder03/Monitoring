@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.DependencyInjection;
 using Monitoring.Component.Tests.Support;
+using Monitoring.Controller.Features.Topology;
 using Monitoring.Protocol.Health;
 using Shouldly;
 using Xunit;
@@ -79,6 +81,36 @@ public class ApplicationToControllerTests
             var edge = controller.Registry.GetInstances("shop").Single().Edges!.Single(e => e.Target == "payments:8080");
             edge.Target.ShouldBe("payments:8080");
             edge.Calls.ShouldBe(3);
+        });
+    }
+
+    [Fact]
+    public async Task The_dependency_graph_of_the_controller_shows_what_the_application_called()
+    {
+        // Arrange
+        var sourceName = $"app-{Guid.NewGuid():N}";
+        using var source = new ActivitySource(sourceName);
+        await using var cluster = new FakeKubernetesApiServer().WithPod("orders-1").Start();
+        await using var controller = new ControllerHost().AcceptingEnrollment(Token).With("Controller:Topology:SampleInterval", "00:00:00.100").Start();
+        await using var agent = new AgentHost("shop", Token).ConnectingTo(controller).DiscoveringIn(cluster)
+            .With("Agent:Sidecars:HeartbeatInterval", "00:00:01")
+            .With("Agent:Sidecars:MetricsPullInterval", "00:00:00.100")
+            .With("Agent:Sidecars:EdgesPullInterval", "00:00:00.100").Start();
+        await using var application = new ApplicationHost("orders-1").WithTraceSource(sourceName).Start(agent);
+
+        // Act
+        using (var call = source.StartActivity("query", ActivityKind.Client))
+        {
+            call!.SetTag("db.system", "mssql");
+            call.SetTag("server.address", "db1");
+            call.SetTag("db.namespace", "orders");
+        }
+
+        // Assert
+        await Eventually.AssertAsync(() =>
+        {
+            var graph = controller.Services.GetRequiredService<ITopology>().GetGraph();
+            graph.Edges.Single(e => e.To.StartsWith("database:mssql://db1", StringComparison.Ordinal)).From.ShouldBe("service:shop/orders");
         });
     }
 

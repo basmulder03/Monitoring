@@ -42,6 +42,8 @@ Logging is controlled by the usual `Logging:LogLevel` settings, for example `MON
 | `Controller:Dashboard:PushInterval` | `00:00:01` | How often open pages are checked for changes to push; bursts of changes become one update |
 | `Controller:Dashboard:GroupBy` | `environment,datacenter` | The scope labels the page groups scopes by, outermost first. Scopes without a label are listed last under "not set". `none` turns grouping off |
 | `Controller:Dashboard:KeepAliveInterval` | `00:00:05` | How long a stream may stay silent before a keep-alive event is sent. Keep it well below 15 seconds, after which a page warns that its data is old |
+| `Controller:Topology:SampleInterval` | `00:00:05` | How often the dependency graph is updated from what the instances report |
+| `Controller:Topology:EdgeFadeAfter` | `00:05:00` | How long an edge may go without a new call before it leaves the graph |
 | `Controller:Liveness:HeartbeatInterval` | `00:00:05` | How often agents are told to send a heartbeat |
 | `Controller:Liveness:MissedHeartbeats` | `3` | How many heartbeats in a row may be missing before an agent counts as gone (15 seconds by default). A connection that is silent that long is closed |
 | `Controller:Alerting:ScopeUnknownWait` | `00:02:00` | How long the agent of a scope must stay gone before the critical `scope-unknown` alert fires |
@@ -64,6 +66,21 @@ A silence keeps alerts out of the dashboard until it ends, for example during pl
 | `Controller:Alerting:Silences:<n>:Rule` | `*` | The rule to silence, such as `service-down`, or `*` for all |
 | `Controller:Alerting:Silences:<n>:Subject` | all | Silences subjects starting with this text, such as `shop/` for a whole scope or `shop/orders/` for one service |
 | `Controller:Alerting:Silences:<n>:Reason` | none | Why, for whoever reads the file |
+
+### Dependency graph
+
+Applications report the calls they make: HTTP calls and, with the right activity sources, database and broker calls. The controller connects each caller to the thing it called:
+
+| Address used by the caller | Node |
+| --- | --- |
+| The IP address of a pod of a known service | That service |
+| `service.namespace`, `service.namespace.svc`, `service.namespace.svc.cluster.local` | That service in that scope |
+| A plain `service` name | That service in the caller's own scope |
+| Anything else | An external system |
+| A database call | A database node, by server and database name |
+| A message sent to a queue or topic | A queue node |
+
+A name that only matches a service of another scope is not guessed at; it stays external. An edge nobody called for `EdgeFadeAfter` disappears. Calls of all instances of a service are added up.
 
 ### When an agent goes away
 
@@ -136,6 +153,7 @@ The controller serves the dashboard itself, so there is nothing else to install.
 | `/?theme=dark` or `?theme=light` | Forces a theme; otherwise the page follows the system setting, and the button in the corner switches it |
 | `/api/overview` | The overview as JSON |
 | `/api/scopes/<name>` | One scope with its services and instances as JSON, each instance with its version, health checks, containers and latest metrics |
+| `/api/topology` | The dependency graph as JSON: nodes (services, databases, queues, external systems) and the edges between them with calls, errors and time |
 | `/api/events` | The overview as Server-Sent Events: the current one at once, then one per change, plus a keep-alive event while nothing changes |
 
 The page has no login yet; reach it only over a network you trust.

@@ -24,6 +24,8 @@ internal sealed class ControllerHost : IAsyncDisposable
     private int _tokens;
     private IHost? _host;
 
+    public IServiceProvider Services => _host!.Services;
+
     public IScopeRegistry Registry => _host!.Services.GetRequiredService<IScopeRegistry>();
 
     public string Address => $"127.0.0.1:{_host!.Services.GetRequiredService<IAgentListener>().LocalEndPoint!.Port}";

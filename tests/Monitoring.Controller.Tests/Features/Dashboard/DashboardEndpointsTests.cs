@@ -8,6 +8,7 @@ using Monitoring.Controller.Features.Alerting;
 using Monitoring.Controller.Features.Dashboard;
 using Monitoring.Controller.Features.Health;
 using Monitoring.Controller.Features.Liveness;
+using Monitoring.Controller.Features.Topology;
 using Monitoring.Controller.Tests.Shared;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Instances;
@@ -32,6 +33,26 @@ public class DashboardEndpointsTests
         // Assert
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         response.Content.Headers.ContentType!.MediaType.ShouldBe("application/json");
+    }
+
+    [Fact]
+    public async Task Topology_answers_with_nodes_and_edges_as_json()
+    {
+        // Arrange
+        await using var server = await new ApiFixture().StartAsync();
+
+        // Act
+        using var json = await server.GetJsonAsync("/api/topology");
+
+        // Assert
+        var node = json.RootElement.GetProperty("nodes")[0];
+        node.GetProperty("id").GetString().ShouldBe("service:shop/orders");
+        node.GetProperty("kind").GetString().ShouldBe("Service");
+        node.GetProperty("health").GetString().ShouldBe("Healthy");
+        var edge = json.RootElement.GetProperty("edges")[0];
+        edge.GetProperty("from").GetString().ShouldBe("service:shop/orders");
+        edge.GetProperty("to").GetString().ShouldBe("database:mssql://db1/orders");
+        edge.GetProperty("calls").GetInt64().ShouldBe(7);
     }
 
     [Fact]
@@ -199,6 +220,7 @@ public class DashboardEndpointsTests
             builder.Services.AddSingleton<IAgentLiveness>(new FakeAgentLiveness());
             builder.Services.AddSingleton<IHealthRollup, HealthRollup>();
             builder.Services.AddSingleton<IAlertState>(new NoAlerts());
+            builder.Services.AddSingleton<ITopology>(new FixedTopology());
             builder.Services.AddDashboard();
 
             var app = builder.Build();
@@ -230,5 +252,15 @@ public class DashboardEndpointsTests
     private sealed class NoAlerts : IAlertState
     {
         public IReadOnlyList<Alert> GetActiveAlerts() => [];
+    }
+
+    private sealed class FixedTopology : ITopology
+    {
+        public TopologyGraph GetGraph() => new(
+            [
+                new TopologyNode("service:shop/orders", "orders", NodeKind.Service, "shop", HealthState.Healthy),
+                new TopologyNode("database:mssql://db1/orders", "mssql://db1/orders", NodeKind.Database, null, null),
+            ],
+            [new TopologyEdge("service:shop/orders", "database:mssql://db1/orders", "DB", 7, 0, 35)]);
     }
 }

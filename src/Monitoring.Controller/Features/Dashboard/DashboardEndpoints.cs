@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Monitoring.Controller.Features.Topology;
 using Monitoring.Ui;
 
 namespace Monitoring.Controller.Features.Dashboard;
@@ -9,7 +10,7 @@ namespace Monitoring.Controller.Features.Dashboard;
 public static class DashboardEndpoints
 {
     /// <summary>
-    /// Maps the read API (<c>GET /api/overview</c>, <c>GET /api/scopes/{name}</c>), the live stream (<c>GET /api/events</c>)
+    /// Maps the read API (<c>GET /api/overview</c>, <c>GET /api/scopes/{name}</c>, <c>GET /api/topology</c>), the live stream (<c>GET /api/events</c>)
     /// and the page itself (<c>/</c>, <c>/tv</c> for a wall display, and its script and style sheet).
     /// </summary>
     /// <param name="endpoints">The route builder to add the endpoints to.</param>
@@ -23,6 +24,9 @@ public static class DashboardEndpoints
             model.BuildScope(name) is { } scope
                 ? Results.Json(scope, DashboardJsonContext.Default.ScopeDetail)
                 : Results.NotFound());
+
+        endpoints.MapGet("/api/topology", (ITopology topology) =>
+            Results.Json(topology.GetGraph(), DashboardJsonContext.Default.TopologyGraph));
 
         endpoints.MapGet("/api/events", (HttpContext context, OverviewStream stream) =>
             stream.StreamAsync(context.Response, context.RequestAborted));

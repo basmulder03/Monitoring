@@ -8,4 +8,5 @@ namespace Monitoring.Controller.Features.Dashboard;
     UseStringEnumConverter = true)]
 [JsonSerializable(typeof(Overview))]
 [JsonSerializable(typeof(ScopeDetail))]
+[JsonSerializable(typeof(Topology.TopologyGraph))]
 internal sealed partial class DashboardJsonContext : JsonSerializerContext;
