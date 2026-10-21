@@ -152,6 +152,61 @@ public class HealthRollupTests
         health.ShouldBe(Unknown);
     }
 
+    [Fact]
+    public void GetScopeHealth_is_unknown_while_the_agent_of_the_scope_is_gone_whatever_was_reported_last()
+    {
+        // Arrange
+        var fixture = new RollupFixture().WithInstances("shop", "orders", Running, Healthy).WithAgentGone("shop");
+
+        // Act
+        var health = fixture.Rollup.GetScopeHealth("shop");
+
+        // Assert
+        health.ShouldBe(Unknown);
+    }
+
+    [Fact]
+    public void GetScopeHealth_is_unknown_for_a_gone_agent_even_when_the_last_report_was_bad()
+    {
+        // Arrange
+        var fixture = new RollupFixture().WithInstances("shop", "orders", Running, Unhealthy).WithAgentGone("shop");
+
+        // Act
+        var health = fixture.Rollup.GetScopeHealth("shop");
+
+        // Assert
+        health.ShouldBe(Unknown);
+    }
+
+    [Fact]
+    public void GetScopeHealth_only_affects_the_scope_whose_agent_is_gone()
+    {
+        // Arrange
+        var fixture = new RollupFixture()
+            .WithInstances("shop", "orders", Running, Healthy)
+            .WithInstances("billing", "invoices", Running, Healthy)
+            .WithAgentGone("shop");
+
+        // Act
+        var health = fixture.Rollup.GetScopeHealth("billing");
+
+        // Assert
+        health.ShouldBe(Healthy);
+    }
+
+    [Fact]
+    public void GetServiceHealth_still_reports_the_last_known_state_when_the_agent_is_gone()
+    {
+        // Arrange
+        var fixture = new RollupFixture().WithInstances("shop", "orders", Running, Degraded).WithAgentGone("shop");
+
+        // Act
+        var services = fixture.Rollup.GetServiceHealth("shop");
+
+        // Assert
+        services.Single().Health.ShouldBe(Degraded);
+    }
+
     /// <summary>Builds a roll-up over a registry that holds exactly the instances the test adds.</summary>
     private sealed class RollupFixture
     {
@@ -159,10 +214,19 @@ public class HealthRollupTests
 
         public RollupFixture()
         {
-            Rollup = new HealthRollup(_registry);
+            Rollup = new HealthRollup(_registry, Liveness);
         }
 
         public IHealthRollup Rollup { get; }
+
+        public FakeAgentLiveness Liveness { get; } = new();
+
+        /// <summary>Makes the agent of the scope count as gone.</summary>
+        public RollupFixture WithAgentGone(string scope)
+        {
+            Liveness.WithDeadScope(scope);
+            return this;
+        }
 
         /// <summary>Adds one instance per given health, all in the same scope, service and lifecycle.</summary>
         public RollupFixture WithInstances(string scope, string service, InstanceLifecycle lifecycle, params HealthState[] healths)

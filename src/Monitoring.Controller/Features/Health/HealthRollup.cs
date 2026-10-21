@@ -1,3 +1,4 @@
+using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Instances;
@@ -6,7 +7,8 @@ namespace Monitoring.Controller.Features.Health;
 
 /// <summary>Default <see cref="IHealthRollup"/>, computed on demand from the registry so it can never drift from it.</summary>
 /// <param name="registry">Source of the instances per scope.</param>
-internal sealed class HealthRollup(IScopeRegistry registry) : IHealthRollup
+/// <param name="liveness">Tells whether the agent of a scope is alive.</param>
+internal sealed class HealthRollup(IScopeRegistry registry, IAgentLiveness liveness) : IHealthRollup
 {
     /// <inheritdoc />
     public IReadOnlyList<ServiceHealth> GetServiceHealth(string scopeName)
@@ -24,6 +26,12 @@ internal sealed class HealthRollup(IScopeRegistry registry) : IHealthRollup
     /// <inheritdoc />
     public HealthState GetScopeHealth(string scopeName)
     {
+        // Without its agent nothing is known about the scope's workloads: they may be fine or down, so it is neither green nor red.
+        if (!liveness.GetScopeLiveness(scopeName).IsLive)
+        {
+            return HealthState.Unknown;
+        }
+
         var services = GetServiceHealth(scopeName);
         return services.Count == 0 ? HealthState.Unknown : services.Select(s => s.Health).Worst();
     }
