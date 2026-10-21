@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Monitoring.Common.Transport;
 
 namespace Monitoring.Controller.Features.AgentLink;
 
@@ -31,6 +32,7 @@ public static class AgentLinkSlice
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.MaxFrameBytes, 0);
 
         services.AddLogging();
+        services.AddTransportSecurity(options.Transport, server: true);
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton(options);
         services.AddSingleton<AgentConnectionHandler>();

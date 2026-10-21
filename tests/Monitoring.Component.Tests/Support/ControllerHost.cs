@@ -6,6 +6,7 @@ using Monitoring.Controller.Features.AgentLink;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Features.Security;
 using Monitoring.Controller.Hosting;
+using Monitoring.Tests.Shared;
 
 namespace Monitoring.Component.Tests.Support;
 
@@ -52,6 +53,20 @@ internal sealed class ControllerHost : IAsyncDisposable
         _settings[$"Controller:AgentTokens:{_tokens}:Scope"] = scope;
         _settings[$"Controller:AgentTokens:{_tokens}:TokenHash"] = AgentTokenHash.Compute(token);
         _tokens++;
+        return this;
+    }
+
+    /// <summary>Makes the controller require TLS with the certificate, and a client certificate from the authority when one is given.</summary>
+    public ControllerHost WithTls(TestPki.Issued certificate, TestPki? clientCa = null)
+    {
+        _settings["Controller:Transport:Mode"] = clientCa is null ? "tls" : "mtls";
+        _settings["Controller:Transport:Certificate"] = certificate.CertificateFile;
+        _settings["Controller:Transport:Key"] = certificate.KeyFile;
+        if (clientCa is not null)
+        {
+            _settings["Controller:Transport:ClientCaFile"] = clientCa.CaFile;
+        }
+
         return this;
     }
 

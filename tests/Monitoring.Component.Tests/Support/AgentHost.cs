@@ -5,6 +5,7 @@ using Monitoring.Agent.Features.SidecarConnections;
 using Monitoring.Agent.Hosting;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Instances;
+using Monitoring.Tests.Shared;
 
 namespace Monitoring.Component.Tests.Support;
 
@@ -48,6 +49,21 @@ internal sealed class AgentHost(string scope, string token) : IAsyncDisposable
     public AgentHost ConnectingTo(ControllerHost controller)
     {
         _settings["Agent:Controllers"] = controller.Address;
+        return this;
+    }
+
+    /// <summary>Makes the agent use TLS, trusting the authority and checking the controller's certificate for the name; with a client certificate it uses mutual TLS.</summary>
+    public AgentHost WithTls(TestPki trusted, string controllerName, TestPki.Issued? clientCertificate = null)
+    {
+        _settings["Agent:Transport:Mode"] = clientCertificate is null ? "tls" : "mtls";
+        _settings["Agent:Transport:CaFile"] = trusted.CaFile;
+        _settings["Agent:Transport:ServerName"] = controllerName;
+        if (clientCertificate is not null)
+        {
+            _settings["Agent:Transport:Certificate"] = clientCertificate.CertificateFile;
+            _settings["Agent:Transport:Key"] = clientCertificate.KeyFile;
+        }
+
         return this;
     }
 

@@ -31,6 +31,11 @@ Logging is controlled by the usual `Logging:LogLevel` settings, for example `MON
 | `Controller:Listen:Port` | `9440` | TCP port agents connect to |
 | `Controller:Replicas` | none | The individual `host:port` address of every controller replica, handed to agents so they connect to all of them. List every replica, including this one: agents follow exactly this list |
 | `Controller:AgentTokens` | required | The accepted agent tokens, see below. At least one |
+| `Controller:Transport:Mode` | `none` | How agent connections are protected: `none`, `tls` or `mtls`, see below |
+| `Controller:Transport:Certificate` | none | PEM file with the server certificate and its chain. Required for `tls` and `mtls` |
+| `Controller:Transport:Key` | none | PEM file with its private key; may be left out when the certificate file holds the key too |
+| `Controller:Transport:ClientCaFile` | none | PEM file with the certificate authority that signs agent certificates. Required for `mtls` |
+| `Controller:Transport:HandshakeTimeout` | `00:00:10` | How long a TLS handshake may take before the connection is dropped |
 | `Controller:AgentLink:HelloTimeout` | `00:00:10` | How long a new connection may stay silent before it must say hello |
 | `Controller:Web:Address` | `0.0.0.0` | IP address the dashboard's web server listens on |
 | `Controller:Web:Port` | `8080` | TCP port of the dashboard and its API; plain HTTP, so keep it on a network you trust |
@@ -83,7 +88,30 @@ The hash is the SHA-256 of the token as lower-case hexadecimal text: `printf '%s
 }
 ```
 
-Without transport security the token travels in clear text. Use it only on a network you trust; TLS comes in a later version.
+### Transport security
+
+| Mode | What it does | When to use |
+| --- | --- | --- |
+| `none` | Plain TCP. The agent token travels in clear text, and both executables log a warning at startup | A closed network the traffic cannot leave |
+| `tls` | The controller presents a certificate and the agent checks it against `CaFile` and the host name (or `ServerName`) | Agents in other clusters or on Windows servers, for example through a TLS passthrough Route |
+| `mtls` | `tls`, and the agent also presents a client certificate that the controller checks against `ClientCaFile` | Strict environments |
+
+- The certificate files are read again when they change, so a renewed certificate is used for the next connection without a restart. Connections already open keep the old one.
+- A mistake in a file or setting stops the executable from starting, with exit code 78 and a message naming the file.
+- Revocation is not checked for a private authority (`CaFile`, `ClientCaFile`): such authorities rarely publish a list, and the check would fail every handshake offline. Use short-lived certificates. Without `CaFile` the agent uses the machine's authorities and the normal checks.
+- Authentication stays on whatever the mode: the agent token is still required, and `mtls` adds to it.
+
+```json
+{
+  "Controller": { "Transport": { "Mode": "tls", "Certificate": "/certs/tls.crt", "Key": "/certs/tls.key" } }
+}
+```
+
+```json
+{
+  "Agent": { "Transport": { "Mode": "tls", "CaFile": "/certs/ca.crt" } }
+}
+```
 
 ### Dashboard
 
@@ -111,6 +139,11 @@ The page has no login yet; reach it only over a network you trust.
 | `Agent:Id` | machine name | Id of this agent |
 | `Agent:Version` | none | Version of this agent, shown by the controller |
 | `Agent:Labels:<name>` | none | Free-form labels such as `environment` and `datacenter`. They describe the scope, are sent with every snapshot (a change reaches the controller within the snapshot interval) and are what the dashboard groups and filters by |
+| `Agent:Transport:Mode` | `none` | How the connection to the controller is protected: `none`, `tls` or `mtls`, see below. Must match the controller |
+| `Agent:Transport:CaFile` | machine's authorities | PEM file with the certificate authority that signed the controller's certificate |
+| `Agent:Transport:ServerName` | host of the address | The name the controller's certificate must be valid for, when it differs from the host the agent connects to, as behind a Route |
+| `Agent:Transport:Certificate`, `Agent:Transport:Key` | none | The agent's client certificate and key (PEM). Required for `mtls` |
+| `Agent:Transport:HandshakeTimeout` | `00:00:10` | How long a TLS handshake may take |
 | `Agent:Reconnect:MinDelay` | `00:00:01` | Shortest wait before reconnecting to a replica |
 | `Agent:Reconnect:MaxDelay` | `00:00:30` | Longest wait; repeated failures grow the wait up to this |
 | `Agent:ConfigReplyTimeout` | `00:00:10` | How long to wait for the controller's answer to the hello |

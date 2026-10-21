@@ -52,6 +52,7 @@ internal static class AgentComposition
                 options.ReconnectMaxDelay = reconnect.Duration("MaxDelay", options.ReconnectMaxDelay);
                 options.ConfigReplyTimeout = agent.Duration("ConfigReplyTimeout", options.ConfigReplyTimeout);
                 options.SnapshotInterval = agent.Duration("SnapshotInterval", options.SnapshotInterval);
+                options.Transport = TransportSettings.Read(agent.Section("Transport"));
             })
             .AddDiscovery(options => ReadDiscovery(agent.Section("Discovery"), options));
 

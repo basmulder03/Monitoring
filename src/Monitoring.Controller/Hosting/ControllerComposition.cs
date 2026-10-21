@@ -79,6 +79,7 @@ internal static class ControllerComposition
                 options.Port = listen.Int("Port", options.Port);
                 options.HelloTimeout = controller.Section("AgentLink").Duration("HelloTimeout", options.HelloTimeout);
                 options.ControllerReplicas = [.. controller.List("Replicas")];
+                options.Transport = TransportSettings.Read(controller.Section("Transport"));
             });
     }
 

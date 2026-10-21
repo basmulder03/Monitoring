@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using System.Security.Authentication;
 using Microsoft.Extensions.Logging;
 using Monitoring.Common;
 using Monitoring.Protocol.Messages;
@@ -67,9 +68,11 @@ internal sealed class ControllerConnection(
             {
                 return;
             }
-            catch (Exception ex) when (ex is IOException or SocketException)
+            catch (Exception ex) when (ex is IOException or SocketException or AuthenticationException or TimeoutException)
             {
-                logger.LogDebug("Cannot reach controller replica {Address}: {Reason}", address, ex.Message);
+                // A refused certificate is not a debug matter: it will not fix itself, and someone has to look.
+                var level = ex is AuthenticationException ? LogLevel.Warning : LogLevel.Debug;
+                logger.Log(level, "Cannot reach controller replica {Address}: {Reason}", address, ex.InnerException?.Message ?? ex.Message);
                 wait = NextWait(failures);
                 failures++;
             }

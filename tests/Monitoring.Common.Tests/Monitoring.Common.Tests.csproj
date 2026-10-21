@@ -9,5 +9,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Monitoring.Common/Monitoring.Common.csproj" />
+    <ProjectReference Include="../Monitoring.Tests.Shared/Monitoring.Tests.Shared.csproj" />
   </ItemGroup>
 </Project>

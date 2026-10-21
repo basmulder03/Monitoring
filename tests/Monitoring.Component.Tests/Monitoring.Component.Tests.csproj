@@ -10,6 +10,9 @@
     <PackageReference Include="Shouldly" Version="4.3.0" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../Monitoring.Tests.Shared/Monitoring.Tests.Shared.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../../src/Monitoring.Agent/Monitoring.Agent.csproj" />
     <ProjectReference Include="../../src/Monitoring.Client/Monitoring.Client.csproj" />
     <ProjectReference Include="../../src/Monitoring.Controller/Monitoring.Controller.csproj" />

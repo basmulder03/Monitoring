@@ -1,3 +1,4 @@
+using Monitoring.Common.Transport;
 using Monitoring.Protocol.Framing;
 
 namespace Monitoring.Agent.Features.ControllerLink;
@@ -37,4 +38,7 @@ public sealed class ControllerLinkOptions
 
     /// <summary>Largest frame accepted from the controller.</summary>
     public int MaxFrameBytes { get; set; } = FrameCodec.DefaultMaxFrameBytes;
+
+    /// <summary>How the connection to the controller is protected; plain TCP by default, which is only for a network you trust.</summary>
+    public TransportSecurityOptions Transport { get; set; } = new();
 }

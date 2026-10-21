@@ -120,5 +120,8 @@ public sealed class SettingsReader
     public IReadOnlyList<SettingsReader> Items(string key) =>
         [.. _configuration.GetSection(key).GetChildren().Select(c => new SettingsReader(c, NameOf($"{key}:{c.Key}")))];
 
-    private string NameOf(string key) => _path.Length == 0 ? key : $"{_path}:{key}";
+    /// <summary>Gets the full name of a setting, as it is written in a file, for messages that name it.</summary>
+    /// <param name="key">The setting, relative to this reader.</param>
+    /// <returns>The path from the root, such as <c>Agent:Transport:Mode</c>.</returns>
+    public string NameOf(string key) => _path.Length == 0 ? key : $"{_path}:{key}";
 }
