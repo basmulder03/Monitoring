@@ -1,8 +1,7 @@
 using Monitoring.Controller.Features.Health;
-using Monitoring.Controller.Features.Registry;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Instances;
-using Monitoring.Protocol.Messages;
+using Monitoring.Controller.Tests.Shared;
 using Shouldly;
 using Xunit;
 using static Monitoring.Protocol.Health.HealthState;
@@ -156,7 +155,7 @@ public class HealthRollupTests
     /// <summary>Builds a roll-up over a registry that holds exactly the instances the test adds.</summary>
     private sealed class RollupFixture
     {
-        private readonly FakeRegistry _registry = new();
+        private readonly FakeScopeRegistry _registry = new();
 
         public RollupFixture()
         {
@@ -170,38 +169,10 @@ public class HealthRollupTests
         {
             foreach (var health in healths)
             {
-                var id = $"{service}-{_registry.Count(scope)}";
-                _registry.Add(scope, new InstanceInfo(id, service, lifecycle, health, new Dictionary<string, string>()));
+                _registry.WithInstance(scope, service, lifecycle, health);
             }
 
             return this;
         }
-    }
-
-    /// <summary>Registry stand-in that only answers reads; the roll-up never writes.</summary>
-    private sealed class FakeRegistry : IScopeRegistry
-    {
-        private readonly Dictionary<string, List<InstanceInfo>> _scopes = [];
-
-        public void Add(string scope, InstanceInfo instance)
-        {
-            if (!_scopes.TryGetValue(scope, out var list))
-            {
-                _scopes[scope] = list = [];
-            }
-
-            list.Add(instance);
-        }
-
-        public int Count(string scope) => _scopes.TryGetValue(scope, out var list) ? list.Count : 0;
-
-        public IReadOnlyList<InstanceInfo> GetInstances(string scopeName) =>
-            _scopes.TryGetValue(scopeName, out var list) ? list : [];
-
-        public ApplyResult ApplySnapshot(Snapshot snapshot) => throw new NotSupportedException();
-
-        public ApplyResult ApplyDelta(string scopeName, Delta delta) => throw new NotSupportedException();
-
-        public void PurgeExpired() => throw new NotSupportedException();
     }
 }

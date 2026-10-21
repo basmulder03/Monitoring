@@ -86,6 +86,15 @@ internal sealed class ScopeRegistry(RegistryOptions options, TimeProvider time) 
     }
 
     /// <inheritdoc />
+    public IReadOnlyList<string> GetScopeNames()
+    {
+        lock (_gate)
+        {
+            return [.. _scopes.Keys.OrderBy(name => name, StringComparer.Ordinal)];
+        }
+    }
+
+    /// <inheritdoc />
     public void PurgeExpired()
     {
         lock (_gate)

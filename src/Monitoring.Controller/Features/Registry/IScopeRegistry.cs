@@ -25,6 +25,10 @@ public interface IScopeRegistry
     /// <returns>The instances, or an empty list for an unknown scope.</returns>
     IReadOnlyList<InstanceInfo> GetInstances(string scopeName);
 
+    /// <summary>Gets the names of all scopes that have sent a snapshot.</summary>
+    /// <returns>The scope names, ordered.</returns>
+    IReadOnlyList<string> GetScopeNames();
+
     /// <summary>Drops instances that have been Gone for longer than <see cref="RegistryOptions.GoneRetention"/>.</summary>
     void PurgeExpired();
 }

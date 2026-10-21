@@ -197,6 +197,33 @@ public class ScopeRegistryTests
     }
 
     [Fact]
+    public void GetScopeNames_lists_every_scope_that_sent_a_snapshot_ordered_by_name()
+    {
+        // Arrange
+        var fixture = new RegistryFixture().WithSnapshot("shop", 1, "a").WithSnapshot("billing", 1);
+
+        // Act
+        var names = fixture.Registry.GetScopeNames();
+
+        // Assert
+        names.ShouldBe(["billing", "shop"]);
+    }
+
+    [Fact]
+    public void GetScopeNames_does_not_list_a_scope_known_only_from_a_delta()
+    {
+        // Arrange
+        var fixture = new RegistryFixture();
+        fixture.Registry.ApplyDelta("shop", new Delta(1, [RegistryFixture.Instance("a")], []));
+
+        // Act
+        var names = fixture.Registry.GetScopeNames();
+
+        // Assert
+        names.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void GetInstances_returns_an_empty_list_for_an_unknown_scope()
     {
         // Arrange
