@@ -25,7 +25,11 @@ internal sealed class ScopeRegistry(RegistryOptions options, TimeProvider time) 
         lock (_gate)
         {
             // A new state object also drops instances the agent no longer reports, including expired Gone ones.
-            var scope = new ScopeState { LastSequence = snapshot.Sequence };
+            var scope = new ScopeState
+            {
+                LastSequence = snapshot.Sequence,
+                Labels = new Dictionary<string, string>(snapshot.Labels ?? new Dictionary<string, string>()),
+            };
             foreach (var instance in snapshot.Instances)
             {
                 scope.Instances[instance.Id] = Track(instance);
@@ -91,6 +95,15 @@ internal sealed class ScopeRegistry(RegistryOptions options, TimeProvider time) 
         lock (_gate)
         {
             return [.. _scopes.Keys.OrderBy(name => name, StringComparer.Ordinal)];
+        }
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyDictionary<string, string> GetScopeLabels(string scopeName)
+    {
+        lock (_gate)
+        {
+            return _scopes.TryGetValue(scopeName, out var scope) ? scope.Labels : new Dictionary<string, string>();
         }
     }
 

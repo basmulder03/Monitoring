@@ -29,6 +29,11 @@ public interface IScopeRegistry
     /// <returns>The scope names, ordered.</returns>
     IReadOnlyList<string> GetScopeNames();
 
+    /// <summary>Gets the labels of a scope, as the latest snapshot of its agent announced them.</summary>
+    /// <param name="scopeName">The scope to read.</param>
+    /// <returns>The labels, or an empty dictionary for an unknown scope or a scope without labels.</returns>
+    IReadOnlyDictionary<string, string> GetScopeLabels(string scopeName);
+
     /// <summary>Drops instances that have been Gone for longer than <see cref="RegistryOptions.GoneRetention"/>.</summary>
     void PurgeExpired();
 }

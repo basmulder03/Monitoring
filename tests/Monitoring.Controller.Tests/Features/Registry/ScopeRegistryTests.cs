@@ -224,6 +224,94 @@ public class ScopeRegistryTests
     }
 
     [Fact]
+    public void GetScopeLabels_returns_the_labels_of_the_latest_snapshot()
+    {
+        // Arrange
+        var fixture = new RegistryFixture();
+        fixture.Registry.ApplySnapshot(new Snapshot(1, "shop", [], new Dictionary<string, string> { ["environment"] = "prod" }));
+
+        // Act
+        var labels = fixture.Registry.GetScopeLabels("shop");
+
+        // Assert
+        labels["environment"].ShouldBe("prod");
+        labels.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void GetScopeLabels_follows_a_change_announced_by_a_newer_snapshot()
+    {
+        // Arrange
+        var fixture = new RegistryFixture();
+        fixture.Registry.ApplySnapshot(new Snapshot(1, "shop", [], new Dictionary<string, string> { ["environment"] = "test" }));
+        fixture.Registry.ApplySnapshot(new Snapshot(2, "shop", [], new Dictionary<string, string> { ["environment"] = "prod", ["site"] = "a" }));
+
+        // Act
+        var labels = fixture.Registry.GetScopeLabels("shop");
+
+        // Assert
+        labels["environment"].ShouldBe("prod");
+        labels["site"].ShouldBe("a");
+    }
+
+    [Fact]
+    public void GetScopeLabels_keeps_the_labels_when_deltas_arrive()
+    {
+        // Arrange
+        var fixture = new RegistryFixture();
+        fixture.Registry.ApplySnapshot(new Snapshot(1, "shop", [], new Dictionary<string, string> { ["environment"] = "prod" }));
+        fixture.Registry.ApplyDelta("shop", new Delta(2, [RegistryFixture.Instance("a")], []));
+
+        // Act
+        var labels = fixture.Registry.GetScopeLabels("shop");
+
+        // Assert
+        labels["environment"].ShouldBe("prod");
+    }
+
+    [Fact]
+    public void GetScopeLabels_is_empty_for_a_snapshot_without_labels()
+    {
+        // Arrange
+        var fixture = new RegistryFixture().WithSnapshot("shop", 1, "a");
+
+        // Act
+        var labels = fixture.Registry.GetScopeLabels("shop");
+
+        // Assert
+        labels.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void GetScopeLabels_is_empty_for_an_unknown_scope()
+    {
+        // Arrange
+        var fixture = new RegistryFixture();
+
+        // Act
+        var labels = fixture.Registry.GetScopeLabels("nowhere");
+
+        // Assert
+        labels.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void GetScopeLabels_is_not_changed_by_later_changes_to_the_dictionary_that_was_sent()
+    {
+        // Arrange
+        var fixture = new RegistryFixture();
+        var sent = new Dictionary<string, string> { ["environment"] = "prod" };
+        fixture.Registry.ApplySnapshot(new Snapshot(1, "shop", [], sent));
+        sent["environment"] = "changed";
+
+        // Act
+        var labels = fixture.Registry.GetScopeLabels("shop");
+
+        // Assert
+        labels["environment"].ShouldBe("prod");
+    }
+
+    [Fact]
     public void GetInstances_returns_an_empty_list_for_an_unknown_scope()
     {
         // Arrange

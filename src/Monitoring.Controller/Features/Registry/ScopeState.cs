@@ -8,6 +8,9 @@ internal sealed class ScopeState
     /// <summary>The scope's instances by id, including those shown as Gone.</summary>
     public Dictionary<string, TrackedInstance> Instances { get; } = [];
 
+    /// <summary>The labels the agent announced for the scope with its latest snapshot.</summary>
+    public IReadOnlyDictionary<string, string> Labels { get; init; } = new Dictionary<string, string>();
+
     /// <summary>Sequence number of the last snapshot or delta applied; replicas acknowledge it to the agent.</summary>
     public long LastSequence { get; set; }
 

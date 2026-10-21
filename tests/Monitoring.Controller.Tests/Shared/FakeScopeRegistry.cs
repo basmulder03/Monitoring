@@ -12,6 +12,7 @@ namespace Monitoring.Controller.Tests.Shared;
 internal sealed class FakeScopeRegistry : IScopeRegistry
 {
     private readonly SortedDictionary<string, List<InstanceInfo>> _scopes = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Dictionary<string, string>> _labels = new(StringComparer.Ordinal);
     private bool _failNextPurge;
 
     /// <summary>How many times <see cref="PurgeExpired"/> was called.</summary>
@@ -44,6 +45,27 @@ internal sealed class FakeScopeRegistry : IScopeRegistry
         return this;
     }
 
+    /// <summary>Sets a label of a scope, creating the scope when needed.</summary>
+    /// <param name="scope">The scope.</param>
+    /// <param name="key">Label name.</param>
+    /// <param name="value">Label value.</param>
+    /// <returns>This fake, for chaining.</returns>
+    public FakeScopeRegistry WithLabel(string scope, string key, string value)
+    {
+        if (!_scopes.ContainsKey(scope))
+        {
+            _scopes[scope] = [];
+        }
+
+        if (!_labels.TryGetValue(scope, out var labels))
+        {
+            _labels[scope] = labels = [];
+        }
+
+        labels[key] = value;
+        return this;
+    }
+
     /// <summary>Removes every instance of a scope but keeps the scope known.</summary>
     /// <param name="scope">The scope to empty.</param>
     /// <returns>This fake, for chaining.</returns>
@@ -55,6 +77,9 @@ internal sealed class FakeScopeRegistry : IScopeRegistry
 
     public IReadOnlyList<InstanceInfo> GetInstances(string scopeName) =>
         _scopes.TryGetValue(scopeName, out var list) ? list : [];
+
+    public IReadOnlyDictionary<string, string> GetScopeLabels(string scopeName) =>
+        _labels.TryGetValue(scopeName, out var labels) ? labels : new Dictionary<string, string>();
 
     public IReadOnlyList<string> GetScopeNames() => [.. _scopes.Keys];
 
