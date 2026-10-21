@@ -22,3 +22,7 @@ Every change comes with tests, and `dotnet test` must pass at every commit.
 ## Work items
 
 Planned work is tracked as issues, one per slice, listed in the [roadmap](https://github.com/basmulder03/MonitoringAgent/issues/61). Say on the issue when you pick one up.
+
+## License
+
+By contributing you agree that your contribution is licensed under the [Apache License 2.0](LICENSE), as the rest of the project.
