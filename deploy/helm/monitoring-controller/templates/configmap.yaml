@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "monitoring-controller.name" . }}
+  labels: {{- include "monitoring-controller.labels" . | nindent 4 }}
+data:
+  central.json: |
+    {{- .Values.centralConfiguration | nindent 4 }}

@@ -1,0 +1,41 @@
+image:
+  repository: monitoring-agent
+  tag: ""            # defaults to the chart's appVersion
+  pullPolicy: IfNotPresent
+
+# The scope this agent reports as. The dashboard shows it as a tile.
+scope:
+  name: ""           # defaults to the namespace of the release
+  labels: {}         # for example: { environment: prod, datacenter: a }
+
+controller:
+  # The bootstrap address of the controller as host:port. The controller answers with the address of every replica.
+  addresses: []
+
+# The token that proves who the agent is. Create the secret yourself; it needs one key, "token".
+token:
+  existingSecret: ""
+  key: token
+
+# How the connection to the controller is protected: none, tls or mtls. See docs/configuration.md.
+transport:
+  mode: none
+  # A secret with ca.crt (and tls.crt and tls.key for mtls), mounted at /etc/monitoring/transport.
+  existingSecret: ""
+  serverName: ""
+
+# Name of the monitoring sidecar container in the pods of the namespace, so a failing sidecar is not reported as a failing application.
+sidecarContainer: monitoring-sidecar
+
+service:
+  port: 9441         # where the sidecars connect
+
+resources:
+  requests: { cpu: 25m, memory: 32Mi }
+  limits: { memory: 128Mi }
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}
+extraEnv: []

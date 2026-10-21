@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: orders }
+  template:
+    metadata:
+      labels: { app: orders }
+    spec:
+      {{- if include "monitoring.sidecar.initContainers" . }}
+      initContainers:
+        {{- include "monitoring.sidecar.initContainers" . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: orders
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- if include "monitoring.sidecar.enabled" . }}
+          env:
+            {{- include "monitoring.sidecar.env" . | nindent 12 }}
+          volumeMounts:
+            {{- include "monitoring.sidecar.volumeMounts" . | nindent 12 }}
+          {{- end }}
+        {{- include "monitoring.sidecar.containers" . | nindent 8 }}
+      {{- if include "monitoring.sidecar.enabled" . }}
+      volumes:
+        {{- include "monitoring.sidecar.volumes" . | nindent 8 }}
+      {{- end }}

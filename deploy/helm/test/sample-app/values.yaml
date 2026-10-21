@@ -1,0 +1,7 @@
+image: { repository: example/orders, tag: "1.0.0" }
+monitoring:
+  enabled: true
+  labels: { team: orders }
+  image: { repository: monitoring-sidecar, tag: "0.1.0" }
+  agentAddress: monitoring-agent:9441
+  nativeSidecar: true

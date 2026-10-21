@@ -4,3 +4,5 @@ artifacts/
 .idea/
 node_modules/
 src/Monitoring.Ui/wwwroot/
+deploy/helm/test/sample-app/charts/
+deploy/helm/test/sample-app/Chart.lock

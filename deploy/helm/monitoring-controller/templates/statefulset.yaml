@@ -1,0 +1,134 @@
+{{- if empty .Values.agentTokens }}{{ fail "agentTokens needs at least one entry with a scope and a tokenHash" }}{{ end }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "monitoring-controller.name" . }}
+  labels: {{- include "monitoring-controller.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "monitoring-controller.name" . }}-headless
+  replicas: {{ .Values.replicas }}
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels: {{- include "monitoring-controller.selector" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "monitoring-controller.selector" . | nindent 8 }}
+      annotations:
+        # A new central configuration needs no restart, but a changed setting here does.
+        checksum/settings: {{ toYaml (dict "tokens" .Values.agentTokens "dashboard" .Values.dashboard "aligned" .Values.alignedPackages "replicas" .Values.replicaAddresses "transport" .Values.transport) | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: controller
+          image: "{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          ports:
+            - name: agents
+              containerPort: 9440
+            - name: web
+              containerPort: 8080
+          env:
+            {{- range $i, $token := .Values.agentTokens }}
+            - name: MONITORING_Controller__AgentTokens__{{ $i }}__Scope
+              value: {{ $token.scope | quote }}
+            - name: MONITORING_Controller__AgentTokens__{{ $i }}__TokenHash
+              value: {{ $token.tokenHash | quote }}
+            {{- end }}
+            {{- range $i, $address := (include "monitoring-controller.replicaAddresses" . | trim | splitList "\n") }}
+            - name: MONITORING_Controller__Replicas__{{ $i }}
+              value: {{ $address | quote }}
+            {{- end }}
+            - name: MONITORING_Controller__Configuration__File
+              value: /etc/monitoring/central/central.json
+            {{- range $i, $key := .Values.dashboard.groupBy }}
+            - name: MONITORING_Controller__Dashboard__GroupBy__{{ $i }}
+              value: {{ $key | quote }}
+            {{- end }}
+            {{- range $i, $rule := .Values.alignedPackages }}
+            - name: MONITORING_Controller__Packages__Aligned__{{ $i }}__Package
+              value: {{ $rule.package | quote }}
+            - name: MONITORING_Controller__Packages__Aligned__{{ $i }}__Spread
+              value: {{ default "major" $rule.spread | quote }}
+            {{- end }}
+            {{- if .Values.advisories.existingConfigMap }}
+            - name: MONITORING_Controller__Vulnerabilities__Advisories
+              value: /etc/monitoring/advisories
+            {{- end }}
+            - name: MONITORING_Controller__Transport__Mode
+              value: {{ .Values.transport.mode | quote }}
+            {{- if ne .Values.transport.mode "none" }}
+            - name: MONITORING_Controller__Transport__Certificate
+              value: /etc/monitoring/transport/tls.crt
+            - name: MONITORING_Controller__Transport__Key
+              value: /etc/monitoring/transport/tls.key
+            {{- end }}
+            {{- if eq .Values.transport.mode "mtls" }}
+            - name: MONITORING_Controller__Transport__ClientCaFile
+              value: /etc/monitoring/transport/ca.crt
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          readinessProbe:
+            httpGet: { path: /api/overview, port: web }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/overview, port: web }
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          volumeMounts:
+            - name: central
+              mountPath: /etc/monitoring/central
+              readOnly: true
+            {{- if ne .Values.transport.mode "none" }}
+            - name: transport
+              mountPath: /etc/monitoring/transport
+              readOnly: true
+            {{- end }}
+            {{- if .Values.advisories.existingConfigMap }}
+            - name: advisories
+              mountPath: /etc/monitoring/advisories
+              readOnly: true
+            {{- end }}
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: central
+          configMap:
+            name: {{ include "monitoring-controller.name" . }}
+        {{- if ne .Values.transport.mode "none" }}
+        - name: transport
+          secret:
+            secretName: {{ required "transport.existingSecret is needed for tls and mtls" .Values.transport.existingSecret }}
+        {{- end }}
+        {{- if .Values.advisories.existingConfigMap }}
+        - name: advisories
+          configMap:
+            name: {{ .Values.advisories.existingConfigMap }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        {{- if .Values.affinity }}
+        {{- toYaml .Values.affinity | nindent 8 }}
+        {{- else }}
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels: {{- include "monitoring-controller.selector" . | nindent 20 }}
+        {{- end }}

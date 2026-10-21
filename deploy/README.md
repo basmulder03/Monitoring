@@ -15,4 +15,29 @@ docker build --build-arg PROJECT=Sidecar    -t monitoring-sidecar    -f deploy/D
 - `--platform linux/arm64` builds an arm64 image.
 - The build compiles for the architecture of the machine it runs on; the controller image also builds the dashboard, which needs no setup on your side.
 
-Helm charts and the sidecar injector are tracked as issues and are not here yet.
+## Helm charts
+
+| Chart | What it installs |
+| --- | --- |
+| `deploy/helm/monitoring-controller` | The controller as a stateful set of identical replicas, each with an address of its own through a headless service, a service for the dashboard, and the central configuration as a config map. Tokens, aligned packages, advisories and transport security are values |
+| `deploy/helm/monitoring-agent` | The agent of one namespace: a single replica, a service for the sidecars, and a role that can only read pods of its own namespace |
+| `deploy/helm/monitoring-sidecar` | A library chart: the sidecar for the chart of any application, as a native sidecar (Kubernetes 1.29 and later, OpenShift 4.16 and later) or, with `nativeSidecar: false`, as a second container |
+
+```sh
+# The controller. Two replicas; the hash of an enrollment token goes in, never the token.
+helm install monitoring-controller deploy/helm/monitoring-controller \
+  --set 'agentTokens[0].scope=*' --set "agentTokens[0].tokenHash=$(printf '%s' "$TOKEN" | sha256sum | cut -d' ' -f1)"
+
+# The agent, in each namespace that is to be monitored. The token comes from a secret you create.
+kubectl create secret generic agent-token --from-literal=token="$TOKEN"
+helm install monitoring-agent deploy/helm/monitoring-agent \
+  --set 'controller.addresses={monitoring-controller.monitoring.svc:9440}' --set token.existingSecret=agent-token \
+  --set scope.labels.environment=prod
+```
+
+An application chart gets monitored by depending on `monitoring-sidecar` and including its pieces once in the pod template; `deploy/helm/test/sample-app` shows how, and the comment at the top of `_sidecar.tpl` lists the values. The application also needs the monitoring client in its code.
+
+- Agents inside the cluster reach the replicas through the addresses of the stateful set. For agents in other clusters, give one address per replica in `replicaAddresses`, for example the host of a route per replica; that needs `tls` or `mtls`.
+- `deploy/helm/test.sh` lints and renders the charts and checks what they must contain; CI runs it. It uses Helm when installed and Docker otherwise.
+
+The label-based injector (#45) and OpenShift specifics (#46) are not here yet.

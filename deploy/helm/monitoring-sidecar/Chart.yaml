@@ -1,0 +1,6 @@
+apiVersion: v2
+name: monitoring-sidecar
+description: "A library chart: the monitoring sidecar, ready to include in the chart of any application."
+type: library
+version: 0.1.0
+appVersion: "0.1.0"

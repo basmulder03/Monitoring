@@ -70,3 +70,14 @@ jobs:
           docker build --build-arg PROJECT=${{ matrix.project }} -t "$name:ci" -f deploy/Dockerfile .
           docker images "$name:ci" --format '{{.Repository}} {{.Size}}'
 
+  charts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+      - name: Lint and render the charts and check what they must contain
+        run: deploy/helm/test.sh
+
