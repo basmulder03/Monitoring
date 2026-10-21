@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Monitoring.Controller.Features.AgentLink;
 using Monitoring.Controller.Features.Alerting;
+using Monitoring.Controller.Features.Packages;
 using Monitoring.Controller.Features.Dashboard;
 using Monitoring.Controller.Features.Health;
 using Monitoring.Controller.Features.Registry;
@@ -131,6 +132,38 @@ public class ControllerCompositionTests
         options.ServiceDownWait.ShouldBe(TimeSpan.FromSeconds(5));
         options.ScopeUnknownWait.ShouldBe(TimeSpan.FromMinutes(3));
         options.EvaluationInterval.ShouldBe(TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public void CreateHost_reads_the_alignment_rules_of_packages()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret")
+            .With("Controller:Packages:Aligned:0:Package", "Microsoft.Extensions.*")
+            .With("Controller:Packages:Aligned:0:Spread", "minor")
+            .With("Controller:Packages:Aligned:1:Package", "Serilog")
+            .Build();
+
+        // Act
+        var rules = host.Services.GetRequiredService<PackagesOptions>().Aligned;
+
+        // Assert
+        rules.ShouldBe([new AlignmentRule("Microsoft.Extensions.*", VersionSpread.Minor), new AlignmentRule("Serilog", VersionSpread.Major)]);
+    }
+
+    [Fact]
+    public void CreateHost_refuses_an_alignment_spread_it_does_not_know()
+    {
+        // Arrange
+        var settings = new ControllerSettings().WithToken("shop", "secret")
+            .With("Controller:Packages:Aligned:0:Package", "Serilog")
+            .With("Controller:Packages:Aligned:0:Spread", "loose");
+
+        // Act
+        var build = () => settings.Build();
+
+        // Assert
+        build.ShouldThrow<ConfigurationException>().Message.ShouldContain("Controller:Packages:Aligned:0:Spread");
     }
 
     [Fact]

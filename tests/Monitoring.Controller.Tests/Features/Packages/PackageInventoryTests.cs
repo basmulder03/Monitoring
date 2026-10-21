@@ -16,7 +16,8 @@ public class PackageInventoryTests
         string service, string id, string? version, IReadOnlyList<PackageReport>? packages, InstanceLifecycle lifecycle = InstanceLifecycle.Running) =>
         new(id, service, lifecycle, HealthState.Healthy, new Dictionary<string, string>(), version, Packages: packages);
 
-    private static PackageInventory Inventory(FakeScopeRegistry registry) => new(registry);
+    private static PackageInventory Inventory(FakeScopeRegistry registry, params AlignmentRule[] aligned) =>
+        new(registry, new PackagesOptions { Aligned = [.. aligned] });
 
     [Fact]
     public void GetCatalog_lists_each_package_once_with_the_versions_in_use_newest_first()
@@ -121,5 +122,88 @@ public class PackageInventoryTests
 
         // Assert
         service.ShouldBeNull();
+    }
+
+    private static FakeScopeRegistry TwoServices(string first, string second) => new FakeScopeRegistry()
+        .WithInstance("shop", Instance("orders", "orders-1", "1.0", [Package("Microsoft.Extensions.Hosting", first)]))
+        .WithInstance("shop", Instance("payments", "payments-1", "1.0", [Package("Microsoft.Extensions.Hosting", second)]));
+
+    [Theory]
+    [InlineData("10.0.1", "10.0.1", VersionSpread.Exact, false)]
+    [InlineData("10.0.1", "10.0.2", VersionSpread.Exact, true)]
+    [InlineData("10.0.1", "10.0.2", VersionSpread.Minor, false)]
+    [InlineData("10.0.1", "10.1.0", VersionSpread.Minor, true)]
+    [InlineData("10.0.1", "10.1.0", VersionSpread.Major, false)]
+    [InlineData("9.0.5", "10.0.0", VersionSpread.Major, true)]
+    [InlineData("10.0.0-rc.1", "10.0.0", VersionSpread.Minor, false)]
+    public void GetCatalog_flags_a_package_whose_versions_are_further_apart_than_its_rule_allows(string first, string second, VersionSpread spread, bool violated)
+    {
+        // Arrange
+        var inventory = Inventory(TwoServices(first, second), new AlignmentRule("Microsoft.Extensions.*", spread));
+
+        // Act
+        var entry = inventory.Find("Microsoft.Extensions.Hosting")!;
+
+        // Assert
+        (entry.Violation is not null).ShouldBe(violated);
+    }
+
+    [Fact]
+    public void GetCatalog_says_which_rule_a_package_breaks()
+    {
+        // Arrange
+        var inventory = Inventory(TwoServices("9.0.0", "10.0.0"), new AlignmentRule("Microsoft.Extensions.*", VersionSpread.Major));
+
+        // Act
+        var entry = inventory.Find("Microsoft.Extensions.Hosting")!;
+
+        // Assert
+        entry.Violation.ShouldBe("Microsoft.Extensions.* must have the same major version");
+    }
+
+    [Fact]
+    public void GetCatalog_does_not_flag_packages_that_no_rule_covers()
+    {
+        // Arrange
+        var inventory = Inventory(TwoServices("9.0.0", "10.0.0"), new AlignmentRule("Serilog", VersionSpread.Exact));
+
+        // Act
+        var entry = inventory.Find("Microsoft.Extensions.Hosting")!;
+
+        // Assert
+        entry.Violation.ShouldBeNull();
+    }
+
+    [Fact]
+    public void GetCatalog_lets_the_first_rule_that_covers_a_package_decide()
+    {
+        // Arrange
+        var inventory = Inventory(
+            TwoServices("10.0.1", "10.1.0"),
+            new AlignmentRule("Microsoft.Extensions.Hosting", VersionSpread.Major),
+            new AlignmentRule("Microsoft.Extensions.*", VersionSpread.Exact));
+
+        // Act
+        var entry = inventory.Find("Microsoft.Extensions.Hosting")!;
+
+        // Assert
+        entry.Violation.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("Serilog", "serilog", true)]
+    [InlineData("Microsoft.Extensions.*", "microsoft.extensions.hosting", true)]
+    [InlineData("Microsoft.Extensions.*", "Microsoft.Extension", false)]
+    [InlineData("Serilog", "Serilog.Sinks.File", false)]
+    public void An_alignment_rule_covers_a_package_by_name_or_prefix_whatever_the_case(string rule, string package, bool covered)
+    {
+        // Arrange
+        var alignment = new AlignmentRule(rule, VersionSpread.Exact);
+
+        // Act
+        var result = alignment.Covers(package);
+
+        // Assert
+        result.ShouldBe(covered);
     }
 }

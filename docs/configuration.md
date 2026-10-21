@@ -84,6 +84,18 @@ Layers, the most specific winning: the built-in defaults, then `defaults`, then 
 - Agents say in every heartbeat which version they use. When it differs from what the controller would give that agent now, the scope view says so and the tile shows "Configuration not yet up to date". A moment after a change this is normal; if it stays, the agent is not receiving it. Replicas that run different files during a rollout show up the same way.
 - The heartbeat interval is not part of it: it belongs together with how long silence is tolerated, and is set with `Controller:Liveness`.
 
+### Aligned packages
+
+Different services may use different versions of a library, and often that is fine. For libraries that should match, such as a family of framework packages or your own shared libraries, list them. The packages view then marks a package whose versions are further apart than allowed, and the warning `package-drift` fires after `PackageDriftWait`, which is long by default because a rollout of a library passes through this state.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Controller:Packages:Aligned:<n>:Package` | required | A package id, or a prefix ending in `*`, such as `Microsoft.Extensions.*`. The first rule that covers a package decides |
+| `Controller:Packages:Aligned:<n>:Spread` | `major` | `exact`: the same version everywhere; `minor`: the same major and minor version; `major`: the same major version |
+| `Controller:Alerting:PackageDriftWait` | `01:00:00` | How long a package must stay out of alignment before its alert fires |
+
+Pre-release labels do not count: `10.0.0-rc.1` and `10.0.0` are the same version for `minor` and `major`, but not for `exact`.
+
 ### Silences
 
 A silence keeps alerts out of the dashboard until it ends, for example during planned maintenance. The conditions are still checked, so an alert that is still true when the silence ends appears at once. A silence has to end: `Until` is required, and an expired silence does nothing.

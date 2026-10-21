@@ -8,12 +8,14 @@ function PackageRow({ entry }: { entry: PackageEntry }) {
   const differs = entry.versions.length > 1;
   // A package used in several versions is the thing to look at, so it starts open.
   const disclosure = useDisclosure(`package:${entry.name}`, differs);
+  const violates = entry.violation !== null;
 
   return (
     <details class="package" {...disclosure}>
       <summary>
         <strong>{entry.name}</strong>
         <span class={differs ? "differs" : "muted"}>{differs ? `${entry.versions.length} versions in use` : entry.versions[0]?.version}</span>
+        {violates && <span class="violation">Not aligned: {entry.violation}</span>}
       </summary>
       <table class="instances">
         <thead>
@@ -50,6 +52,7 @@ export function PackagesView({ refresh }: { refresh: unknown }) {
   const catalog = loaded.value;
   const needle = search.trim().toLowerCase();
   const shown = catalog.packages.filter((entry) => entry.name.toLowerCase().includes(needle));
+  const violations = catalog.packages.filter((entry) => entry.violation !== null).length;
 
   return (
     <div>
@@ -63,6 +66,7 @@ export function PackagesView({ refresh }: { refresh: unknown }) {
             {catalog.servicesWithoutList > 0 && ` ${plural(catalog.servicesWithoutList, "service has", "services have")} not reported its packages.`}{" "}
             <a href="/api/sbom" download="landscape.cdx.json">Download the bill of materials (CycloneDX)</a>
           </p>
+          {violations > 0 && <p class="notice">{plural(violations, "package is", "packages are")} not aligned as the configuration requires.</p>}
           <div class="filter">
             <label for="package-search">Search packages </label>
             <input id="package-search" type="search" value={search} onInput={(event) => setSearch(event.currentTarget.value)} />

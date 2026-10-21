@@ -6,7 +6,8 @@ namespace Monitoring.Controller.Features.Packages;
 
 /// <summary>Builds the inventory from the instances in the registry each time it is asked, so it is always as current as the registry.</summary>
 /// <param name="registry">Source of the instances and the packages they reported.</param>
-internal sealed class PackageInventory(IScopeRegistry registry) : IPackageInventory
+/// <param name="options">Which packages must be aligned.</param>
+internal sealed class PackageInventory(IScopeRegistry registry, PackagesOptions options) : IPackageInventory
 {
     /// <inheritdoc />
     public PackageCatalog GetCatalog()
@@ -19,7 +20,7 @@ internal sealed class PackageInventory(IScopeRegistry registry) : IPackageInvent
             .SelectMany(entry => entry.Instance.Packages!.Select(package => (entry.Scope, entry.Instance.ServiceName, Package: package)))
             .GroupBy(item => item.Package.Name, StringComparer.OrdinalIgnoreCase)
             .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(ToEntry)
+            .Select(group => ToEntry(group, options))
             .ToList();
 
         var withList = reported.Select(i => (i.Scope, i.Instance.ServiceName)).Distinct().Count();
@@ -56,7 +57,7 @@ internal sealed class PackageInventory(IScopeRegistry registry) : IPackageInvent
             .Where(instance => instance.Lifecycle is InstanceLifecycle.Starting or InstanceLifecycle.Running or InstanceLifecycle.Terminating)
             .Select(instance => (scope, instance)));
 
-    private static PackageEntry ToEntry(IGrouping<string, (string Scope, string ServiceName, PackageReport Package)> group)
+    private static PackageEntry ToEntry(IGrouping<string, (string Scope, string ServiceName, PackageReport Package)> group, PackagesOptions options)
     {
         var versions = group
             .GroupBy(item => item.Package.Version, StringComparer.OrdinalIgnoreCase)
@@ -69,6 +70,26 @@ internal sealed class PackageInventory(IScopeRegistry registry) : IPackageInvent
                     .ThenBy(service => service.Key.ServiceName, StringComparer.Ordinal)
                     .Select(service => new PackageUsage(service.Key.Scope, service.Key.ServiceName, service.Count(), service.Any(item => item.Package.Direct)))]))
             .ToList();
-        return new PackageEntry(group.First().Package.Name, versions);
+        var name = group.First().Package.Name;
+        var rule = options.Aligned.FirstOrDefault(candidate => candidate.Covers(name));
+        var violation = rule is not null && Spread(versions.Select(v => v.Version), rule.Spread) > 1 ? rule.ToString() : null;
+        return new PackageEntry(name, versions, violation);
+    }
+
+    /// <summary>How many different versions there are once the parts a rule allows to differ are left out.</summary>
+    private static int Spread(IEnumerable<string> versions, VersionSpread spread) => versions
+        .Select(version => spread switch
+        {
+            VersionSpread.Exact => version,
+            VersionSpread.Minor => string.Join('.', Numbers(version).Take(2)),
+            _ => string.Join('.', Numbers(version).Take(1)),
+        })
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Count();
+
+    private static IEnumerable<string> Numbers(string version)
+    {
+        var end = version.IndexOfAny(['-', '+']);
+        return (end < 0 ? version : version[..end]).Split('.');
     }
 }

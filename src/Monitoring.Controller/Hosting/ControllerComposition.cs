@@ -56,7 +56,7 @@ internal static class ControllerComposition
                 options.PollInterval = configuration.Duration("PollInterval", options.PollInterval);
             })
             .AddHealth()
-            .AddPackages()
+            .AddPackages(options => options.Aligned = [.. controller.Section("Packages").Items("Aligned").Select(ReadAlignment)])
             .AddTopology(options =>
             {
                 var topology = controller.Section("Topology");
@@ -68,6 +68,7 @@ internal static class ControllerComposition
                 var alerting = controller.Section("Alerting");
                 options.StartupGrace = alerting.Duration("StartupGrace", options.StartupGrace);
                 options.InstanceUnhealthyWait = alerting.Duration("InstanceUnhealthyWait", options.InstanceUnhealthyWait);
+                options.PackageDriftWait = alerting.Duration("PackageDriftWait", options.PackageDriftWait);
                 options.RestartLoopCount = alerting.Int("RestartLoopCount", options.RestartLoopCount);
                 options.RestartLoopWindow = alerting.Duration("RestartLoopWindow", options.RestartLoopWindow);
                 options.ServiceDownWait = alerting.Duration("ServiceDownWait", options.ServiceDownWait);
@@ -147,6 +148,17 @@ internal static class ControllerComposition
             kestrel.Listen(address, port);
         });
     }
+
+    /// <summary>Reads one alignment rule: the package (or prefix) and how far apart its versions may be.</summary>
+    private static AlignmentRule ReadAlignment(SettingsReader item) => new(
+        item.Required("Package"),
+        item.Text("Spread", "major").ToLowerInvariant() switch
+        {
+            "exact" => VersionSpread.Exact,
+            "minor" => VersionSpread.Minor,
+            "major" => VersionSpread.Major,
+            var other => throw new ConfigurationException($"Setting '{item.NameOf("Spread")}' must be 'exact', 'minor' or 'major', but is '{other}'."),
+        });
 
     /// <summary>Reads one silence; the end time is required, so a silence cannot be forgotten.</summary>
     private static AlertSilence ReadSilence(SettingsReader item)

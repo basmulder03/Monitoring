@@ -75,6 +75,7 @@ export interface PackageCatalog {
 export interface PackageEntry {
   name: string;
   versions: PackageVersion[];
+  violation: string | null;
 }
 
 export interface PackageUsage {

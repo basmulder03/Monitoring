@@ -8,16 +8,18 @@ const catalog: PackageCatalog = {
   packages: [
     {
       name: "Microsoft.Extensions.Hosting",
+      violation: null,
       versions: [{ version: "10.0.0", usedBy: [{ scope: "shop", service: "orders", instances: 2, direct: true }] }],
     },
     {
       name: "Serilog",
+      violation: "Serilog must have the same major version",
       versions: [
         { version: "4.0.0", usedBy: [{ scope: "shop", service: "orders", instances: 2, direct: true }] },
         { version: "3.1.0", usedBy: [{ scope: "billing", service: "invoices", instances: 1, direct: false }] },
       ],
     },
-    { name: "<img src=x onerror=window.__pwned=1>", versions: [{ version: "1.0.0", usedBy: [] }] },
+    { name: "<img src=x onerror=window.__pwned=1>", violation: null, versions: [{ version: "1.0.0", usedBy: [] }] },
   ],
 };
 
@@ -45,6 +47,14 @@ describe("the packages view", () => {
     expect(serilog.open).toBe(true);
     expect(serilog.textContent).toContain("2 versions in use");
     expect(single.open).toBe(false);
+  });
+
+  it("says in words which packages are not aligned and which rule they break", async () => {
+    const page = await openPackages();
+    expect(page.main.textContent).toContain("1 package is not aligned as the configuration requires.");
+    const serilog = all(page.main, "details.package").find((d) => d.textContent!.includes("Serilog"))!;
+    expect(serilog.textContent).toContain("Not aligned: Serilog must have the same major version");
+    expect(all(page.main, "details.package .violation")).toHaveLength(1);
   });
 
   it("shows who uses each version, marking what comes in indirectly", async () => {
