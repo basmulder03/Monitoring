@@ -109,6 +109,20 @@ grep -q '"role":"MonitoringSidecar"' <<<"$detail" || fail "the sidecar is not sh
 grep -q '"role":"App"' <<<"$detail" || fail "the application is not shown as a container"
 echo "ok"
 
+step "A pod says which Kubernetes services select it"
+# The service is named differently from the application, as it often is; the agent finds it by its selector.
+kubectl apply -n shop -f - >/dev/null <<'YAML'
+apiVersion: v1
+kind: Service
+metadata: { name: orders-front }
+spec:
+  selector: { app: orders }
+  ports: [{ port: 80 }]
+YAML
+selected() { api /api/scopes/shop | grep -q '"k8s.services":"orders-front"'; }
+eventually 120 selected || fail "the pod of the application does not say that the service orders-front selects it"
+echo "ok"
+
 step "The packages of the application are known"
 packages_ok() { api /api/packages | grep -q '"name": "Polly.Core"'; }
 eventually 60 packages_ok || fail "the packages of the application did not arrive"

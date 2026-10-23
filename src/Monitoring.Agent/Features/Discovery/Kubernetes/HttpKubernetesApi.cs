@@ -82,6 +82,21 @@ internal sealed class HttpKubernetesApi(HttpClient http) : IKubernetesApi, IDisp
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<KubernetesService>> ListServicesAsync(string namespaceName, CancellationToken ct)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(ListTimeout);
+
+        using var response = await http.GetAsync($"api/v1/namespaces/{Uri.EscapeDataString(namespaceName)}/services", timeout.Token).ConfigureAwait(false);
+        await EnsureSuccessAsync(response, timeout.Token).ConfigureAwait(false);
+
+        await using var body = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false);
+        var list = await ReadAsync(() => JsonSerializer.DeserializeAsync(body, KubernetesJsonContext.Default.ServiceList, timeout.Token).AsTask())
+            .ConfigureAwait(false);
+        return list?.Items ?? [];
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyDictionary<string, PodUsage>> ListPodUsageAsync(string namespaceName, CancellationToken ct)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);

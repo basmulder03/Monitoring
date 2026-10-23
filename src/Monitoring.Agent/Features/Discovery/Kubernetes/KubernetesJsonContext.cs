@@ -14,5 +14,6 @@ namespace Monitoring.Agent.Features.Discovery.Kubernetes;
 [JsonSerializable(typeof(EventList))]
 [JsonSerializable(typeof(WorkloadList))]
 [JsonSerializable(typeof(PodMetricsList))]
+[JsonSerializable(typeof(ServiceList))]
 [JsonSerializable(typeof(Status))]
 internal sealed partial class KubernetesJsonContext : JsonSerializerContext;

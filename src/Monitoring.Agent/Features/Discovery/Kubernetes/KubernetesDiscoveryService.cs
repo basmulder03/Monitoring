@@ -36,6 +36,9 @@ internal sealed class KubernetesDiscoveryService(
     /// <summary>The latest warning event per pod name, as of the last listing.</summary>
     private Dictionary<string, KubernetesEvent> _warnings = [];
 
+    /// <summary>The Services of the namespace, as of the last listing.</summary>
+    private IReadOnlyList<KubernetesService> _services = [];
+
     /// <summary>What each pod uses, as of the last listing; empty unless <see cref="KubernetesDiscoveryOptions.PodMetrics"/> is on.</summary>
     private Dictionary<string, PodUsage> _usage = [];
 
@@ -100,11 +103,12 @@ internal sealed class KubernetesDiscoveryService(
         _warnings = await ListWarningsAsync(ct).ConfigureAwait(false);
         _rollouts = await ListRolloutsAsync(ct).ConfigureAwait(false);
         _usage = await ListUsageAsync(ct).ConfigureAwait(false);
+        _services = await ListServicesAsync(ct).ConfigureAwait(false);
 
         var current = new Dictionary<string, InstanceInfo>();
         foreach (var pod in list.Pods)
         {
-            if (PodMapper.Map(pod, options.MonitoringSidecarContainer, _warnings.GetValueOrDefault(pod.Metadata.Name), RolloutOf(pod), _usage.GetValueOrDefault(pod.Metadata.Name)) is { } instance)
+            if (PodMapper.Map(pod, options.MonitoringSidecarContainer, _warnings.GetValueOrDefault(pod.Metadata.Name), RolloutOf(pod), _usage.GetValueOrDefault(pod.Metadata.Name), _services) is { } instance)
             {
                 current[instance.Id] = instance;
             }
@@ -182,6 +186,20 @@ internal sealed class KubernetesDiscoveryService(
 
     private bool _usageUnavailableReported;
 
+    /// <summary>Reads the Services. Like the events this is a detail the agent can do without, for example when its role may not read Services; calls are then traced by the name of the application only.</summary>
+    private async Task<IReadOnlyList<KubernetesService>> ListServicesAsync(CancellationToken ct)
+    {
+        try
+        {
+            return await api.ListServicesAsync(target.Namespace, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is KubernetesApiException or HttpRequestException or IOException)
+        {
+            logger.LogDebug("Cannot read the services of '{Namespace}': {Reason}", target.Namespace, ex.Message);
+            return [];
+        }
+    }
+
     private string? RolloutOf(Pod pod) => Rollout.KeyOf(pod) is { } key ? _rollouts.GetValueOrDefault(key) : null;
 
     /// <summary>
@@ -213,7 +231,7 @@ internal sealed class KubernetesDiscoveryService(
             switch (podEvent.Type)
             {
                 case PodEventType.Added or PodEventType.Modified when podEvent.Pod is { } pod:
-                    if (PodMapper.Map(pod, options.MonitoringSidecarContainer, _warnings.GetValueOrDefault(pod.Metadata.Name), RolloutOf(pod), _usage.GetValueOrDefault(pod.Metadata.Name)) is { } instance)
+                    if (PodMapper.Map(pod, options.MonitoringSidecarContainer, _warnings.GetValueOrDefault(pod.Metadata.Name), RolloutOf(pod), _usage.GetValueOrDefault(pod.Metadata.Name), _services) is { } instance)
                     {
                         Upsert(instance);
                     }

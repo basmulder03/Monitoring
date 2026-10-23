@@ -14,6 +14,46 @@ public class TargetResolverTests
 
     private static TargetResolver Resolver(params (string Scope, InstanceInfo Instance)[] instances) => new(instances);
 
+    private static InstanceInfo SelectedBy(string service, string services, string? serviceIps = null)
+    {
+        var labels = new Dictionary<string, string> { ["k8s.services"] = services };
+        if (serviceIps is not null)
+        {
+            labels["k8s.service-ips"] = serviceIps;
+        }
+
+        return new InstanceInfo($"{service}-1", service, InstanceLifecycle.Running, HealthState.Healthy, labels);
+    }
+
+    [Theory]
+    [InlineData("payments-svc:8080", "billing", "service:shop/payments")]
+    [InlineData("payments-svc.shop.svc.cluster.local", "elsewhere", "service:shop/payments")]
+    [InlineData("10.96.0.7:8080", "elsewhere", "service:shop/payments")]
+    public void Resolve_finds_the_service_behind_the_name_or_address_of_a_kubernetes_service(string target, string callerScope, string expected)
+    {
+        // Arrange
+        var resolver = Resolver(("shop", SelectedBy("payments", "payments-svc,payments-headless", "10.96.0.7")));
+
+        // Act
+        var node = resolver.Resolve(callerScope == "billing" ? "shop" : callerScope, "HTTP", target);
+
+        // Assert
+        node.Id.ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Resolve_does_not_take_the_name_of_a_kubernetes_service_of_another_scope_for_a_plain_name()
+    {
+        // Arrange
+        var resolver = Resolver(("shop", SelectedBy("payments", "payments-svc")));
+
+        // Act
+        var node = resolver.Resolve("billing", "HTTP", "payments-svc:8080");
+
+        // Assert
+        node.Kind.ShouldBe(NodeKind.External);
+    }
+
     [Fact]
     public void Resolve_finds_the_service_that_has_the_address_of_the_pod()
     {

@@ -30,8 +30,9 @@ internal static class PodMapper
     /// <returns>The instance, or <see langword="null"/> for a pod that completed successfully, which is not an outage and not worth showing.</returns>
     /// <param name="warning">The latest warning event the cluster recorded about the pod; shown as a check while the pod is not healthy.</param>
     /// <param name="usage">What the pod uses right now, when the metrics API is read; the pod then also gets its requests and limits as metrics.</param>
+    /// <param name="services">The Services of the namespace; the ones that select this pod are named on it, so a call to the name of a Service can be traced to the application.</param>
     /// <param name="rollout">What the Deployment or StatefulSet of the pod says about its rollout, see <see cref="Rollout.Describe"/>; <see langword="null"/> when nothing is going on.</param>
-    public static InstanceInfo? Map(Pod pod, string monitoringSidecar = DefaultMonitoringSidecar, KubernetesEvent? warning = null, string? rollout = null, PodUsage? usage = null)
+    public static InstanceInfo? Map(Pod pod, string monitoringSidecar = DefaultMonitoringSidecar, KubernetesEvent? warning = null, string? rollout = null, PodUsage? usage = null, IReadOnlyList<KubernetesService>? services = null)
     {
         if (pod.Status?.Phase == "Succeeded")
         {
@@ -63,7 +64,7 @@ internal static class PodMapper
             ServiceNameOf(pod),
             LifecycleOf(pod),
             health,
-            LabelsOf(pod),
+            LabelsOf(pod, services),
             Checks: checks.Count > 0 ? checks : null,
             Containers: containers.Count > 0 ? containers : null,
             Metrics: usage is null ? null : ResourceMetrics(pod, usage));
@@ -171,7 +172,7 @@ internal static class PodMapper
         container.State?.Waiting is { Reason: { } reason } && FailingWaitingReasons.Contains(reason)
         || container.State?.Terminated is { ExitCode: not 0 };
 
-    private static Dictionary<string, string> LabelsOf(Pod pod)
+    private static Dictionary<string, string> LabelsOf(Pod pod, IReadOnlyList<KubernetesService>? services)
     {
         var labels = new Dictionary<string, string>(pod.Metadata.Labels ?? []);
         if (pod.Spec?.NodeName is { Length: > 0 } node)
@@ -184,8 +185,23 @@ internal static class PodMapper
             labels["k8s.pod-ip"] = ip;
         }
 
+        var selecting = (services ?? []).Where(service => Selects(service, labels) && service.Metadata?.Name is { Length: > 0 }).ToList();
+        if (selecting.Count > 0)
+        {
+            labels["k8s.services"] = string.Join(',', selecting.Select(service => service.Metadata!.Name).Order(StringComparer.Ordinal));
+            var addresses = selecting.Select(service => service.Spec?.ClusterIP).Where(address => address is { Length: > 0 } and not "None").Order(StringComparer.Ordinal).ToList();
+            if (addresses.Count > 0)
+            {
+                labels["k8s.service-ips"] = string.Join(',', addresses);
+            }
+        }
+
         return labels;
     }
+
+    /// <summary>A Service selects a pod when the pod carries every label of its selector; one without a selector selects nothing.</summary>
+    private static bool Selects(KubernetesService service, Dictionary<string, string> podLabels) =>
+        service.Spec?.Selector is { Count: > 0 } selector && selector.All(pair => podLabels.TryGetValue(pair.Key, out var value) && value == pair.Value);
 
     /// <summary>Lists the containers of a pod with their role and state. Init containers that finished without error are left out.</summary>
     private static List<ContainerInfo> ContainersOf(Pod pod, string monitoringSidecar)

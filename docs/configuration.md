@@ -324,7 +324,7 @@ The agent learns which instances exist from the platform it runs on. `Agent:Disc
 Inside a cluster none of the Kubernetes settings are needed: the namespace, the API server address, the token and the certificate authority come from the pod's service account.
 The API server is always contacted directly, never through a proxy set in the environment.
 
-The agent needs a namespace-scoped role that can read pods and list events, deployments and stateful sets, and nothing else. Without the permission on events everything works, but a pod that does not start no longer shows the warning of the cluster as a check; without the one on deployments and stateful sets a pod no longer says its workload is rolling out:
+The agent needs a namespace-scoped role that can read pods and list events, services, deployments and stateful sets, and nothing else. Without the permission on events everything works, but a pod that does not start no longer shows the warning of the cluster as a check; without the one on services a call to the name of a Kubernetes Service that differs from the name of the application is no longer traced to it; without the one on deployments and stateful sets a pod no longer says its workload is rolling out:
 
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -336,7 +336,7 @@ rules:
     resources: ["pods"]
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
-    resources: ["events"]
+    resources: ["events", "services"]
     verbs: ["list"]
   - apiGroups: ["apps"]
     resources: ["deployments", "statefulsets"]
@@ -350,6 +350,8 @@ With `PodMetrics` on (the chart: `podMetrics: true`, which also adds the permiss
     resources: ["pods"]
     verbs: ["list"]
 ```
+
+A pod that a Kubernetes Service selects carries the labels `k8s.services` (the names of the Services) and `k8s.service-ips` (their cluster addresses). The controller uses them to trace a call to `payments-svc`, `payments-svc.shop.svc.cluster.local` or the cluster address to the application behind it, also when that is named differently (it only does so within the scope of the caller for a plain name, as cluster DNS does). They are read when the pods are listed again.
 
 Every pod of a Deployment or StatefulSet that is changing or short of pods carries a check `rollout`, shown as Degraded information and not as a state of the pod, such as `Rolling out: 1 of 3 replicas updated, 2 ready.` or `2 of 3 replicas are ready.`. It is read when the pods are listed again, so it can lag by up to the resync interval.
 

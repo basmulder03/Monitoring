@@ -36,6 +36,13 @@ internal interface IKubernetesApi
     /// <exception cref="KubernetesApiException">The API server answered with an error, for example because the role may not read events.</exception>
     Task<IReadOnlyList<KubernetesEvent>> ListWarningEventsAsync(string namespaceName, CancellationToken ct);
 
+    /// <summary>Lists the Services of a namespace, which are the names other applications call the pods by.</summary>
+    /// <param name="namespaceName">The namespace.</param>
+    /// <param name="ct">Cancels the request.</param>
+    /// <returns>The Services.</returns>
+    /// <exception cref="KubernetesApiException">The API server answered with an error, for example because the role may not read Services.</exception>
+    Task<IReadOnlyList<KubernetesService>> ListServicesAsync(string namespaceName, CancellationToken ct);
+
     /// <summary>Reads what the pods of a namespace use right now, from the metrics API (the metrics server).</summary>
     /// <param name="namespaceName">The namespace.</param>
     /// <param name="ct">Cancels the request.</param>

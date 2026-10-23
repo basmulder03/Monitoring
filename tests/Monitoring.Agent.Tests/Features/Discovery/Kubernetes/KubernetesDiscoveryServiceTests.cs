@@ -127,6 +127,44 @@ public class KubernetesDiscoveryServiceTests
     }
 
     [Fact]
+    public async Task Service_names_the_kubernetes_services_that_select_a_pod_on_it()
+    {
+        // Arrange
+        var fixture = new DiscoveryFixture().ListingPods("10", new PodBuilder().Named("orders-1").InPhase("Running").PodReady().WithLabel("app", "orders").Build(), Running("other"));
+        fixture.Api.Services = new List<KubernetesService>
+        {
+            new(new PodMetadata("orders-svc"), new ServiceSpec(new() { ["app"] = "orders" }, "10.96.0.7")),
+            new(new PodMetadata("orders-headless"), new ServiceSpec(new() { ["app"] = "orders" }, "None")),
+            new(new PodMetadata("elsewhere"), new ServiceSpec(new() { ["app"] = "billing" }, "10.96.0.9")),
+            new(new PodMetadata("external-name"), new ServiceSpec(null, null)),
+        };
+
+        // Act
+        await fixture.StartAsync();
+        await fixture.WaitUntilAsync(() => fixture.InstanceIds().Count == 2);
+
+        // Assert
+        fixture.Instance("orders-1")!.Labels["k8s.services"].ShouldBe("orders-headless,orders-svc");
+        fixture.Instance("orders-1")!.Labels["k8s.service-ips"].ShouldBe("10.96.0.7");
+        fixture.Instance("other")!.Labels.ShouldNotContainKey("k8s.services");
+    }
+
+    [Fact]
+    public async Task Service_still_follows_the_pods_when_the_services_cannot_be_read()
+    {
+        // Arrange
+        var fixture = new DiscoveryFixture().ListingPods("10", Running("a"));
+        fixture.Api.Services = new KubernetesApiException("forbidden");
+
+        // Act
+        await fixture.StartAsync();
+        await fixture.WaitUntilAsync(() => fixture.InstanceIds().Count == 1);
+
+        // Assert
+        fixture.Instance("a")!.Labels.ShouldNotContainKey("k8s.services");
+    }
+
+    [Fact]
     public async Task Service_does_not_ask_for_the_use_of_pods_unless_told_to()
     {
         // Arrange
@@ -575,6 +613,12 @@ public class KubernetesDiscoveryServiceTests
 
         public Task<IReadOnlyDictionary<string, KubernetesWorkload>> ListWorkloadsAsync(string namespaceName, CancellationToken ct) =>
             Workloads is Exception exception ? throw exception : Task.FromResult((IReadOnlyDictionary<string, KubernetesWorkload>)Workloads);
+
+        /// <summary>The Services the API answers with, or the exception it fails with.</summary>
+        public object Services { get; set; } = (IReadOnlyList<KubernetesService>)[];
+
+        public Task<IReadOnlyList<KubernetesService>> ListServicesAsync(string namespaceName, CancellationToken ct) =>
+            Services is Exception exception ? throw exception : Task.FromResult((IReadOnlyList<KubernetesService>)Services);
 
         /// <summary>What the metrics API answers with, or the exception it fails with.</summary>
         public object Usage { get; set; } = (IReadOnlyDictionary<string, PodUsage>)new Dictionary<string, PodUsage>();

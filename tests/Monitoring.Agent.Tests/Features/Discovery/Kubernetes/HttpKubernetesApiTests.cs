@@ -59,6 +59,23 @@ public class HttpKubernetesApiTests
     }
 
     [Fact]
+    public async Task ListServicesAsync_reads_the_selector_and_the_address_of_each_service()
+    {
+        // Arrange
+        const string json = """{"items":[{"metadata":{"name":"orders-svc"},"spec":{"selector":{"app":"orders"},"clusterIP":"10.96.0.7"}}]}""";
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, json);
+
+        // Act
+        var services = await server.Api.ListServicesAsync("shop", Ct);
+
+        // Assert
+        server.Requests.Single().ShouldBe("GET api/v1/namespaces/shop/services");
+        services.Single().Metadata!.Name.ShouldBe("orders-svc");
+        services.Single().Spec!.Selector!["app"].ShouldBe("orders");
+        services.Single().Spec!.ClusterIP.ShouldBe("10.96.0.7");
+    }
+
+    [Fact]
     public async Task ListPodUsageAsync_adds_up_the_containers_of_each_pod()
     {
         // Arrange
