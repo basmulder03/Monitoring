@@ -9,6 +9,8 @@ using Xunit;
 
 namespace Monitoring.Client.Tests.Features.Certificates;
 
+// The metrics collector listens to every meter of the process, so tests that make meters must not overlap with its tests.
+[Collection("Meters")]
 public class CertificateMeterTests : IDisposable
 {
     private readonly string _directory = Directory.CreateTempSubdirectory("certs-").FullName;

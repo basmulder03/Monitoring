@@ -7,7 +7,7 @@ internal static class EdgeClassifier
 {
     /// <summary>Classifies an operation.</summary>
     /// <param name="activity">A finished operation.</param>
-    /// <param name="type">Receives <c>HTTP</c>, <c>DB</c> or <c>MQ</c>.</param>
+    /// <param name="type">Receives <c>HTTP</c>, <c>DB</c>, <c>MQ</c> or <c>TCP</c>.</param>
     /// <param name="target">Receives where the call went.</param>
     /// <returns><see langword="true"/> when the operation is a call to a dependency that is worth an edge.</returns>
     public static bool TryClassify(Activity activity, out string type, out string target)
@@ -40,6 +40,14 @@ internal static class EdgeClassifier
         if (host is not null && (Tag(activity, "http.request.method") ?? Tag(activity, "http.method")) is not null)
         {
             type = "HTTP";
+            target = Endpoint(host, port);
+            return true;
+        }
+
+        // Last, so a protocol that says more about itself, such as HTTP, is not reduced to a connection.
+        if (host is not null && Tag(activity, "network.transport") == "tcp")
+        {
+            type = "TCP";
             target = Endpoint(host, port);
             return true;
         }

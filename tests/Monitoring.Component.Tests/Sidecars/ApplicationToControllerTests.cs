@@ -109,6 +109,33 @@ public class ApplicationToControllerTests
     }
 
     [Fact]
+    public async Task A_raw_tcp_connection_of_the_application_shows_as_an_edge_to_the_peer_address_on_the_controller()
+    {
+        // Arrange
+        using var peer = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        peer.Start();
+        var address = $"127.0.0.1:{((System.Net.IPEndPoint)peer.LocalEndpoint).Port}";
+        await using var cluster = new FakeKubernetesApiServer().WithPod("orders-1").Start();
+        await using var controller = new ControllerHost().AcceptingEnrollment(Token).WithCentralConfiguration(FastPulls).With("Controller:Topology:SampleInterval", "00:00:00.100").Start();
+        await using var agent = new AgentHost("shop", Token).ConnectingTo(controller).DiscoveringIn(cluster)
+            .With("Agent:Sidecars:HeartbeatInterval", "00:00:01").Start();
+        await using var application = new ApplicationHost("orders-1").Start(agent);
+
+        // Act
+        using (await Monitoring.Client.Features.Tracing.MonitoredTcp.ConnectAsync("127.0.0.1", ((System.Net.IPEndPoint)peer.LocalEndpoint).Port, TestContext.Current.CancellationToken))
+        {
+        }
+
+        // Assert
+        await Eventually.AssertAsync(() =>
+        {
+            controller.Registry.GetInstances("shop").Single().Edges!.ShouldContain(e => e.Type == "TCP" && e.Target == address && e.Calls == 1);
+            var graph = controller.Services.GetRequiredService<ITopology>().GetGraph();
+            graph.Edges.Single(e => e.Type == "TCP").To.ShouldBe($"external:{address}");
+        });
+    }
+
+    [Fact]
     public async Task The_dependency_graph_of_the_controller_shows_what_the_application_called()
     {
         // Arrange

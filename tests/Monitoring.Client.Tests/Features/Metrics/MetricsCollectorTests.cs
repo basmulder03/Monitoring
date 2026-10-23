@@ -7,6 +7,7 @@ using Xunit;
 
 namespace Monitoring.Client.Tests.Features.Metrics;
 
+[Collection("Meters")]
 public class MetricsCollectorTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;

@@ -38,10 +38,10 @@ public sealed class MonitoringOptions
     public int MaxMetricSeries { get; set; } = 1000;
 
     /// <summary>
-    /// The names of the activity sources whose operations are counted as calls and kept as spans. The defaults cover outgoing HTTP calls and
-    /// incoming requests; add the source of a database or broker package to see those too. A source that is not listed costs nothing.
+    /// The names of the activity sources whose operations are counted as calls and kept as spans. The defaults cover outgoing HTTP calls,
+    /// incoming requests and connections opened with <see cref="Tracing.MonitoredTcp"/>; add the source of a database or broker package to see those too. A source that is not listed costs nothing.
     /// </summary>
-    public List<string> TraceSources { get; set; } = ["System.Net.Http", "Microsoft.AspNetCore"];
+    public List<string> TraceSources { get; set; } = ["System.Net.Http", "Microsoft.AspNetCore", "Monitoring.Client.Tcp"];
 
     /// <summary>Certificates whose days to expiry are reported as a metric. Empty by default; add what the application serves or uses.</summary>
     public List<Certificates.CertificateWatch> Certificates { get; set; } = [];

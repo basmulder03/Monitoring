@@ -392,6 +392,16 @@ builder.Services.AddMonitoring(options =>
 
 Each certificate becomes the gauge `monitoring.certificate.expiry_days`, tagged `certificate=<name>`, with the days left (negative once it has expired). A certificate that cannot be read at one reading is left out of it, which shows as a gap. The controller alerts on it as described under `CertificateWarningDays` and `CertificateCriticalDays`; replicas that share a certificate count as one, and the one that expires first decides.
 
+### Raw TCP connections
+
+HTTP calls and the calls of database and broker packages that publish activities are counted without any code. For a protocol that has nothing of the sort, open the connection through the client:
+
+```csharp
+using var client = await MonitoredTcp.ConnectAsync("legacy-host", 5000, cancellationToken);
+```
+
+It works like `TcpClient.ConnectAsync` and also counts the attempt, with how long it took and whether it failed, as a call of kind `TCP` to `host:port`. The dependency graph shows the peer as a service when the address belongs to one, and as an external node otherwise. TCP has no headers, so there is no trace context to pass on: you get the edge and its counts, and a span `TCP connect`, but no link to what the peer did.
+
 ### Packages of an application
 
 An application that references the monitoring client lists the packages it is built from, so the dashboard can show what each service contains. A Native AOT binary cannot ask NuGet at run time, so the list is written during the build: the client package ships MSBuild targets (`build/Monitoring.Client.targets`) that read what NuGet restored (direct and transitive packages with their versions) and embed it in the application. Nothing needs to be configured.
