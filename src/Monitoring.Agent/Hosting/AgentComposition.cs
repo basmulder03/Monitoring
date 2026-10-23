@@ -4,6 +4,7 @@ using Monitoring.Agent.Features.Configuration;
 using Monitoring.Agent.Features.ControllerLink;
 using Monitoring.Agent.Features.Discovery;
 using Monitoring.Agent.Features.ScopeState;
+using Monitoring.Agent.Features.SelfMonitoring;
 using Monitoring.Agent.Features.SidecarConnections;
 using Monitoring.Hosting;
 
@@ -41,6 +42,7 @@ internal static class AgentComposition
                 options.Labels = new Dictionary<string, string>(agent.Map("Labels"));
             })
             .AddAgentConfiguration()
+            .AddSelfMonitoring()
             .AddControllerLink(options =>
             {
                 options.ControllerAddresses = [.. controllers];

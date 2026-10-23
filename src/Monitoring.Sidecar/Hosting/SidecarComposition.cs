@@ -4,6 +4,7 @@ using Monitoring.Hosting;
 using Monitoring.Sidecar.Features.AgentLink;
 using Monitoring.Sidecar.Features.LibraryLink;
 using Monitoring.Sidecar.Features.Probing;
+using Monitoring.Sidecar.Features.SelfMonitoring;
 
 namespace Monitoring.Sidecar.Hosting;
 
@@ -31,6 +32,7 @@ internal static class SidecarComposition
                 options.CallTimeout = library.Duration("CallTimeout", options.CallTimeout);
             })
             .AddProbing(options => options.Interval = sidecar.Section("Probe").Duration("Interval", options.Interval))
+            .AddSelfMonitoring()
             .AddAgentLink(options =>
             {
                 options.AgentAddress = agent;

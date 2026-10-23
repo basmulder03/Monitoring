@@ -6,6 +6,7 @@ using Monitoring.Protocol.Messages;
 using Monitoring.Protocol.Reports;
 using Monitoring.Protocol.Versioning;
 using Monitoring.Sidecar.Features.AgentLink;
+using Monitoring.Sidecar.Features.SelfMonitoring;
 using Monitoring.Sidecar.Tests.Shared;
 using Monitoring.Tests.Shared;
 using Shouldly;
@@ -146,6 +147,44 @@ public class AgentSessionTests
         var result = reply.ShouldBeOfType<PullResult>();
         result.RequestId.ShouldBe(44);
         ReportPayload.ReadMetrics(result.PayloadJson)!.Series.Single().Value.ShouldBe(4);
+    }
+
+    [Fact]
+    public async Task RunAsync_adds_its_own_values_to_the_metrics_of_the_application()
+    {
+        // Arrange
+        var fixture = new SessionFixture { Self = new SelfMetrics(new FakeTimeProvider()) };
+        fixture.Link.Answering(PullKind.Metrics, ReportPayload.Write(new MetricsReport([new MetricSeries("orders.placed", new Dictionary<string, string>(), 4)])));
+        var agent = fixture.Start();
+        await agent.AcceptAsync();
+
+        // Act
+        await agent.SendAsync(new Pull(47, PullKind.Metrics, 0));
+        var reply = await agent.ReceiveAsync();
+
+        // Assert
+        var series = ReportPayload.ReadMetrics(reply.ShouldBeOfType<PullResult>().PayloadJson)!.Series.ToDictionary(s => s.Name, s => s.Value);
+        series["orders.placed"].ShouldBe(4);
+        series["monitoring.sidecar.library_connected"].ShouldBe(1);
+        series["monitoring.sidecar.memory_bytes"].ShouldBeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task RunAsync_still_reports_its_own_values_and_that_the_application_is_not_reachable()
+    {
+        // Arrange
+        var fixture = new SessionFixture { Self = new SelfMetrics(new FakeTimeProvider()) };
+        var agent = fixture.Start();
+        await agent.AcceptAsync();
+
+        // Act
+        await agent.SendAsync(new Pull(48, PullKind.Metrics, 0));
+        var reply = await agent.ReceiveAsync();
+
+        // Assert
+        var series = ReportPayload.ReadMetrics(reply.ShouldBeOfType<PullResult>().PayloadJson)!.Series.ToDictionary(s => s.Name, s => s.Value);
+        series["monitoring.sidecar.library_connected"].ShouldBe(0);
+        series.ShouldNotContainKey("orders.placed");
     }
 
     [Fact]
@@ -403,9 +442,11 @@ public class AgentSessionTests
 
         public void Shutdown() => _shutdown.Cancel();
 
+        public ISelfMetrics? Self { get; set; }
+
         public FakeAgent Start()
         {
-            var session = new AgentSession(Probe, Link, _options, Clock, NullLogger<AgentSession>.Instance);
+            var session = new AgentSession(Probe, Link, _options, Clock, NullLogger<AgentSession>.Instance, Self);
             var (server, client) = DuplexStream.CreatePair();
             Result = RunAsync(session, server);
             return new FakeAgent(client);

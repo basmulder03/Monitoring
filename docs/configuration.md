@@ -378,3 +378,10 @@ An application that references the monitoring client lists the packages it is bu
 - Turn it off for a project with `<MonitoringReportPackages>false</MonitoringReportPackages>`; the application then reports an empty list.
 - The agent asks for the list once per sidecar connection, as soon as the application has reported its health, because it can only change with a new version of the application.
 
+
+## What the agent and the sidecar report about themselves
+
+Both report through the pipeline they already use, as metrics (no settings; the agent reports every 15 seconds, and only fixed names are used, so memory stays bounded).
+
+- **Sidecar**: added to the metrics of its application, so they show on the instance: `monitoring.sidecar.memory_bytes`, `cpu_seconds`, `uptime_seconds`, `library_pull_ms` (the latest question to the application) and `library_connected` (1 when the application answered the latest question).
+- **Agent**: reported as the application of its own pod, which becomes the service `monitoring-agent` (only when the pod is in a namespace the agent discovers): `monitoring.agent.memory_bytes`, `cpu_seconds`, `uptime_seconds`, `instances_watched`, `controller_connections`, `sidecar_connections`, `frames_sent`, `pull_ms` (the latest answer of a sidecar), `kubernetes_errors` and `kubernetes_relists`.

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Monitoring.Agent.Features.ScopeState;
+using Monitoring.Agent.Features.SelfMonitoring;
 using Monitoring.Common;
 using Monitoring.Protocol.Instances;
 
@@ -16,13 +17,15 @@ namespace Monitoring.Agent.Features.Discovery.Kubernetes;
 /// <param name="options">Resync interval and retry delays.</param>
 /// <param name="time">Clock for the waits.</param>
 /// <param name="logger">Receives discovery failures.</param>
+/// <param name="telemetry">Counts failures and re-lists; optional.</param>
 internal sealed class KubernetesDiscoveryService(
     IKubernetesApi api,
     IScopeStateStore store,
     DiscoveryTarget target,
     KubernetesDiscoveryOptions options,
     TimeProvider time,
-    ILogger<KubernetesDiscoveryService> logger) : BackgroundService
+    ILogger<KubernetesDiscoveryService> logger,
+    IAgentTelemetry? telemetry = null) : BackgroundService
 {
     /// <summary>The instances currently in the store because of this service, by id.</summary>
     private readonly Dictionary<string, InstanceInfo> _known = [];
@@ -54,11 +57,13 @@ internal sealed class KubernetesDiscoveryService(
             }
             catch (KubernetesResourceExpiredException)
             {
+                telemetry?.Add("monitoring.agent.kubernetes_relists");
                 logger.LogInformation("The pod watch fell too far behind; listing the pods of '{Namespace}' again", target.Namespace);
                 wait = options.RetryMinDelay;
             }
             catch (Exception ex) when (ex is KubernetesApiException or HttpRequestException or IOException)
             {
+                telemetry?.Add("monitoring.agent.kubernetes_errors");
                 logger.LogWarning("Cannot follow the pods of '{Namespace}': {Reason}", target.Namespace, ex.Message);
                 wait = Backoff.Delay(failures, options.RetryMinDelay, options.RetryMaxDelay, Random.Shared.NextDouble());
                 failures++;

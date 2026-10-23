@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Monitoring.Agent.Features.Configuration;
 using Monitoring.Agent.Features.ScopeState;
+using Monitoring.Agent.Features.SelfMonitoring;
 using Monitoring.Protocol.Framing;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Messages;
@@ -23,12 +24,14 @@ namespace Monitoring.Agent.Features.SidecarConnections;
 /// <param name="options">Timeouts, intervals and limits.</param>
 /// <param name="time">Clock for the timeouts and the pull interval.</param>
 /// <param name="logger">Receives the reasons a connection was refused or ended.</param>
+/// <param name="telemetry">Told about connected sidecars and how long pulls take; optional.</param>
 internal sealed class SidecarConnectionHandler(
     IScopeStateStore store,
     IAgentConfiguration configuration,
     SidecarConnectionsOptions options,
     TimeProvider time,
-    ILogger<SidecarConnectionHandler> logger)
+    ILogger<SidecarConnectionHandler> logger,
+    IAgentTelemetry? telemetry = null)
 {
     private readonly ConcurrentDictionary<string, Guid> _current = new();
 
@@ -50,6 +53,7 @@ internal sealed class SidecarConnectionHandler(
             }
 
             _current[registered.InstanceId] = connection;
+            telemetry?.Add("monitoring.agent.sidecar_connections");
             logger.LogInformation("Sidecar of instance '{Instance}' connected", registered.InstanceId);
 
             var config = new Config("built-in", [], HeartbeatSeconds: (int)Math.Ceiling(options.HeartbeatInterval.TotalSeconds));
@@ -72,6 +76,11 @@ internal sealed class SidecarConnectionHandler(
         finally
         {
             // On shutdown the agent is the one going away, and its controllers see that; the sidecars did nothing wrong.
+            if (registered is not null)
+            {
+                telemetry?.Add("monitoring.agent.sidecar_connections", -1);
+            }
+
             if (registered is not null && !ct.IsCancellationRequested)
             {
                 End(registered.InstanceId, connection, leftOnPurpose);
@@ -145,6 +154,7 @@ internal sealed class SidecarConnectionHandler(
 
                 case PullResult { Kind: PullKind.Health } result when result.RequestId == pulls.Health.Request:
                     pulls.Health.Outstanding = false;
+                    RecordPullDuration(pulls.Health);
                     ApplyHealth(hello, result, pulls);
 
                     // What the application is built from does not change while it runs, so it is asked once, as soon as it is known to be up.
@@ -163,6 +173,7 @@ internal sealed class SidecarConnectionHandler(
 
                 case PullResult { Kind: PullKind.Metrics } result when result.RequestId == pulls.Metrics.Request:
                     pulls.Metrics.Outstanding = false;
+                    RecordPullDuration(pulls.Metrics);
                     ApplyMetrics(hello, result, pulls);
                     break;
 
@@ -216,6 +227,9 @@ internal sealed class SidecarConnectionHandler(
 
         return metricsDue ? PullKind.Metrics : edgesDue ? PullKind.Edges : null;
     }
+
+    private void RecordPullDuration(PullProgress pull) =>
+        telemetry?.Set("monitoring.agent.pull_ms", (time.GetUtcNow() - pull.LastPullAt).TotalMilliseconds);
 
     private async Task PullAsync(Stream stream, PullKind kind, PullState pulls, CancellationToken ct)
     {

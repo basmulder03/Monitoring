@@ -1,6 +1,7 @@
 using Monitoring.Agent.Features.Configuration;
 using Microsoft.Extensions.Logging;
 using Monitoring.Agent.Features.ScopeState;
+using Monitoring.Agent.Features.SelfMonitoring;
 using Monitoring.Protocol.Framing;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Messages;
@@ -21,12 +22,14 @@ namespace Monitoring.Agent.Features.ControllerLink;
 /// <param name="options">Identity, token, intervals and limits.</param>
 /// <param name="time">Clock for the timeouts and timers.</param>
 /// <param name="logger">Receives the reasons a session ended.</param>
+/// <param name="telemetry">Told about connections and frames sent; optional.</param>
 internal sealed class ControllerSession(
     IScopeStateStore store,
     IAgentConfiguration configuration,
     ControllerLinkOptions options,
     TimeProvider time,
-    ILogger<ControllerSession> logger)
+    ILogger<ControllerSession> logger,
+    IAgentTelemetry? telemetry = null)
 {
     private static readonly TimeSpan GoodbyeTimeout = TimeSpan.FromSeconds(1);
 
@@ -51,6 +54,7 @@ internal sealed class ControllerSession(
             }
 
             established = true;
+            telemetry?.Add("monitoring.agent.controller_connections");
             onConfig(config);
 
             var end = await SendStateAsync(stream, config, onConfig, ct).ConfigureAwait(false);
@@ -74,6 +78,13 @@ internal sealed class ControllerSession(
         {
             logger.LogDebug("Controller session ended abruptly: {Reason}", ex.Message);
             return new SessionResult(SessionEnd.Disconnected, established);
+        }
+        finally
+        {
+            if (established)
+            {
+                telemetry?.Add("monitoring.agent.controller_connections", -1);
+            }
         }
     }
 
@@ -162,11 +173,13 @@ internal sealed class ControllerSession(
                 {
                     nextHeartbeat = null;
                     await FrameCodec.WriteAsync(stream, new Heartbeat(++heartbeats, HealthState.Healthy, configuration.Current.Version), options.MaxFrameBytes, ct).ConfigureAwait(false);
+                    telemetry?.Add("monitoring.agent.frames_sent");
                 }
                 else
                 {
                     nextSnapshot = null;
                     await FrameCodec.WriteAsync(stream, store.CreateSnapshot(), options.MaxFrameBytes, ct).ConfigureAwait(false);
+                    telemetry?.Add("monitoring.agent.frames_sent");
                 }
             }
         }
@@ -201,6 +214,7 @@ internal sealed class ControllerSession(
         while (subscription.Deltas.TryRead(out var delta))
         {
             await FrameCodec.WriteAsync(stream, delta, options.MaxFrameBytes, ct).ConfigureAwait(false);
+            telemetry?.Add("monitoring.agent.frames_sent");
         }
 
         return true;

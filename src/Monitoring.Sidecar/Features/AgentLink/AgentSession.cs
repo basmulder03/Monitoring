@@ -5,6 +5,7 @@ using Monitoring.Protocol.Reports;
 using Monitoring.Protocol.Versioning;
 using Monitoring.Sidecar.Features.LibraryLink;
 using Monitoring.Sidecar.Features.Probing;
+using Monitoring.Sidecar.Features.SelfMonitoring;
 
 namespace Monitoring.Sidecar.Features.AgentLink;
 
@@ -18,8 +19,9 @@ namespace Monitoring.Sidecar.Features.AgentLink;
 /// <param name="options">Identity, labels and limits.</param>
 /// <param name="time">Clock for the timeouts and the heartbeat.</param>
 /// <param name="logger">Receives why a session ended.</param>
+/// <param name="self">What the sidecar reports about itself with the application's metrics; optional.</param>
 internal sealed class AgentSession(
-    IProbeResults probe, ILibraryLink link, AgentLinkOptions options, TimeProvider time, ILogger<AgentSession> logger)
+    IProbeResults probe, ILibraryLink link, AgentLinkOptions options, TimeProvider time, ILogger<AgentSession> logger, ISelfMetrics? self = null)
 {
     private static readonly TimeSpan GoodbyeTimeout = TimeSpan.FromSeconds(1);
 
@@ -176,8 +178,18 @@ internal sealed class AgentSession(
 
             case PullKind.Metrics or PullKind.Edges or PullKind.Spans or PullKind.Packages:
                 // The sidecar only passes these on, so it needs no idea of what they contain; the cursor is the application's own.
+                var started = time.GetTimestamp();
                 var answer = await link.PullAsync(pull.Kind, pull.Cursor, ct).ConfigureAwait(false);
-                return new PullResult(pull.RequestId, pull.Kind, answer?.Cursor ?? pull.Cursor, answer?.PayloadJson);
+                self?.LibraryPulled(time.GetElapsedTime(started), answer is not null);
+                var payload = answer?.PayloadJson;
+                if (pull.Kind == PullKind.Metrics && self is not null)
+                {
+                    // The one place the sidecar looks inside a pass-through answer: its own values travel with the application's.
+                    var series = ReportPayload.ReadMetrics(payload)?.Series ?? [];
+                    payload = ReportPayload.Write(new MetricsReport([.. series, .. self.Read()]));
+                }
+
+                return new PullResult(pull.RequestId, pull.Kind, answer?.Cursor ?? pull.Cursor, payload);
 
             default:
                 return new PullResult(pull.RequestId, pull.Kind, pull.Cursor, null);

@@ -41,7 +41,7 @@ public class AgentCompositionTests
         var hosted = host.Services.GetServices<IHostedService>().Select(s => s.GetType().Name);
 
         // Assert
-        hosted.ShouldBe(["ControllerLinkHostedService", "PlainTransportWarning"], ignoreOrder: true);
+        hosted.ShouldBe(["ControllerLinkHostedService", "PlainTransportWarning", "SelfReportService"], ignoreOrder: true);
     }
 
     [Theory]
@@ -117,7 +117,7 @@ public class AgentCompositionTests
         var hosted = host.Services.GetServices<IHostedService>().Select(s => s.GetType().Name);
 
         // Assert
-        hosted.ShouldBe(["ControllerLinkHostedService", "KubernetesDiscoveryService", "SidecarListenerService", "PlainTransportWarning"], ignoreOrder: true);
+        hosted.ShouldBe(["ControllerLinkHostedService", "KubernetesDiscoveryService", "SidecarListenerService", "PlainTransportWarning", "SelfReportService"], ignoreOrder: true);
     }
 
     [Fact]
@@ -174,7 +174,7 @@ public class AgentCompositionTests
         var hosted = host.Services.GetServices<IHostedService>().Select(s => s.GetType().Name);
 
         // Assert
-        hosted.ShouldBe(["ControllerLinkHostedService", "PlainTransportWarning"], ignoreOrder: true);
+        hosted.ShouldBe(["ControllerLinkHostedService", "PlainTransportWarning", "SelfReportService"], ignoreOrder: true);
     }
 
     [Fact]
