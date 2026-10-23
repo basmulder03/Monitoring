@@ -50,7 +50,13 @@ internal static class AgentComposition
                 options.ScopeName = scopeName;
                 options.Labels = new Dictionary<string, string>(agent.Map("Labels"));
             })
-            .AddAgentConfiguration()
+            .AddAgentConfiguration(options =>
+            {
+                // Only counts for the settings the central configuration allows to be overridden.
+                var overrides = agent.Section("Overrides");
+                options.PullSeconds = overrides.Optional("PullSeconds") is { } pull ? overrides.Int("PullSeconds", 0) : null;
+                options.EdgeFlushSeconds = overrides.Optional("EdgeFlushSeconds") is { } edges ? overrides.Int("EdgeFlushSeconds", 0) : null;
+            })
             .AddSelfMonitoring(options =>
             {
                 var self = agent.Section("SelfMonitoring");

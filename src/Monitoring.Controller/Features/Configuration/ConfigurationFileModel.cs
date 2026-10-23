@@ -8,7 +8,8 @@ internal sealed record SettingsLayer(int? PullSeconds = null, int? EdgeFlushSeco
 /// <summary>Which agents an override applies to; every condition that is given must hold.</summary>
 /// <param name="Scope">The scope the agent reports as.</param>
 /// <param name="Labels">Labels the scope must have, with exactly these values.</param>
-internal sealed record OverrideMatch(string? Scope = null, Dictionary<string, string>? Labels = null);
+/// <param name="Service">A service in the scope, which narrows what the override sets to the applications of that service.</param>
+internal sealed record OverrideMatch(string? Scope = null, Dictionary<string, string>? Labels = null, string? Service = null);
 
 /// <summary>Settings for the agents that match.</summary>
 /// <param name="Match">Which agents.</param>
@@ -18,5 +19,5 @@ internal sealed record OverrideRule(OverrideMatch Match, SettingsLayer Set);
 /// <summary>The content of the central configuration file.</summary>
 /// <param name="Defaults">Settings for every agent.</param>
 /// <param name="Overrides">Settings for the agents that match, applied in order of how specific they are.</param>
-/// <param name="Overridable">The settings a local override on the agent may change; reserved for agents that read their own overrides.</param>
+/// <param name="Overridable">The settings a local override on the agent may change.</param>
 internal sealed record ConfigurationFileModel(SettingsLayer? Defaults = null, List<OverrideRule>? Overrides = null, List<string>? Overridable = null);

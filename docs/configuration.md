@@ -78,8 +78,11 @@ How often agents read what their applications report is decided centrally, not o
   "defaults": { "pullSeconds": 15, "edgeFlushSeconds": 10 },
   "overrides": [
     { "match": { "labels": { "environment": "prod" } }, "set": { "pullSeconds": 10 } },
-    { "match": { "scope": "orders-platform" }, "set": { "edgeFlushSeconds": 5 } }
-  ]
+    { "match": { "scope": "orders-platform" }, "set": { "edgeFlushSeconds": 5 } },
+    { "match": { "service": "reports" }, "set": { "pullSeconds": 120 } },
+    { "match": { "scope": "orders-platform", "service": "reports" }, "set": { "pullSeconds": 90 } }
+  ],
+  "overridable": ["pullSeconds"]
 }
 ```
 
@@ -88,7 +91,10 @@ How often agents read what their applications report is decided centrally, not o
 | `pullSeconds` | `15` | How often an agent reads the metrics of its applications |
 | `edgeFlushSeconds` | `10` | How often an agent reads the calls of its applications to their dependencies |
 
-Layers, the most specific winning: the built-in defaults, then `defaults`, then every override whose `labels` all match the scope, then every override whose `scope` matches (and whose labels, if given, match too). Within the same kind, a later rule wins. A rule has to match on a scope or labels; use `defaults` for everyone.
+Layers, the most specific winning: the built-in defaults, then `defaults`, then every override whose `labels` all match the scope, then every override whose `scope` matches (and whose labels, if given, match too), then every override for a `service`, and last a local override on the agent. Within the same kind, a later rule wins. A rule has to match on a scope, a service or labels; use `defaults` for everyone.
+
+- **A service** narrows a rule to the applications of that service: `{ "match": { "service": "reports" }, "set": { "pullSeconds": 120 } }` makes the agents pull the metrics of the `reports` application every two minutes and leaves every other service alone. A service rule can also name a scope or labels, and then only counts on the agents that match them. The agent reads what is set for a service as the application introduces itself.
+- **A local override** is set on the agent itself, for example `Agent:Overrides:PullSeconds` or `MONITORING_Agent__Overrides__PullSeconds`, and wins over everything above, but only for the settings that the central file lists under `overridable` (`pullSeconds`, `edgeFlushSeconds`). The central file stays in charge: a setting it does not list cannot be changed on the machine, and an agent that has not heard from a controller yet ignores its local overrides.
 
 - Each agent gets a configuration with a version that changes whenever any of its settings does, and applies it without a restart. An agent that cannot reach a controller keeps the last one; after a restart it uses the built-in defaults until a controller answers.
 - A file that cannot be read, is not valid JSON, has a name that is not a setting or a value outside 1 to 3600 seconds is rejected as a whole, the error is logged, and what was in force stays in force. Fix the file and it is picked up at the next look.

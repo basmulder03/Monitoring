@@ -8,6 +8,101 @@ public class ParsedConfigurationTests
 {
     private static readonly IReadOnlyDictionary<string, string> NoLabels = new Dictionary<string, string>();
 
+    private const string WithServices = """
+        {
+          "defaults": { "pullSeconds": 15, "edgeFlushSeconds": 10 },
+          "overrides": [
+            { "match": { "labels": { "environment": "prod" } }, "set": { "pullSeconds": 10 } },
+            { "match": { "service": "orders" }, "set": { "edgeFlushSeconds": 5 } },
+            { "match": { "service": "reports" }, "set": { "pullSeconds": 120 } },
+            { "match": { "scope": "shop", "service": "reports" }, "set": { "pullSeconds": 90 } }
+          ],
+          "overridable": ["pullSeconds"]
+        }
+        """;
+
+    [Fact]
+    public void For_sets_a_service_apart_with_the_settings_of_the_agent_where_the_service_says_nothing()
+    {
+        // Arrange
+        var configuration = ParsedConfiguration.Parse(WithServices);
+
+        // Act
+        var settings = configuration.For("blog", new Dictionary<string, string> { ["environment"] = "prod" });
+
+        // Assert: the labels apply to the agent, the service rules on top of that
+        settings.PullSeconds.ShouldBe(10);
+        settings.Services!["orders"].ShouldBe(new ServiceSettings(10, 5));
+        settings.Services["reports"].ShouldBe(new ServiceSettings(120, 10));
+    }
+
+    [Fact]
+    public void For_applies_a_rule_for_a_service_and_a_scope_only_to_the_agent_of_that_scope_and_after_the_one_for_the_service_alone()
+    {
+        // Arrange
+        var configuration = ParsedConfiguration.Parse(WithServices);
+
+        // Act
+        var shop = configuration.For("shop", NoLabels);
+        var blog = configuration.For("blog", NoLabels);
+
+        // Assert
+        shop.Services!["reports"].PullSeconds.ShouldBe(90);
+        blog.Services!["reports"].PullSeconds.ShouldBe(120);
+    }
+
+    [Fact]
+    public void For_leaves_out_a_service_whose_rules_change_nothing_for_it_and_has_no_services_at_all_without_such_rules()
+    {
+        // Arrange
+        var same = ParsedConfiguration.Parse("""{ "defaults": { "pullSeconds": 15 }, "overrides": [ { "match": { "service": "orders" }, "set": { "pullSeconds": 15 } } ] }""");
+
+        // Act
+        var settings = same.For("shop", NoLabels);
+
+        // Assert
+        settings.Services.ShouldBeNull();
+        ParsedConfiguration.BuiltIn.For("shop", NoLabels).Services.ShouldBeNull();
+    }
+
+    [Fact]
+    public void For_gives_agents_that_get_different_service_settings_from_the_same_file_different_versions()
+    {
+        // Arrange
+        var configuration = ParsedConfiguration.Parse(WithServices);
+
+        // Act
+        var shop = configuration.For("shop", NoLabels);
+        var blog = configuration.For("blog", NoLabels);
+        var blogAgain = configuration.For("blog", NoLabels);
+
+        // Assert
+        shop.Version.ShouldNotBe(blog.Version);
+        blog.Version.ShouldBe(blogAgain.Version);
+    }
+
+    [Fact]
+    public void For_passes_on_which_settings_may_be_overridden_locally()
+    {
+        // Act
+        var settings = ParsedConfiguration.Parse(WithServices).For("shop", NoLabels);
+
+        // Assert
+        settings.Overridable.ShouldBe(["pullSeconds"]);
+    }
+
+    [Fact]
+    public void Parse_accepts_a_rule_that_names_only_a_service_and_refuses_a_blank_one()
+    {
+        // Act
+        var blank = () => ParsedConfiguration.Parse("""{ "overrides": [ { "match": { "service": " " }, "set": { "pullSeconds": 5 } } ] }""");
+        var ok = () => ParsedConfiguration.Parse("""{ "overrides": [ { "match": { "service": "orders" }, "set": { "pullSeconds": 5 } } ] }""");
+
+        // Assert
+        blank.ShouldThrow<ConfigurationRejectedException>();
+        ok.ShouldNotThrow();
+    }
+
     [Fact]
     public void For_uses_the_built_in_defaults_when_nothing_is_configured()
     {

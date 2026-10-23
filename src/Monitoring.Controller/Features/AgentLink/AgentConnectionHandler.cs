@@ -109,7 +109,9 @@ internal sealed class AgentConnectionHandler(
         options.ControllerReplicas,
         HeartbeatSeconds: Math.Max(1, (int)Math.Ceiling(livenessOptions.HeartbeatInterval.TotalSeconds)),
         PullSeconds: settings.PullSeconds,
-        EdgeFlushSeconds: settings.EdgeFlushSeconds);
+        EdgeFlushSeconds: settings.EdgeFlushSeconds,
+        Services: settings.Services?.ToDictionary(pair => pair.Key, pair => new ServiceConfig(pair.Value.PullSeconds, pair.Value.EdgeFlushSeconds)),
+        Overridable: settings.Overridable);
 
     /// <summary>Reads and checks the <c>Hello</c>; null when the agent is refused.</summary>
     private async Task<(AgentIdentity Identity, Hello Hello)?> AuthenticateAsync(Stream stream, CancellationToken ct)

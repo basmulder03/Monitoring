@@ -314,6 +314,33 @@ public class SidecarConnectionHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_follows_the_interval_set_for_the_service_of_the_application_and_not_the_one_of_the_agent()
+    {
+        // Arrange: the agent pulls every 15 seconds, but the service of this application every 60
+        var fixture = new HandlerFixture().WithInstance("pod-1");
+        fixture.Configuration.Apply(AgentConfiguration.BuiltIn with
+        {
+            Version = "v3",
+            Services = new Dictionary<string, ServiceConfig> { ["orders"] = new(PullSeconds: 60, EdgeFlushSeconds: 60) },
+        });
+        var session = await fixture.Build().RegisterAsync("pod-1");
+        await session.AnswerHealthAsync(HealthState.Healthy);
+        await session.SendAsync(new Heartbeat(1, HealthState.Healthy));
+        (await session.ReceiveAsync()).ShouldBeOfType<Pull>().Kind.ShouldBe(PullKind.Metrics);
+        await session.SendAsync(new Heartbeat(2, HealthState.Healthy));
+        (await session.ReceiveAsync()).ShouldBeOfType<Pull>().Kind.ShouldBe(PullKind.Edges);
+
+        // Act: after 30 seconds the agent's own interval has passed twice, the service's has not
+        fixture.Clock.Advance(TimeSpan.FromSeconds(30));
+        await session.SendAsync(new Heartbeat(3, HealthState.Healthy));
+        await session.SendAsync(new Goodbye("pod-1"));
+        var rest = await session.ReadUntilClosedAsync();
+
+        // Assert
+        rest.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task HandleAsync_asks_for_the_packages_once_after_the_first_health_answer()
     {
         // Arrange

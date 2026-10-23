@@ -13,20 +13,24 @@ internal sealed class ParsedConfiguration
     private readonly SettingsLayer _defaults;
     private readonly IReadOnlyList<OverrideRule> _byLabels;
     private readonly IReadOnlyList<OverrideRule> _byScope;
+    private readonly IReadOnlyList<OverrideRule> _byService;
+    private readonly IReadOnlyList<string> _overridable;
     private readonly string _hash;
 
-    private ParsedConfiguration(string hash, SettingsLayer defaults, List<OverrideRule> overrides)
+    private ParsedConfiguration(string hash, SettingsLayer defaults, List<OverrideRule> overrides, IEnumerable<string> overridable)
     {
         _hash = hash;
         _defaults = defaults;
 
-        // The more specific a rule, the later it applies and the more it counts: labels first, then a scope; within each, the order of the file.
-        _byLabels = [.. overrides.Where(rule => rule.Match.Scope is null)];
-        _byScope = [.. overrides.Where(rule => rule.Match.Scope is not null)];
+        // The more specific a rule, the later it applies and the more it counts: labels first, then a scope, and a service last; within each, the order of the file.
+        _byLabels = [.. overrides.Where(rule => rule.Match.Service is null && rule.Match.Scope is null)];
+        _byScope = [.. overrides.Where(rule => rule.Match.Service is null && rule.Match.Scope is not null)];
+        _byService = [.. overrides.Where(rule => rule.Match.Service is not null)];
+        _overridable = [.. overridable.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)];
     }
 
     /// <summary>The built-in defaults, used when there is no file.</summary>
-    public static ParsedConfiguration BuiltIn { get; } = new("built-in", new SettingsLayer(), []);
+    public static ParsedConfiguration BuiltIn { get; } = new("built-in", new SettingsLayer(), [], []);
 
     /// <summary>Reads and checks the text of a configuration file.</summary>
     /// <param name="json">The text of the file.</param>
@@ -57,9 +61,14 @@ internal sealed class ParsedConfiguration
                 throw new ConfigurationRejectedException($"overrides[{i}] needs a 'match' and a 'set'.");
             }
 
-            if (rule.Match.Scope is null && (rule.Match.Labels is null || rule.Match.Labels.Count == 0))
+            if (rule.Match.Scope is null && rule.Match.Service is null && (rule.Match.Labels is null || rule.Match.Labels.Count == 0))
             {
-                throw new ConfigurationRejectedException($"overrides[{i}].match must name a scope or labels, or it would apply to everyone; use 'defaults' for that.");
+                throw new ConfigurationRejectedException($"overrides[{i}].match must name a scope, a service or labels, or it would apply to everyone; use 'defaults' for that.");
+            }
+
+            if (rule.Match.Service is { } service && string.IsNullOrWhiteSpace(service))
+            {
+                throw new ConfigurationRejectedException($"overrides[{i}].match.service must not be blank.");
             }
 
             Check(rule.Set, $"overrides[{i}].set");
@@ -73,7 +82,7 @@ internal sealed class ParsedConfiguration
             }
         }
 
-        return new ParsedConfiguration(Hash(json), defaults, overrides);
+        return new ParsedConfiguration(Hash(json), defaults, overrides, model.Overridable ?? []);
     }
 
     /// <summary>Works out the settings of one agent.</summary>
@@ -82,24 +91,48 @@ internal sealed class ParsedConfiguration
     /// <returns>The settings; the version covers the whole file and the settings that came out, so it changes when either does.</returns>
     public AgentSettings For(string scope, IReadOnlyDictionary<string, string> labels)
     {
-        int? pull = _defaults.PullSeconds;
-        int? edges = _defaults.EdgeFlushSeconds;
-        foreach (var rule in _byLabels.Concat(_byScope).Where(rule => Matches(rule.Match, scope, labels)))
+        var agent = Apply(new Resolved(_defaults.PullSeconds ?? 15, _defaults.EdgeFlushSeconds ?? 10), _byLabels.Concat(_byScope).Where(rule => Matches(rule.Match, scope, labels)));
+
+        // A service is set apart only where the rules that name it, and match this agent too, change something for it.
+        var services = new Dictionary<string, ServiceSettings>(StringComparer.Ordinal);
+        var named = _byService.Where(rule => Matches(rule.Match, scope, labels)).ToList();
+        foreach (var service in named.Select(rule => rule.Match.Service!).Distinct(StringComparer.Ordinal))
         {
-            pull = rule.Set.PullSeconds ?? pull;
-            edges = rule.Set.EdgeFlushSeconds ?? edges;
+            var forService = Apply(agent, named.Where(rule => rule.Match.Service == service));
+            if (forService != agent)
+            {
+                services[service] = new ServiceSettings(forService.Pull, forService.Edges);
+            }
         }
 
-        var settings = (Pull: pull ?? 15, Edges: edges ?? 10);
-        return new AgentSettings($"{_hash}-{settings.Pull}-{settings.Edges}", settings.Pull, settings.Edges);
+        // The version has to tell apart agents that read the same file and get different settings, so it holds what they get.
+        var version = $"{_hash}-{agent.Pull}-{agent.Edges}";
+        if (services.Count > 0)
+        {
+            var text = string.Join(';', services.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}:{pair.Value.PullSeconds}:{pair.Value.EdgeFlushSeconds}"));
+            version += "-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)))[..6];
+        }
+
+        return new AgentSettings(version, agent.Pull, agent.Edges, services.Count > 0 ? services : null, _overridable.Count > 0 ? _overridable : null);
     }
 
-    /// <summary>Tells whether this is the same file as another, so a rewrite with the same content is not a change.</summary>
-    /// <param name="other">The other configuration.</param>
-    /// <returns><see langword="true"/> when the files had the same content.</returns>
+    private static Resolved Apply(Resolved start, IEnumerable<OverrideRule> rules)
+    {
+        var result = start;
+        foreach (var rule in rules)
+        {
+            result = new Resolved(rule.Set.PullSeconds ?? result.Pull, rule.Set.EdgeFlushSeconds ?? result.Edges);
+        }
+
+        return result;
+    }
+
+    private readonly record struct Resolved(int Pull, int Edges);
+
     public bool SameAs(ParsedConfiguration other) => _hash == other._hash;
 
     private static bool Matches(OverrideMatch match, string scope, IReadOnlyDictionary<string, string> labels) =>
+        // A service is not a condition on the agent: it only says which applications the rule is for once the agent has matched.
         (match.Scope is null || string.Equals(match.Scope, scope, StringComparison.Ordinal))
         && (match.Labels is null || match.Labels.All(label => labels.TryGetValue(label.Key, out var value) && value == label.Value));
 

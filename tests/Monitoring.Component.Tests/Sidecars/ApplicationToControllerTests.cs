@@ -266,6 +266,29 @@ public class ApplicationToControllerTests
     }
 
     [Fact]
+    public async Task The_central_configuration_sets_a_service_apart_and_lets_the_agent_override_only_what_it_allows()
+    {
+        // Arrange
+        const string central = """
+            { "defaults": { "pullSeconds": 30, "edgeFlushSeconds": 20 },
+              "overrides": [ { "match": { "service": "orders" }, "set": { "pullSeconds": 45 } } ],
+              "overridable": ["edgeFlushSeconds"] }
+            """;
+        await using var controller = new ControllerHost().AcceptingEnrollment(Token).WithCentralConfiguration(central).Start();
+        await using var agent = new AgentHost("shop", Token).ConnectingTo(controller)
+            .With("Agent:Overrides:PullSeconds", "3")
+            .With("Agent:Overrides:EdgeFlushSeconds", "4").Start();
+        var configuration = agent.Services.GetRequiredService<IAgentConfiguration>();
+
+        // Assert: the service has its own pull interval; of the two local overrides only the one the file allows counts
+        await Eventually.AssertAsync(() =>
+        {
+            configuration.SettingsFor("orders").ShouldBe(new EffectiveSettings(45, 4));
+            configuration.SettingsFor("billing").ShouldBe(new EffectiveSettings(30, 4));
+        });
+    }
+
+    [Fact]
     public async Task A_central_configuration_that_is_not_valid_leaves_the_agent_with_what_it_has()
     {
         // Arrange

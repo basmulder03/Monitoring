@@ -169,7 +169,7 @@ internal sealed class SidecarConnectionHandler(
                     {
                         await PullAsync(stream, PullKind.Health, pulls, ct).ConfigureAwait(false);
                     }
-                    else if (NextDue(pulls) is { } kind)
+                    else if (NextDue(pulls, hello.ServiceName) is { } kind)
                     {
                         await PullAsync(stream, kind, pulls, ct).ConfigureAwait(false);
                     }
@@ -233,7 +233,7 @@ internal sealed class SidecarConnectionHandler(
     /// Metrics and edges are pulled on timers, once the application has reported its health, which shows that it is up.
     /// With one pull per heartbeat, of the kinds that are due the one pulled longest ago goes first, so a short interval of one kind cannot starve the other.
     /// </summary>
-    private PullKind? NextDue(PullState pulls)
+    private PullKind? NextDue(PullState pulls, string serviceName)
     {
         if (pulls.Report is null)
         {
@@ -241,7 +241,7 @@ internal sealed class SidecarConnectionHandler(
         }
 
         var now = time.GetUtcNow();
-        var settings = configuration.Current;
+        var settings = configuration.SettingsFor(serviceName);
         var metricsDue = now - pulls.Metrics.LastPullAt >= TimeSpan.FromSeconds(settings.PullSeconds);
         var edgesDue = now - pulls.Edges.LastPullAt >= TimeSpan.FromSeconds(settings.EdgeFlushSeconds);
         if (metricsDue && edgesDue)
