@@ -40,4 +40,4 @@ An application chart gets monitored by depending on `monitoring-sidecar` and inc
 - Agents inside the cluster reach the replicas through the addresses of the stateful set. For agents in other clusters, give one address per replica in `replicaAddresses`, for example the host of a route per replica; that needs `tls` or `mtls`.
 - `deploy/helm/test.sh` lints and renders the charts and checks what they must contain; CI runs it. It uses Helm when installed and Docker otherwise.
 
-The label-based injector (#45) and OpenShift specifics (#46) are not here yet.
+On OpenShift, see [docs/openshift.md](../docs/openshift.md): the security context, Routes and network policies. The label-based injector (#45) is not here yet.
