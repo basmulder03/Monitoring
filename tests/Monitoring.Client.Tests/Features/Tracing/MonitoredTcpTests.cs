@@ -7,6 +7,7 @@ using Xunit;
 
 namespace Monitoring.Client.Tests.Features.Tracing;
 
+[Collection("Meters")]
 public class MonitoredTcpTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;

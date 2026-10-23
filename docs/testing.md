@@ -37,6 +37,17 @@ export NODE_OPTIONS=--use-system-ca
 
 Proxy settings for downloads come from `HTTPS_PROXY`, and for npm from the usual `.npmrc`. The lockfile names the public npm registry; npm swaps in the registry you have configured.
 
+## A real database
+
+`tests/Monitoring.Client.Tests/Features/Database` talks to a real PostgreSQL server, to see what a database provider publishes and that it becomes an edge. It skips itself, and says why, when `MONITORING_TEST_POSTGRES` is not set; CI starts a server and sets it. To run it here:
+
+```sh
+docker run -d --name pg -e POSTGRES_PASSWORD=test -p 127.0.0.1:54329:5432 postgres:18-alpine
+MONITORING_TEST_POSTGRES='Host=127.0.0.1;Port=54329;Username=postgres;Password=test' dotnet test --project tests/Monitoring.Client.Tests
+```
+
+`samples/Monitoring.DatabaseSample` is the same check as a Native AOT program: `docker build --build-arg PROJECT=DatabaseSample --build-arg PROJECT_PATH=samples/Monitoring.DatabaseSample -f deploy/Dockerfile .`, then run the image with `MONITORING_SAMPLE_POSTGRES` set.
+
 ## Windows
 
 Code that talks to Windows (the Service Control Manager and the like) has tests that skip themselves with an explanation anywhere else. To run them on a Windows machine, publish the test project for it, which works from Linux too, copy the folder over and start the executable:

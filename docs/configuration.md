@@ -466,6 +466,20 @@ builder.Services.AddMonitoring(options =>
 
 Each certificate becomes the gauge `monitoring.certificate.expiry_days`, tagged `certificate=<name>`, with the days left (negative once it has expired). A certificate that cannot be read at one reading is left out of it, which shows as a gap. The controller alerts on it as described under `CertificateWarningDays` and `CertificateCriticalDays`; replicas that share a certificate count as one, and the one that expires first decides.
 
+### Databases
+
+A database call becomes an edge to the server and database, with its calls, errors and duration, and a span with the statement (with the values taken out). No code is needed beyond naming the activity source of the provider, because the client only listens to the sources you list:
+
+```csharp
+builder.Services.AddMonitoring(options => options.TraceSources.Add("Npgsql"));
+```
+
+| Provider | Source | Checked |
+| --- | --- | --- |
+| Npgsql 9 (PostgreSQL) | `Npgsql` | Against a real server, JIT and Native AOT (`samples/Monitoring.DatabaseSample`): the edge, the failed query counted as an error, the statement with its values replaced, no trim or AOT warning |
+
+Other providers work when they publish activities with the `db.system` tag and the address of the server, in the older (`net.peer.name`, `db.name`, `db.statement`) or the current (`server.address`, `db.namespace`, `db.query.text`) names; a failure is recognized from the status of the activity, the `error.type` tag, the `otel.status_code` tag or an `exception` event. They have not been tried here: SqlClient and the others are yours to check with the sample, which takes one connection string.
+
 ### Messages through ActiveMQ
 
 A Native AOT application cannot be patched at run time, so the messages are counted by two calls around the application's own send and receive. They know nothing about the broker library, so the client stays free of one: you pass the code that sets and reads a property of your message. Register once:

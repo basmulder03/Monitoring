@@ -6,6 +6,7 @@ using Xunit;
 
 namespace Monitoring.Client.Tests.Features.Tracing;
 
+[Collection("Meters")]
 public class MonitoredMessagingTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;

@@ -14,6 +14,7 @@ using HealthCheckResult = Microsoft.Extensions.Diagnostics.HealthChecks.HealthCh
 namespace Monitoring.Client.Tests.Features.LocalServer;
 
 /// <summary>The client inside an application, answering over a real Unix socket as the sidecar would ask.</summary>
+[Collection("Meters")]
 public class LocalServerTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;

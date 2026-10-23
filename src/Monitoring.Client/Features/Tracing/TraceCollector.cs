@@ -75,8 +75,11 @@ internal sealed class TraceCollector(MonitoringOptions options, EdgeCounters edg
 
     private void OnStopped(Activity activity)
     {
+        // Newer code sets the status of the activity; older code, such as Npgsql, says it with a tag and an exception event instead.
         var error = activity.Status == ActivityStatusCode.Error
             || activity.GetTagItem("error.type") is not null
+            || string.Equals(activity.GetTagItem("otel.status_code")?.ToString(), "ERROR", StringComparison.OrdinalIgnoreCase)
+            || activity.Events.Any(e => e.Name == "exception")
             || StatusCodeOf(activity) >= 500;
         var duration = activity.Duration.TotalMilliseconds;
 
@@ -102,7 +105,18 @@ internal sealed class TraceCollector(MonitoringOptions options, EdgeCounters edg
         int.TryParse(activity.GetTagItem("http.response.status_code")?.ToString(), out var code) ? code : 0;
 
     /// <summary>Names a span without anything a person typed: an HTTP operation is named by method and route, never by address.</summary>
-    private static string Name(Activity activity) => SpanSanitizer.Url(activity.DisplayName);
+    private static string Name(Activity activity)
+    {
+        // Some providers do not name their operations at all (Npgsql says UNKNOWN); the kind of database and what it was asked to do is more use.
+        if (activity.DisplayName is "" or "UNKNOWN" && (activity.GetTagItem("db.system.name") ?? activity.GetTagItem("db.system"))?.ToString() is { } database)
+        {
+            var statement = (activity.GetTagItem("db.query.text") ?? activity.GetTagItem("db.statement"))?.ToString();
+            var verb = statement?.TrimStart().Split([' ', '\n', '\t', '('], 2)[0].ToLowerInvariant();
+            return string.IsNullOrEmpty(verb) ? database : $"{database} {verb}";
+        }
+
+        return SpanSanitizer.Url(activity.DisplayName);
+    }
 
     private static Dictionary<string, string> DetailsOf(Activity activity)
     {

@@ -6,6 +6,7 @@ using Xunit;
 
 namespace Monitoring.Client.Tests.Features.Tracing;
 
+[Collection("Meters")]
 public class TraceCollectorTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -75,6 +76,56 @@ public class TraceCollectorTests
 
         // Assert
         fixture.Edges.Read().Edges.Single().Errors.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task A_call_of_a_provider_that_says_it_failed_with_a_tag_and_an_exception_event_counts_as_failed()
+    {
+        // Arrange: this is how Npgsql, for one, reports a failed query, and leaves the status of the activity unset
+        using var fixture = await new CollectorFixture().StartAsync();
+
+        // Act
+        fixture.Run(ActivityKind.Client, a =>
+        {
+            a.SetTag("db.system", "postgresql");
+            a.SetTag("net.peer.name", "db1");
+            a.SetTag("otel.status_code", "ERROR");
+        });
+        fixture.Run(ActivityKind.Client, a =>
+        {
+            a.SetTag("db.system", "postgresql");
+            a.SetTag("net.peer.name", "db1");
+            a.AddEvent(new ActivityEvent("exception"));
+        });
+        fixture.Run(ActivityKind.Client, a =>
+        {
+            a.SetTag("db.system", "postgresql");
+            a.SetTag("net.peer.name", "db1");
+        });
+
+        // Assert
+        var edge = fixture.Edges.Read().Edges.Single();
+        edge.Calls.ShouldBe(3);
+        edge.Errors.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task A_database_span_that_has_no_name_of_its_own_is_named_after_the_database_and_what_it_was_asked()
+    {
+        // Arrange
+        using var fixture = await new CollectorFixture().StartAsync();
+
+        // Act
+        fixture.Run(ActivityKind.Client, a =>
+        {
+            a.DisplayName = "UNKNOWN";
+            a.SetTag("db.system", "postgresql");
+            a.SetTag("net.peer.name", "db1");
+            a.SetTag("db.statement", "  SELECT * from orders where id = 4");
+        });
+
+        // Assert
+        fixture.Spans.ReadAfter(0).Spans.Single().Name.ShouldBe("postgresql select");
     }
 
     [Fact]

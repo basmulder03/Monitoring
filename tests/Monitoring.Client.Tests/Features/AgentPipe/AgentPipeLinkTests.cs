@@ -13,6 +13,7 @@ using HealthCheckResult = Microsoft.Extensions.Diagnostics.HealthChecks.HealthCh
 namespace Monitoring.Client.Tests.Features.AgentPipe;
 
 /// <summary>The client inside an application, reporting to the agent of the machine over a real named pipe.</summary>
+[Collection("Meters")]
 public class AgentPipeLinkTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
