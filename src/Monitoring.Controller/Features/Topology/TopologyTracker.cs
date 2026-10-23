@@ -52,11 +52,15 @@ internal sealed class TopologyTracker(IScopeRegistry registry, TopologyOptions o
                     continue;
                 }
 
-                var to = resolver.Resolve(scope, edge.Type, edge.Target);
+                // A service that takes messages from a queue is reached by the queue, so the edge points from the queue to the service.
+                var consumes = edge.Type == "MQ-IN";
+                var type = consumes ? "MQ" : edge.Type;
+                var to = resolver.Resolve(scope, type, edge.Target);
                 nodes[from.Id] = from;
                 nodes[to.Id] = to;
-                var total = edges.GetValueOrDefault((from.Id, to.Id, edge.Type));
-                edges[(from.Id, to.Id, edge.Type)] = (total.Calls + edge.Calls, total.Errors + edge.Errors, total.Duration + edge.DurationSumMs);
+                var (source, destination) = consumes ? (to.Id, from.Id) : (from.Id, to.Id);
+                var total = edges.GetValueOrDefault((source, destination, type));
+                edges[(source, destination, type)] = (total.Calls + edge.Calls, total.Errors + edge.Errors, total.Duration + edge.DurationSumMs);
             }
         }
 

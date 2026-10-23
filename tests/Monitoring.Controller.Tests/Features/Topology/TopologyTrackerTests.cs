@@ -26,6 +26,27 @@ public class TopologyTrackerTests
     }
 
     [Fact]
+    public void Sample_puts_a_queue_between_the_service_that_sends_to_it_and_the_one_that_takes_from_it()
+    {
+        // Arrange
+        var fixture = new TrackerFixture()
+            .With("shop", Instance("orders", "orders-1", Edge("MQ", "activemq://orders", 5, 0)))
+            .With("shop", Instance("billing", "billing-1", Edge("MQ-IN", "activemq://orders", 4, 1)));
+
+        // Act
+        fixture.Tracker.Sample();
+        var graph = fixture.Tracker.GetGraph();
+
+        // Assert
+        graph.Edges.Select(e => (e.From, e.To, e.Type, e.Calls)).ShouldBe(
+        [
+            ("queue:activemq://orders", "service:shop/billing", "MQ", 4L),
+            ("service:shop/orders", "queue:activemq://orders", "MQ", 5L),
+        ]);
+        graph.Nodes.Count(n => n.Kind == NodeKind.Queue).ShouldBe(1);
+    }
+
+    [Fact]
     public void Sample_connects_a_service_to_the_service_it_calls()
     {
         // Arrange

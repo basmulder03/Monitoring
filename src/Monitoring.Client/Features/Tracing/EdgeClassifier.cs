@@ -7,13 +7,13 @@ internal static class EdgeClassifier
 {
     /// <summary>Classifies an operation.</summary>
     /// <param name="activity">A finished operation.</param>
-    /// <param name="type">Receives <c>HTTP</c>, <c>DB</c>, <c>MQ</c> or <c>TCP</c>.</param>
+    /// <param name="type">Receives <c>HTTP</c>, <c>DB</c>, <c>MQ</c> (sent to a queue), <c>MQ-IN</c> (taken from a queue) or <c>TCP</c>.</param>
     /// <param name="target">Receives where the call went.</param>
     /// <returns><see langword="true"/> when the operation is a call to a dependency that is worth an edge.</returns>
     public static bool TryClassify(Activity activity, out string type, out string target)
     {
         type = target = "";
-        if (activity.Kind is not (ActivityKind.Client or ActivityKind.Producer))
+        if (activity.Kind is not (ActivityKind.Client or ActivityKind.Producer or ActivityKind.Consumer))
         {
             return false;
         }
@@ -32,9 +32,15 @@ internal static class EdgeClassifier
         if (Tag(activity, "messaging.system") is { } broker)
         {
             var destination = Tag(activity, "messaging.destination.name") ?? Tag(activity, "messaging.destination");
-            type = "MQ";
+            type = activity.Kind == ActivityKind.Consumer ? "MQ-IN" : "MQ";
             target = $"{broker}://{destination ?? Endpoint(host, port)}";
             return destination is not null || host is not null;
+        }
+
+        // Anything else that consumes is not a call to a dependency.
+        if (activity.Kind == ActivityKind.Consumer)
+        {
+            return false;
         }
 
         if (host is not null && (Tag(activity, "http.request.method") ?? Tag(activity, "http.method")) is not null)

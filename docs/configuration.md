@@ -392,6 +392,25 @@ builder.Services.AddMonitoring(options =>
 
 Each certificate becomes the gauge `monitoring.certificate.expiry_days`, tagged `certificate=<name>`, with the days left (negative once it has expired). A certificate that cannot be read at one reading is left out of it, which shows as a gap. The controller alerts on it as described under `CertificateWarningDays` and `CertificateCriticalDays`; replicas that share a certificate count as one, and the one that expires first decides.
 
+### Messages through ActiveMQ
+
+A Native AOT application cannot be patched at run time, so the messages are counted by two calls around the application's own send and receive. They know nothing about the broker library, so the client stays free of one: you pass the code that sets and reads a property of your message. Register once:
+
+```csharp
+builder.Services.AddMonitoring(options => options.UseActiveMq());
+```
+
+```csharp
+// Sending: the queue or topic becomes a node of its own, and the trace context travels in the message property "traceparent".
+using var send = MonitoredMessaging.StartSend(MonitoredMessaging.ActiveMq, "invoices", (name, value) => message.Properties.SetString(name, value));
+try { producer.Send(message); } catch (Exception ex) { send.Fail(ex); throw; }
+
+// Receiving: the work on the message continues the trace of the sender.
+using var process = MonitoredMessaging.StartProcess(MonitoredMessaging.ActiveMq, "invoices", name => message.Properties.GetString(name));
+```
+
+The graph then shows `sender → queue → receiver`. A message without a usable `traceparent` starts a trace of its own. Without monitoring both calls return `null` and do nothing, so the application code needs no check. The calls have been tested with plain dictionaries as the message, not with a real broker or its library.
+
 ### Raw TCP connections
 
 HTTP calls and the calls of database and broker packages that publish activities are counted without any code. For a protocol that has nothing of the sort, open the connection through the client:

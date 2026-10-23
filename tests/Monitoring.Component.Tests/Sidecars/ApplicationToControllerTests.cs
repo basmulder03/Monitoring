@@ -136,6 +136,35 @@ public class ApplicationToControllerTests
     }
 
     [Fact]
+    public async Task A_queue_between_the_sending_and_the_receiving_side_of_an_application_shows_in_the_graph_with_the_trace_carried_across()
+    {
+        // Arrange
+        await using var cluster = new FakeKubernetesApiServer().WithPod("orders-1").Start();
+        await using var controller = new ControllerHost().AcceptingEnrollment(Token).WithCentralConfiguration(FastPulls).With("Controller:Topology:SampleInterval", "00:00:00.100").Start();
+        await using var agent = new AgentHost("shop", Token).ConnectingTo(controller).DiscoveringIn(cluster)
+            .With("Agent:Sidecars:HeartbeatInterval", "00:00:01").Start();
+        await using var application = new ApplicationHost("orders-1").WithTraceSource(Monitoring.Client.Features.Tracing.MonitoredMessaging.SourceName).Start(agent);
+        var message = new Dictionary<string, string>();
+
+        // Act
+        using (Monitoring.Client.Features.Tracing.MonitoredMessaging.StartSend("activemq", "invoices", message.Add))
+        {
+        }
+
+        using (Monitoring.Client.Features.Tracing.MonitoredMessaging.StartProcess("activemq", "invoices", name => message.GetValueOrDefault(name)))
+        {
+        }
+
+        // Assert
+        await Eventually.AssertAsync(() =>
+        {
+            var edges = controller.Services.GetRequiredService<ITopology>().GetGraph().Edges;
+            edges.ShouldContain(e => e.From == "service:shop/orders" && e.To == "queue:activemq://invoices");
+            edges.ShouldContain(e => e.From == "queue:activemq://invoices" && e.To == "service:shop/orders");
+        });
+    }
+
+    [Fact]
     public async Task The_dependency_graph_of_the_controller_shows_what_the_application_called()
     {
         // Arrange
