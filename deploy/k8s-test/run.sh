@@ -144,10 +144,10 @@ kubectl rollout status deployment/orders -n shop --timeout=120s >/dev/null || fa
 echo "ok"
 
 step "The injector adds the sidecar to the pods of a namespace that asks, and only to those"
-helm install monitoring-injector "$root/deploy/helm/monitoring-injector" -n monitoring \
-  --set image.repository=monitoring-injector --set image.tag=dev --set image.pullPolicy=Never \
-  --set sidecar.image.repository=monitoring-sidecar --set sidecar.image.tag=dev --set sidecar.imagePullPolicy=Never \
-  --set sidecar.agentAddress=monitoring-agent:9441 >/dev/null
+injector_values=(--set image.repository=monitoring-injector --set image.tag=dev --set image.pullPolicy=Never
+  --set sidecar.image.repository=monitoring-sidecar --set sidecar.image.tag=dev --set sidecar.imagePullPolicy=Never
+  --set sidecar.agentAddress=monitoring-agent:9441)
+helm install monitoring-injector "$root/deploy/helm/monitoring-injector" -n monitoring "${injector_values[@]}" >/dev/null
 kubectl rollout status deployment/monitoring-injector -n monitoring --timeout=120s >/dev/null || fail "the injector did not become ready"
 
 # A plain application, without anything of monitoring in its manifest but the client in its code, in a namespace that has not asked yet.
@@ -187,6 +187,22 @@ kubectl label namespace shop monitoring/inject- >/dev/null
 plain labelled true
 kubectl rollout status deployment/labelled -n shop --timeout=120s >/dev/null || fail "the labelled application did not start"
 [ "$(initnames labelled)" = "monitoring-sidecar" ] || fail "a pod with the label did not get the sidecar (got '$(initnames labelled)')"
+echo "ok"
+
+step "A renewed certificate is picked up by the running injector, without a restart"
+# An upgrade makes a new certificate and puts its authority in the registration at once. The pods of the injector are not replaced, so they must notice the new files of
+# the secret, which Kubernetes brings to them after a while; until then the API server does not trust them and pods start without the sidecar, as the policy allows.
+pods_before="$(kubectl get pod -n monitoring -l app.kubernetes.io/name=monitoring-injector -o jsonpath='{.items[*].metadata.name}')"
+helm upgrade monitoring-injector "$root/deploy/helm/monitoring-injector" -n monitoring "${injector_values[@]}" >/dev/null
+plain renewed true
+renewed() {
+  kubectl delete pod -n shop -l app=renewed --wait=true >/dev/null 2>&1 || true
+  kubectl wait --for=condition=Ready pod -l app=renewed -n shop --timeout=60s >/dev/null 2>&1 || return 1
+  [ "$(initnames renewed)" = "monitoring-sidecar" ]
+}
+eventually 150 renewed || fail "the injector did not start using the renewed certificate"
+pods_after="$(kubectl get pod -n monitoring -l app.kubernetes.io/name=monitoring-injector -o jsonpath='{.items[*].metadata.name}')"
+[ "$pods_before" = "$pods_after" ] || fail "the pods of the injector were replaced instead of picking up the certificate"
 echo "ok"
 
 step "Pods still start while the injector is down"

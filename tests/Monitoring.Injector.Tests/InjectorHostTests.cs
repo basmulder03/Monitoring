@@ -104,6 +104,67 @@ public class InjectorHostTests
         health.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
+    /// <summary>The thumbprint of the certificate that a brand new connection is given, which is what the API server meets.</summary>
+    private static async Task<string> PresentedAsync(string address, TestPki pki)
+    {
+        string? presented = null;
+        var authorities = new X509Certificate2Collection();
+        authorities.ImportFromPemFile(pki.CaFile);
+        var handler = new SocketsHttpHandler();
+        handler.SslOptions.RemoteCertificateValidationCallback = (_, certificate, _, _) =>
+        {
+            presented = certificate?.GetCertHashString();
+            return true;
+        };
+        using var client = new HttpClient(handler) { BaseAddress = new Uri(address) };
+        using var response = await client.GetAsync("/healthz", Ct);
+        response.EnsureSuccessStatusCode();
+        return presented!;
+    }
+
+    private static async Task<string> AddressOfAsync(IHost host) =>
+        host.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First().Replace("[::]", "127.0.0.1").Replace("0.0.0.0", "127.0.0.1");
+
+    [Fact]
+    public async Task A_renewed_certificate_is_presented_to_new_connections_without_a_restart_and_a_broken_one_changes_nothing()
+    {
+        // Arrange
+        using var pki = new TestPki();
+        var first = pki.Issue("monitoring-injector.monitoring.svc");
+        var files = pki.Issue("monitoring-injector.monitoring.svc");
+        var certificateFile = Path.Combine(pki.Directory, "live.crt");
+        var keyFile = Path.Combine(pki.Directory, "live.key");
+        File.Copy(first.CertificateFile, certificateFile);
+        File.Copy(first.KeyFile, keyFile);
+        using var host = InjectorComposition.CreateHost([], new Dictionary<string, string?>
+        {
+            ["Injector:SidecarImage"] = "monitoring-sidecar:1",
+            ["Injector:Certificate"] = certificateFile,
+            ["Injector:Key"] = keyFile,
+            ["Injector:Web:Address"] = "127.0.0.1",
+            ["Injector:Web:Port"] = "0",
+            ["Injector:CertificateCheckInterval"] = "00:00:00.050",
+        }, Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}.json"));
+        await host.StartAsync(Ct);
+        var address = await AddressOfAsync(host);
+        var before = await PresentedAsync(address, pki);
+
+        // Act: the renewal is half written first, which must not take the webhook down, and then complete
+        await Task.Delay(100, Ct);
+        await File.WriteAllTextAsync(certificateFile, "this is not a certificate", Ct);
+        await Task.Delay(100, Ct);
+        var whileBroken = await PresentedAsync(address, pki);
+        File.Copy(files.CertificateFile, certificateFile, overwrite: true);
+        File.Copy(files.KeyFile, keyFile, overwrite: true);
+        await Task.Delay(100, Ct);
+        var after = await PresentedAsync(address, pki);
+
+        // Assert
+        before.ShouldBe(first.Thumbprint, StringCompareShould.IgnoreCase);
+        whileBroken.ShouldBe(before);
+        after.ShouldBe(files.Thumbprint, StringCompareShould.IgnoreCase);
+    }
+
     [Fact]
     public void The_sidecar_image_has_to_be_given_and_the_certificate_has_to_exist()
     {

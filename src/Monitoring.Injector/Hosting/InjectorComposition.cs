@@ -42,14 +42,17 @@ public static class InjectorComposition
         var address = IPAddress.TryParse(web.Text("Address", "0.0.0.0"), out var parsed)
             ? parsed
             : throw new ConfigurationException($"Setting '{web.NameOf("Address")}' must be an IP address.");
-        var certificate = X509Certificate2.CreateFromPemFile(injector.Required("Certificate"), injector.Required("Key"));
+        var certificate = new ReloadingCertificate(
+            injector.Required("Certificate"), injector.Required("Key"), injector.Duration("CertificateCheckInterval", TimeSpan.FromSeconds(30)), TimeProvider.System,
+            LoggerFactory.Create(logging => logging.AddConfiguration(builder.Configuration.GetSection("Logging")).AddSimpleConsole(o => { o.SingleLine = true; o.TimestampFormat = "HH:mm:ss "; })).CreateLogger("Monitoring.Injector.Certificate")).Load();
         builder.WebHost.ConfigureKestrel(kestrel =>
         {
             kestrel.AddServerHeader = false;
             kestrel.Listen(address, web.Int("Port", 8443), listen =>
             {
                 listen.Protocols = HttpProtocols.Http1AndHttp2;
-                listen.UseHttps(certificate);
+                // Asked for at every new connection, so a renewed certificate is presented from then on.
+                listen.UseHttps(https => https.ServerCertificateSelector = (_, _) => certificate.Current());
             });
         });
 
