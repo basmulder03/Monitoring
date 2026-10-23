@@ -6,6 +6,7 @@ using Monitoring.Client.Features.Health;
 using Monitoring.Client.Features.Info;
 using Monitoring.Client.Features.LocalServer;
 using Monitoring.Client.Features.Metrics;
+using Monitoring.Client.Features.Queues;
 using Monitoring.Client.Features.Packages;
 using Monitoring.Client.Features.Tracing;
 
@@ -41,6 +42,12 @@ public static class MonitoringExtensions
         {
             services.TryAddSingleton<CertificateMeter>();
             services.AddHostedService<CertificateMeterService>();
+        }
+
+        if (options.Queues.Count > 0)
+        {
+            services.TryAddSingleton<QueueMeter>();
+            services.AddHostedService<QueueMeterService>();
         }
 
         services.TryAddSingleton<MetricsCollector>();

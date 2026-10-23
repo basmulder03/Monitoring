@@ -1,4 +1,5 @@
 using Monitoring.Client.Features.LocalServer;
+using Monitoring.Client.Features.Metrics;
 using Monitoring.Client.Features.Tracing;
 using Npgsql;
 using Shouldly;
@@ -54,5 +55,26 @@ public class NpgsqlEdgesTests
         details.ShouldContain(text => text.Contains("db.statement=select ?", StringComparison.Ordinal));
         spans.ReadAfter(0).Spans.Select(span => span.Name).ShouldBe(["postgresql select", "postgresql select"]);
         spans.ReadAfter(0).Spans.Select(span => span.Error).ShouldBe([false, true]);
+    }
+
+    [Fact]
+    public async Task The_connection_pool_of_npgsql_shows_in_the_metrics()
+    {
+        Assert.SkipUnless(ConnectionString is not null, "Set MONITORING_TEST_POSTGRES to a PostgreSQL connection string to run this.");
+
+        // Arrange
+        using var collector = new MetricsCollector(new MonitoringOptions(), instrument => instrument.Meter.Name == "Npgsql");
+        await collector.StartAsync(Ct);
+        await using var data = new NpgsqlDataSourceBuilder(ConnectionString) { ConnectionStringBuilder = { MaxPoolSize = 7 } }.Build();
+        await using var held = await data.OpenConnectionAsync(Ct);
+
+        // Act
+        var series = collector.Read().Series;
+
+        // Assert: the numbers the controller judges a saturated pool by, with the pool told apart by its connection string (without the password)
+        var pool = series.Where(m => m.Name is "db.client.connections.max" or "db.client.connections.usage").ToList();
+        pool.Single(m => m.Name == "db.client.connections.max").Value.ShouldBe(7);
+        pool.Single(m => m.Labels.GetValueOrDefault("state") == "used").Value.ShouldBe(1);
+        pool.ShouldAllBe(m => !m.Labels["pool.name"].Contains("Password", StringComparison.OrdinalIgnoreCase));
     }
 }

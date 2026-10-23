@@ -56,6 +56,9 @@ public sealed class MonitoringOptions
     /// <summary>Certificates whose days to expiry are reported as a metric. Empty by default; add what the application serves or uses.</summary>
     public List<Certificates.CertificateWatch> Certificates { get; set; } = [];
 
+    /// <summary>Queues whose depth, consumers and dead letters are reported as metrics. Empty by default; add the queues the application depends on.</summary>
+    public List<Queues.QueueWatch> Queues { get; set; } = [];
+
     /// <summary>How many spans are kept in memory for drill-down; older ones are overwritten.</summary>
     public int SpanBufferSize { get; set; } = 2048;
 

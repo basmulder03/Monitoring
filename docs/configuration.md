@@ -57,6 +57,8 @@ Logging is controlled by the usual `Logging:LogLevel` settings, for example `MON
 | `Controller:Alerting:RestartLoopWindow` | `00:10:00` | The time within which that many restarts count as a loop |
 | `Controller:Alerting:CertificateWarningDays` | `14` | A watched certificate with fewer days left raises the warning `certificate-expiring` |
 | `Controller:Alerting:CertificateCriticalDays` | `3` | With fewer days left, or already expired, it raises the critical alert `certificate-expired-soon` instead |
+| `Controller:Alerting:QueueWithoutConsumersWait` | `00:02:00` | How long a watched queue with waiting messages must stay without a consumer before the critical alert `queue-without-consumers` fires. The warning `queue-dead-letters` fires as soon as a watched queue has dead letters |
+| `Controller:Alerting:ConnectionPoolFullWait` | `00:01:00` | How long a database connection pool must stay without a free connection before the warning `connection-pool-full` fires |
 | `Controller:Alerting:ReplicaLagThreshold` | `25` | A replica that has not acknowledged this many changes of a scope that an agent sent raises the warning `replica-behind` |
 | `Controller:Alerting:ReplicaBehindWait` | `00:01:00` | How long a replica must stay behind before that alert fires |
 | `Controller:Alerting:ReplicaUnreachableWait` | `00:02:00` | How long an agent may be unable to reach a replica before the warning `replica-unreachable` fires |
@@ -478,6 +480,23 @@ builder.Services.AddMonitoring(options =>
 ```
 
 Each certificate becomes the gauge `monitoring.certificate.expiry_days`, tagged `certificate=<name>`, with the days left (negative once it has expired). A certificate that cannot be read at one reading is left out of it, which shows as a gap. The controller alerts on it as described under `CertificateWarningDays` and `CertificateCriticalDays`; replicas that share a certificate count as one, and the one that expires first decides.
+
+### Queues an application depends on
+
+The application knows how to ask its broker, so it says what to ask:
+
+```csharp
+builder.Services.AddMonitoring(options =>
+{
+    options.Queues.Add(new QueueWatch("orders", () => cache.Read("orders")));   // QueueStats(Depth, Consumers, DeadLetters)
+});
+```
+
+The function is called each time the metrics are read, every few seconds, so answer from a cache or a cheap call. Each queue becomes the gauges `monitoring.queue.depth`, `monitoring.queue.consumers` and `monitoring.queue.dead_letters`, tagged `queue=<name>`; what the broker does not tell (`null`), or a queue that cannot be read at that moment, is left out and shows as a gap. The controller alerts on dead letters and on waiting messages without consumers (`QueueWithoutConsumersWait`); replicas ask the same broker, so a consumer seen by one of them counts.
+
+### Database connection pools
+
+Nothing needs to be set up for Npgsql: it publishes the pool as `db.client.connections.usage` (`state=used` and `idle`) and `db.client.connections.max`, tagged with the pool, which is the connection string without the password. They are collected like any other metric, and the controller raises `connection-pool-full` when a pool has no free connection for `ConnectionPoolFullWait`.
 
 ### Databases
 

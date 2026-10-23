@@ -38,6 +38,8 @@ public static class AlertingSlice
         ArgumentOutOfRangeException.ThrowIfLessThan(options.ReplicaLagThreshold, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.ReplicaBehindWait, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.ReplicaUnreachableWait, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.QueueWithoutConsumersWait, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.ConnectionPoolFullWait, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.CertificateCriticalDays, 0);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.CertificateWarningDays, options.CertificateCriticalDays);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.RestartLoopWindow, TimeSpan.Zero);
@@ -63,6 +65,11 @@ public static class AlertingSlice
             "certificate-expiring", AlertSeverity.Warning, provider.GetRequiredService<IScopeRegistry>(), options.CertificateWarningDays, options.CertificateCriticalDays));
         services.AddSingleton<IAlertRule>(provider => new CertificateExpiryRule(
             "certificate-expired-soon", AlertSeverity.Critical, provider.GetRequiredService<IScopeRegistry>(), options.CertificateCriticalDays, null));
+        services.AddSingleton<IAlertRule>(provider => new ConnectionPoolRule(options.ConnectionPoolFullWait, provider.GetRequiredService<IScopeRegistry>()));
+        services.AddSingleton<IAlertRule>(provider => new QueueRule(
+            "queue-dead-letters", AlertSeverity.Warning, TimeSpan.Zero, provider.GetRequiredService<IScopeRegistry>(), queue => queue.DeadLetters > 0));
+        services.AddSingleton<IAlertRule>(provider => new QueueRule(
+            "queue-without-consumers", AlertSeverity.Critical, options.QueueWithoutConsumersWait, provider.GetRequiredService<IScopeRegistry>(), queue => queue.Depth > 0 && queue.Consumers == 0));
         services.AddSingleton<IAlertRule>(provider => new ReplicaRule(
             "replica-behind", provider.GetRequiredService<IScopeRegistry>(), options.ReplicaBehindWait, report => report.Lag >= options.ReplicaLagThreshold));
         services.AddSingleton<IAlertRule>(provider => new ReplicaRule(

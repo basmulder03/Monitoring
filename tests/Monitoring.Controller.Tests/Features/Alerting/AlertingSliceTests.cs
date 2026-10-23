@@ -36,7 +36,7 @@ public class AlertingSliceTests
         var rules = provider.GetServices<IAlertRule>().Select(r => r.Name);
 
         // Assert
-        rules.ShouldBe(["instance-unhealthy", "service-down", "scope-unknown", "restart-loop", "package-drift", "vulnerable-package", "vulnerable-package-critical", "certificate-expiring", "certificate-expired-soon", "replica-behind", "replica-unreachable", "edge-error-rate", "dropped-data", "configuration-drift"], ignoreOrder: true);
+        rules.ShouldBe(["instance-unhealthy", "service-down", "scope-unknown", "restart-loop", "package-drift", "vulnerable-package", "vulnerable-package-critical", "certificate-expiring", "certificate-expired-soon", "connection-pool-full", "queue-dead-letters", "queue-without-consumers", "replica-behind", "replica-unreachable", "edge-error-rate", "dropped-data", "configuration-drift"], ignoreOrder: true);
     }
 
     [Fact]
