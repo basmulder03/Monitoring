@@ -30,6 +30,12 @@ public sealed class KubernetesDiscoveryOptions
     public string MonitoringSidecarContainer { get; set; } = "monitoring-sidecar";
 
     /// <summary>
+    /// Shows what each pod uses of the processor and memory it asked for, from the metrics API of the cluster (it needs a metrics server and a role that may read it).
+    /// Off by default; when the metrics API cannot be read the pods are shown without it.
+    /// </summary>
+    public bool PodMetrics { get; set; }
+
+    /// <summary>
     /// How long a watch stays open before the pods are listed again in full, which repairs any event that was missed.
     /// </summary>
     public TimeSpan ResyncInterval { get; set; } = TimeSpan.FromSeconds(60);

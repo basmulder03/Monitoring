@@ -317,6 +317,7 @@ The agent learns which instances exist from the platform it runs on. `Agent:Disc
 | `Agent:Discovery:Kubernetes:CaFile` | in-cluster certificate authority | PEM file with the certificate authority that signed the API server's certificate |
 | `Agent:Discovery:Kubernetes:MonitoringSidecarContainer` | `monitoring-sidecar` | Name of this system's own sidecar container. When it fails, the instance is shown as Degraded with the cause, not Unhealthy |
 | `Agent:Discovery:Kubernetes:ResyncInterval` | `00:01:00` | How long a watch stays open before the pods are listed again in full, which repairs a missed event |
+| `Agent:Discovery:Kubernetes:PodMetrics` | `false` | Shows what each pod uses, from the metrics API of the cluster (it needs a metrics server). See below |
 | `Agent:Discovery:Kubernetes:RetryMinDelay` | `00:00:01` | Shortest wait before retrying after a failure |
 | `Agent:Discovery:Kubernetes:RetryMaxDelay` | `00:00:30` | Longest wait; repeated failures grow the wait up to this |
 
@@ -339,6 +340,14 @@ rules:
     verbs: ["list"]
   - apiGroups: ["apps"]
     resources: ["deployments", "statefulsets"]
+    verbs: ["list"]
+```
+
+With `PodMetrics` on (the chart: `podMetrics: true`, which also adds the permission below to the role) each pod carries the metrics `k8s.pod.cpu_usage_cores` and `k8s.pod.memory_usage_bytes`, and, when every container of the pod sets them, `k8s.pod.cpu_request_cores`, `k8s.pod.cpu_limit_cores`, `k8s.pod.memory_request_bytes` and `k8s.pod.memory_limit_bytes`, so a pod that runs close to its limit can be told apart. They are read when the pods are listed again (the resync interval) and sit beside the metrics of the application. Without a metrics server, or without the permission, the pods are shown without them and the agent says so once in its log.
+
+```yaml
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
     verbs: ["list"]
 ```
 

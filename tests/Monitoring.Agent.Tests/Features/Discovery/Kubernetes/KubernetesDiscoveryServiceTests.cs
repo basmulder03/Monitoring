@@ -104,6 +104,60 @@ public class KubernetesDiscoveryServiceTests
     }
 
     [Fact]
+    public async Task Service_shows_what_a_pod_uses_beside_what_it_asked_for_when_asked_to_read_the_metrics_api()
+    {
+        // Arrange
+        var fixture = new DiscoveryFixture { ReadPodMetrics = true }.ListingPods("10",
+            new PodBuilder().Named("a").InPhase("Running").PodReady().WithResources("app", new() { ["cpu"] = "250m", ["memory"] = "128Mi" }, new() { ["memory"] = "256Mi" }).Build());
+        fixture.Api.Usage = new Dictionary<string, PodUsage> { ["a"] = new(0.1, 100 * 1024 * 1024) };
+
+        // Act
+        await fixture.StartAsync();
+        await fixture.WaitUntilAsync(() => fixture.InstanceIds().Count == 1);
+
+        // Assert
+        fixture.Instance("a")!.Metrics!.ToDictionary(m => m.Name, m => m.Value).ShouldBe(new Dictionary<string, double>
+        {
+            ["k8s.pod.cpu_usage_cores"] = 0.1,
+            ["k8s.pod.memory_usage_bytes"] = 100 * 1024 * 1024,
+            ["k8s.pod.cpu_request_cores"] = 0.25,
+            ["k8s.pod.memory_request_bytes"] = 128 * 1024 * 1024,
+            ["k8s.pod.memory_limit_bytes"] = 256 * 1024 * 1024,
+        });
+    }
+
+    [Fact]
+    public async Task Service_does_not_ask_for_the_use_of_pods_unless_told_to()
+    {
+        // Arrange
+        var fixture = new DiscoveryFixture().ListingPods("10", Running("a"));
+        fixture.Api.Usage = new Dictionary<string, PodUsage> { ["a"] = new(1, 1) };
+
+        // Act
+        await fixture.StartAsync();
+        await fixture.WaitUntilAsync(() => fixture.InstanceIds().Count == 1);
+
+        // Assert
+        fixture.Api.UsageCalls.ShouldBe(0);
+        fixture.Instance("a")!.Metrics.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Service_still_follows_the_pods_when_there_is_no_metrics_server()
+    {
+        // Arrange
+        var fixture = new DiscoveryFixture { ReadPodMetrics = true }.ListingPods("10", Running("a"));
+        fixture.Api.Usage = new KubernetesApiException("the server could not find the requested resource");
+
+        // Act
+        await fixture.StartAsync();
+        await fixture.WaitUntilAsync(() => fixture.InstanceIds().Count == 1);
+
+        // Assert
+        fixture.Instance("a")!.Metrics.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task Service_does_not_show_a_warning_on_a_pod_that_is_healthy()
     {
         // Arrange
@@ -368,6 +422,8 @@ public class KubernetesDiscoveryServiceTests
             _subscription = _store.Subscribe();
         }
 
+        public bool ReadPodMetrics { set => _options.PodMetrics = value; }
+
         public FakeTimeProvider Clock { get; } = new();
 
         public ScriptedApi Api { get; } = new();
@@ -519,6 +575,17 @@ public class KubernetesDiscoveryServiceTests
 
         public Task<IReadOnlyDictionary<string, KubernetesWorkload>> ListWorkloadsAsync(string namespaceName, CancellationToken ct) =>
             Workloads is Exception exception ? throw exception : Task.FromResult((IReadOnlyDictionary<string, KubernetesWorkload>)Workloads);
+
+        /// <summary>What the metrics API answers with, or the exception it fails with.</summary>
+        public object Usage { get; set; } = (IReadOnlyDictionary<string, PodUsage>)new Dictionary<string, PodUsage>();
+
+        public int UsageCalls { get; private set; }
+
+        public Task<IReadOnlyDictionary<string, PodUsage>> ListPodUsageAsync(string namespaceName, CancellationToken ct)
+        {
+            UsageCalls++;
+            return Usage is Exception exception ? throw exception : Task.FromResult((IReadOnlyDictionary<string, PodUsage>)Usage);
+        }
 
         public Task<IReadOnlyList<KubernetesEvent>> ListWarningEventsAsync(string namespaceName, CancellationToken ct) =>
             Events is Exception exception ? throw exception : Task.FromResult((IReadOnlyList<KubernetesEvent>)Events);

@@ -1,6 +1,7 @@
 using Monitoring.Agent.Features.Discovery.Kubernetes.Models;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Instances;
+using Monitoring.Protocol.Reports;
 
 namespace Monitoring.Agent.Features.Discovery.Kubernetes;
 
@@ -28,8 +29,9 @@ internal static class PodMapper
     /// <param name="monitoringSidecar">Name of the container that is this system's own sidecar, whose failure must not make the application look down.</param>
     /// <returns>The instance, or <see langword="null"/> for a pod that completed successfully, which is not an outage and not worth showing.</returns>
     /// <param name="warning">The latest warning event the cluster recorded about the pod; shown as a check while the pod is not healthy.</param>
+    /// <param name="usage">What the pod uses right now, when the metrics API is read; the pod then also gets its requests and limits as metrics.</param>
     /// <param name="rollout">What the Deployment or StatefulSet of the pod says about its rollout, see <see cref="Rollout.Describe"/>; <see langword="null"/> when nothing is going on.</param>
-    public static InstanceInfo? Map(Pod pod, string monitoringSidecar = DefaultMonitoringSidecar, KubernetesEvent? warning = null, string? rollout = null)
+    public static InstanceInfo? Map(Pod pod, string monitoringSidecar = DefaultMonitoringSidecar, KubernetesEvent? warning = null, string? rollout = null, PodUsage? usage = null)
     {
         if (pod.Status?.Phase == "Succeeded")
         {
@@ -63,8 +65,38 @@ internal static class PodMapper
             health,
             LabelsOf(pod),
             Checks: checks.Count > 0 ? checks : null,
-            Containers: containers.Count > 0 ? containers : null);
+            Containers: containers.Count > 0 ? containers : null,
+            Metrics: usage is null ? null : ResourceMetrics(pod, usage));
     }
+
+    /// <summary>What the pod uses beside what it asked for and may use, which is what shows a pod that runs close to its limit. Requests and limits count for the containers that run next to the application too.</summary>
+    private static List<MetricSeries> ResourceMetrics(Pod pod, PodUsage usage)
+    {
+        var containers = pod.Spec?.Containers ?? [];
+        var series = new List<MetricSeries>
+        {
+            new("k8s.pod.cpu_usage_cores", NoLabels, usage.CpuCores),
+            new("k8s.pod.memory_usage_bytes", NoLabels, usage.MemoryBytes),
+        };
+
+        AddSum(series, "k8s.pod.cpu_request_cores", containers, c => c.Resources?.Requests, "cpu");
+        AddSum(series, "k8s.pod.cpu_limit_cores", containers, c => c.Resources?.Limits, "cpu");
+        AddSum(series, "k8s.pod.memory_request_bytes", containers, c => c.Resources?.Requests, "memory");
+        AddSum(series, "k8s.pod.memory_limit_bytes", containers, c => c.Resources?.Limits, "memory");
+        return series;
+    }
+
+    /// <summary>Adds a series with the total over the containers, unless one of them sets none: a limit that only some containers have is not a limit of the pod.</summary>
+    private static void AddSum(List<MetricSeries> series, string name, List<ContainerSpec> containers, Func<ContainerSpec, Dictionary<string, string>?> pick, string resource)
+    {
+        var values = containers.Select(c => Quantity.Parse(pick(c)?.GetValueOrDefault(resource))).ToList();
+        if (values.Count > 0 && values.All(v => v is not null))
+        {
+            series.Add(new MetricSeries(name, NoLabels, values.Sum(v => v!.Value)));
+        }
+    }
+
+    private static readonly IReadOnlyDictionary<string, string> NoLabels = new Dictionary<string, string>();
 
     /// <summary>Names the service a pod belongs to: its name label, else the workload that owns it, else the pod itself.</summary>
     private static string ServiceNameOf(Pod pod)

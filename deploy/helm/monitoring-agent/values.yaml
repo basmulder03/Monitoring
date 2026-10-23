@@ -34,6 +34,9 @@ transport:
 # Name of the monitoring sidecar container in the pods of the namespace, so a failing sidecar is not reported as a failing application.
 sidecarContainer: monitoring-sidecar
 
+# Shows what each pod uses of the processor and memory it asked for. Needs a metrics server in the cluster; the chart then also lets the agent read the metrics API.
+podMetrics: false
+
 service:
   port: 9441         # where the sidecars connect
 

@@ -42,7 +42,8 @@ internal static class InstanceMerger
             Health = platform.Health.Worst(application.Health),
             // What the platform knows about the pod, such as a warning of the cluster or a rollout, stays beside what the application says about itself.
             Checks = [.. platform.Checks ?? [], .. application.Checks],
-            Metrics = application.Metrics,
+            // The use of the pod that the cluster reports stays beside the metrics of the application.
+            Metrics = platform.Metrics is { Count: > 0 } ? [.. platform.Metrics, .. application.Metrics ?? []] : application.Metrics,
             Edges = application.Edges,
             Packages = application.Packages,
         };

@@ -116,6 +116,17 @@ internal sealed class PodBuilder
         return this;
     }
 
+    /// <summary>Adds a container to the spec with what it asks for and may use.</summary>
+    /// <param name="name">Container name.</param>
+    /// <param name="requests">Requests by resource, such as <c>cpu</c>.</param>
+    /// <param name="limits">Limits by resource.</param>
+    /// <returns>This builder, for chaining.</returns>
+    public PodBuilder WithResources(string name, Dictionary<string, string>? requests = null, Dictionary<string, string>? limits = null)
+    {
+        _specs.Add(new ContainerSpec(name, $"{name}:1", Resources: new ResourceRequirements(requests, limits)));
+        return this;
+    }
+
     /// <summary>Adds a running container, with its spec, status and optionally what ended its previous run.</summary>
     /// <param name="name">Container name.</param>
     /// <param name="ready">Whether it is ready.</param>

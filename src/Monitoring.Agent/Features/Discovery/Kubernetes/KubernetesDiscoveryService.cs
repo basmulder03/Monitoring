@@ -36,6 +36,9 @@ internal sealed class KubernetesDiscoveryService(
     /// <summary>The latest warning event per pod name, as of the last listing.</summary>
     private Dictionary<string, KubernetesEvent> _warnings = [];
 
+    /// <summary>What each pod uses, as of the last listing; empty unless <see cref="KubernetesDiscoveryOptions.PodMetrics"/> is on.</summary>
+    private Dictionary<string, PodUsage> _usage = [];
+
     /// <summary>What each Deployment and StatefulSet says about its rollout, for the ones that have something to say, as of the last listing.</summary>
     private Dictionary<string, string> _rollouts = [];
 
@@ -96,11 +99,12 @@ internal sealed class KubernetesDiscoveryService(
         var list = await api.ListPodsAsync(target.Namespace, ct).ConfigureAwait(false);
         _warnings = await ListWarningsAsync(ct).ConfigureAwait(false);
         _rollouts = await ListRolloutsAsync(ct).ConfigureAwait(false);
+        _usage = await ListUsageAsync(ct).ConfigureAwait(false);
 
         var current = new Dictionary<string, InstanceInfo>();
         foreach (var pod in list.Pods)
         {
-            if (PodMapper.Map(pod, options.MonitoringSidecarContainer, _warnings.GetValueOrDefault(pod.Metadata.Name), RolloutOf(pod)) is { } instance)
+            if (PodMapper.Map(pod, options.MonitoringSidecarContainer, _warnings.GetValueOrDefault(pod.Metadata.Name), RolloutOf(pod), _usage.GetValueOrDefault(pod.Metadata.Name)) is { } instance)
             {
                 current[instance.Id] = instance;
             }
@@ -148,6 +152,36 @@ internal sealed class KubernetesDiscoveryService(
         }
     }
 
+    /// <summary>
+    /// Reads what the pods use, when asked to. A cluster without a metrics server, or a role that may not read it, only costs that detail, so it is said once and then tried again quietly.
+    /// </summary>
+    private async Task<Dictionary<string, PodUsage>> ListUsageAsync(CancellationToken ct)
+    {
+        if (!options.PodMetrics)
+        {
+            return [];
+        }
+
+        try
+        {
+            var usage = await api.ListPodUsageAsync(target.Namespace, ct).ConfigureAwait(false);
+            _usageUnavailableReported = false;
+            return new Dictionary<string, PodUsage>(usage, StringComparer.Ordinal);
+        }
+        catch (Exception ex) when (ex is KubernetesApiException or HttpRequestException or IOException)
+        {
+            if (!_usageUnavailableReported)
+            {
+                _usageUnavailableReported = true;
+                logger.LogWarning("Cannot read the use of the pods of '{Namespace}' from the metrics API, so they are shown without it: {Reason}", target.Namespace, ex.Message);
+            }
+
+            return [];
+        }
+    }
+
+    private bool _usageUnavailableReported;
+
     private string? RolloutOf(Pod pod) => Rollout.KeyOf(pod) is { } key ? _rollouts.GetValueOrDefault(key) : null;
 
     /// <summary>
@@ -179,7 +213,7 @@ internal sealed class KubernetesDiscoveryService(
             switch (podEvent.Type)
             {
                 case PodEventType.Added or PodEventType.Modified when podEvent.Pod is { } pod:
-                    if (PodMapper.Map(pod, options.MonitoringSidecarContainer, _warnings.GetValueOrDefault(pod.Metadata.Name), RolloutOf(pod)) is { } instance)
+                    if (PodMapper.Map(pod, options.MonitoringSidecarContainer, _warnings.GetValueOrDefault(pod.Metadata.Name), RolloutOf(pod), _usage.GetValueOrDefault(pod.Metadata.Name)) is { } instance)
                     {
                         Upsert(instance);
                     }

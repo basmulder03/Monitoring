@@ -141,6 +141,7 @@ internal static class AgentComposition
         options.Kubernetes.Token = kubernetes.Optional("Token");
         options.Kubernetes.CaFile = kubernetes.Optional("CaFile");
         options.Kubernetes.MonitoringSidecarContainer = kubernetes.Text("MonitoringSidecarContainer", options.Kubernetes.MonitoringSidecarContainer);
+        options.Kubernetes.PodMetrics = kubernetes.Text("PodMetrics", "false").Equals("true", StringComparison.OrdinalIgnoreCase);
         options.Kubernetes.ResyncInterval = kubernetes.Duration("ResyncInterval", options.Kubernetes.ResyncInterval);
         options.Kubernetes.RetryMinDelay = kubernetes.Duration("RetryMinDelay", options.Kubernetes.RetryMinDelay);
         options.Kubernetes.RetryMaxDelay = kubernetes.Duration("RetryMaxDelay", options.Kubernetes.RetryMaxDelay);

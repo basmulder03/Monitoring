@@ -59,6 +59,10 @@ spec:
               value: kubernetes
             - name: MONITORING_Agent__Discovery__Kubernetes__MonitoringSidecarContainer
               value: {{ .Values.sidecarContainer | quote }}
+            {{- if .Values.podMetrics }}
+            - name: MONITORING_Agent__Discovery__Kubernetes__PodMetrics
+              value: "true"
+            {{- end }}
             - name: MONITORING_Agent__Transport__Mode
               value: {{ .Values.transport.mode | quote }}
             {{- if ne .Values.transport.mode "none" }}

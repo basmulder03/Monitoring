@@ -1,6 +1,7 @@
 using Monitoring.Agent.Features.ScopeState;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Instances;
+using Monitoring.Protocol.Reports;
 using Shouldly;
 using Xunit;
 
@@ -40,6 +41,20 @@ public class InstanceMergerTests
 
         // Assert
         shown.Checks.ShouldBe([rollout, database]);
+    }
+
+    [Fact]
+    public void Merge_keeps_the_use_of_the_pod_beside_the_metrics_of_the_application()
+    {
+        // Arrange
+        var usage = new MetricSeries("k8s.pod.cpu_usage_cores", new Dictionary<string, string>(), 0.2);
+        var own = new MetricSeries("http.requests", new Dictionary<string, string>(), 7);
+
+        // Act
+        var shown = InstanceMerger.Merge(Pod() with { Metrics = [usage] }, App() with { Metrics = [own] }, sidecarLost: false);
+
+        // Assert
+        shown.Metrics.ShouldBe([usage, own]);
     }
 
     [Fact]

@@ -82,6 +82,33 @@ internal sealed class HttpKubernetesApi(HttpClient http) : IKubernetesApi, IDisp
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<string, PodUsage>> ListPodUsageAsync(string namespaceName, CancellationToken ct)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(ListTimeout);
+
+        using var response = await http.GetAsync($"apis/metrics.k8s.io/v1beta1/namespaces/{Uri.EscapeDataString(namespaceName)}/pods", timeout.Token).ConfigureAwait(false);
+        await EnsureSuccessAsync(response, timeout.Token).ConfigureAwait(false);
+
+        await using var body = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false);
+        var list = await ReadAsync(() => JsonSerializer.DeserializeAsync(body, KubernetesJsonContext.Default.PodMetricsList, timeout.Token).AsTask())
+            .ConfigureAwait(false);
+        var usage = new Dictionary<string, PodUsage>(StringComparer.Ordinal);
+        foreach (var item in list?.Items ?? [])
+        {
+            if (item.Metadata?.Name is { } name)
+            {
+                var containers = item.Containers ?? [];
+                usage[name] = new PodUsage(
+                    containers.Sum(c => Quantity.Parse(c.Usage?.GetValueOrDefault("cpu")) ?? 0),
+                    containers.Sum(c => Quantity.Parse(c.Usage?.GetValueOrDefault("memory")) ?? 0));
+            }
+        }
+
+        return usage;
+    }
+
+    /// <inheritdoc />
     public async IAsyncEnumerable<PodEvent> WatchPodsAsync(
         string namespaceName, string resourceVersion, TimeSpan duration, [EnumeratorCancellation] CancellationToken ct)
     {

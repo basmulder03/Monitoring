@@ -35,4 +35,16 @@ internal interface IKubernetesApi
     /// <returns>The events, in no particular order.</returns>
     /// <exception cref="KubernetesApiException">The API server answered with an error, for example because the role may not read events.</exception>
     Task<IReadOnlyList<KubernetesEvent>> ListWarningEventsAsync(string namespaceName, CancellationToken ct);
+
+    /// <summary>Reads what the pods of a namespace use right now, from the metrics API (the metrics server).</summary>
+    /// <param name="namespaceName">The namespace.</param>
+    /// <param name="ct">Cancels the request.</param>
+    /// <returns>The use per pod name.</returns>
+    /// <exception cref="KubernetesApiException">The API server answered with an error, for example because there is no metrics server or the role may not read it.</exception>
+    Task<IReadOnlyDictionary<string, PodUsage>> ListPodUsageAsync(string namespaceName, CancellationToken ct);
 }
+
+/// <summary>What a pod uses right now, added up over its containers.</summary>
+/// <param name="CpuCores">Processor use in cores.</param>
+/// <param name="MemoryBytes">Memory use in bytes.</param>
+internal sealed record PodUsage(double CpuCores, double MemoryBytes);

@@ -59,6 +59,37 @@ public class HttpKubernetesApiTests
     }
 
     [Fact]
+    public async Task ListPodUsageAsync_adds_up_the_containers_of_each_pod()
+    {
+        // Arrange
+        const string json = """
+            {"items":[{"metadata":{"name":"orders-1"},"containers":[{"name":"app","usage":{"cpu":"150m","memory":"100Mi"}},{"name":"sidecar","usage":{"cpu":"2m","memory":"20Mi"}}]}]}
+            """;
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, json);
+
+        // Act
+        var usage = await server.Api.ListPodUsageAsync("shop", Ct);
+
+        // Assert
+        server.Requests.Single().ShouldBe("GET apis/metrics.k8s.io/v1beta1/namespaces/shop/pods");
+        usage["orders-1"].CpuCores.ShouldBe(0.152, tolerance: 1e-9);
+        usage["orders-1"].MemoryBytes.ShouldBe(120 * 1024 * 1024);
+    }
+
+    [Fact]
+    public async Task ListPodUsageAsync_fails_with_an_api_exception_when_there_is_no_metrics_server()
+    {
+        // Arrange
+        var server = new FakeApiServer().Answering(HttpStatusCode.NotFound, "{}");
+
+        // Act
+        var list = () => server.Api.ListPodUsageAsync("shop", Ct);
+
+        // Assert
+        await list.ShouldThrowAsync<KubernetesApiException>();
+    }
+
+    [Fact]
     public async Task ListWorkloadsAsync_reads_deployments_and_statefulsets_by_kind_and_name()
     {
         // Arrange
