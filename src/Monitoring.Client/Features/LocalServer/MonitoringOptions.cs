@@ -43,6 +43,9 @@ public sealed class MonitoringOptions
     /// </summary>
     public List<string> TraceSources { get; set; } = ["System.Net.Http", "Microsoft.AspNetCore"];
 
+    /// <summary>Certificates whose days to expiry are reported as a metric. Empty by default; add what the application serves or uses.</summary>
+    public List<Certificates.CertificateWatch> Certificates { get; set; } = [];
+
     /// <summary>How many spans are kept in memory for drill-down; older ones are overwritten.</summary>
     public int SpanBufferSize { get; set; } = 2048;
 

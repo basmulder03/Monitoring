@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Features.Vulnerabilities;
 
 namespace Monitoring.Controller.Features.Alerting;
@@ -25,6 +26,8 @@ public static class AlertingSlice
         ArgumentOutOfRangeException.ThrowIfLessThan(options.PackageDriftWait, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.VulnerablePackageWait, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.RestartLoopCount, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.CertificateCriticalDays, 0);
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.CertificateWarningDays, options.CertificateCriticalDays);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.RestartLoopWindow, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.EvaluationInterval, TimeSpan.Zero);
         foreach (var silence in options.Silences.Where(silence => string.IsNullOrWhiteSpace(silence.Rule)))
@@ -44,6 +47,10 @@ public static class AlertingSlice
             "vulnerable-package-critical", AlertSeverity.Critical, serious: true, provider.GetRequiredService<IVulnerabilities>(), options));
         services.AddSingleton<IAlertRule>(provider => new VulnerablePackageRule(
             "vulnerable-package", AlertSeverity.Warning, serious: false, provider.GetRequiredService<IVulnerabilities>(), options));
+        services.AddSingleton<IAlertRule>(provider => new CertificateExpiryRule(
+            "certificate-expiring", AlertSeverity.Warning, provider.GetRequiredService<IScopeRegistry>(), options.CertificateWarningDays, options.CertificateCriticalDays));
+        services.AddSingleton<IAlertRule>(provider => new CertificateExpiryRule(
+            "certificate-expired-soon", AlertSeverity.Critical, provider.GetRequiredService<IScopeRegistry>(), options.CertificateCriticalDays, null));
         services.AddSingleton<AlertEvaluator>();
         services.AddSingleton<IAlertEvaluator>(provider => provider.GetRequiredService<AlertEvaluator>());
         services.AddSingleton<IAlertState>(provider => provider.GetRequiredService<AlertEvaluator>());

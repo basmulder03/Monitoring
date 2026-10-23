@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Monitoring.Client;
 using Microsoft.Extensions.Hosting;
+using Monitoring.Client.Features.Certificates;
 using Monitoring.Client.Features.Health;
 using Monitoring.Client.Features.Info;
 using Monitoring.Client.Features.LocalServer;
@@ -35,6 +36,13 @@ public static class MonitoringExtensions
         services.TryAddSingleton<HealthReporter>();
         services.AddSingleton<IPullSource, InfoPullSource>();
         services.AddSingleton<IPullSource, HealthPullSource>();
+        services.TryAddSingleton(TimeProvider.System);
+        if (options.Certificates.Count > 0)
+        {
+            services.TryAddSingleton<CertificateMeter>();
+            services.AddHostedService<CertificateMeterService>();
+        }
+
         services.TryAddSingleton<MetricsCollector>();
         services.AddHostedService(provider => provider.GetRequiredService<MetricsCollector>());
         services.AddSingleton<IPullSource, MetricsPullSource>();

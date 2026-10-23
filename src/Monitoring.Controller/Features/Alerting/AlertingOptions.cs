@@ -18,6 +18,12 @@ public sealed class AlertingOptions
     /// <summary>How long the agent of a scope must stay gone before the alert fires.</summary>
     public TimeSpan ScopeUnknownWait { get; set; } = TimeSpan.FromMinutes(2);
 
+    /// <summary>A certificate with fewer days left than this raises the warning <c>certificate-expiring</c>.</summary>
+    public int CertificateWarningDays { get; set; } = 14;
+
+    /// <summary>A certificate with fewer days left than this, or already expired, raises the critical alert <c>certificate-expired-soon</c> instead.</summary>
+    public int CertificateCriticalDays { get; set; } = 3;
+
     /// <summary>How many restarts of an instance within <see cref="RestartLoopWindow"/> raise the restart-loop alert.</summary>
     public int RestartLoopCount { get; set; } = 3;
 

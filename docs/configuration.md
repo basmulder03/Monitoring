@@ -55,6 +55,8 @@ Logging is controlled by the usual `Logging:LogLevel` settings, for example `MON
 | `Controller:Alerting:InstanceUnhealthyWait` | `00:00:30` | How long an instance must stay Unhealthy before its alert fires |
 | `Controller:Alerting:RestartLoopCount` | `3` | How many restarts of an instance within the window raise the `restart-loop` warning. Counted from when the controller first saw the instance, so an old restart count alone never raises it |
 | `Controller:Alerting:RestartLoopWindow` | `00:10:00` | The time within which that many restarts count as a loop |
+| `Controller:Alerting:CertificateWarningDays` | `14` | A watched certificate with fewer days left raises the warning `certificate-expiring` |
+| `Controller:Alerting:CertificateCriticalDays` | `3` | With fewer days left, or already expired, it raises the critical alert `certificate-expired-soon` instead |
 | `Controller:Alerting:ServiceDownWait` | `00:00:00` | How long a service must have no instance able to serve before its alert fires |
 | `Controller:Alerting:EvaluationInterval` | `00:00:05` | How often the alert rules run |
 
@@ -372,6 +374,23 @@ Each pod is shown down to its containers, taken from the same pod watch, so no e
 | Exited with an error | Unhealthy |
 
 Each container also carries its restart count, image, image digest, the reason and message of what it waits for, and the reason and exit code of its previous run, for example `OOMKilled`.
+
+### Certificates an application serves or uses
+
+An application can report how long its TLS certificates are valid, so a lapse is warned about before it causes an outage. It is off until you name the certificates:
+
+```csharp
+builder.Services.AddMonitoring(options =>
+{
+    // A file, such as the secret a Kubernetes certificate is mounted from; it is read again each time, so a renewal needs no restart.
+    options.Certificates.Add(CertificateWatch.File("https", "/etc/tls/tls.crt"));
+
+    // Or whatever the code has: the function is called at every reading and the certificate disposed afterwards.
+    options.Certificates.Add(new CertificateWatch("signing", () => LoadSigningCertificate()));
+});
+```
+
+Each certificate becomes the gauge `monitoring.certificate.expiry_days`, tagged `certificate=<name>`, with the days left (negative once it has expired). A certificate that cannot be read at one reading is left out of it, which shows as a gap. The controller alerts on it as described under `CertificateWarningDays` and `CertificateCriticalDays`; replicas that share a certificate count as one, and the one that expires first decides.
 
 ### Packages of an application
 
