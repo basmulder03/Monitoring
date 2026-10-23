@@ -85,7 +85,9 @@ public class PodMutatorTests
         var sidecar = Mutator().Sidecar();
 
         // Assert
-        var env = sidecar["env"]!.AsArray().ToDictionary(e => e!["name"]!.GetValue<string>(), e => e!["value"]!.GetValue<string>());
+        var entries = sidecar["env"]!.AsArray();
+        var env = entries.Where(e => e!["value"] is not null).ToDictionary(e => e!["name"]!.GetValue<string>(), e => e!["value"]!.GetValue<string>());
+        entries.Single(e => e!["name"]!.GetValue<string>() == "MONITORING_Sidecar__Pod__Node")!["valueFrom"]!["fieldRef"]!["fieldPath"]!.GetValue<string>().ShouldBe("spec.nodeName");
         env["MONITORING_Sidecar__Agent"].ShouldBe("monitoring-agent:9441");
         env["MONITORING_Sidecar__Library__Socket"].ShouldBe("/var/run/monitoring/monitoring.sock");
         env["MONITORING_Sidecar__Labels__team"].ShouldBe("orders");

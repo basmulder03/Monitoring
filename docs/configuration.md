@@ -439,6 +439,8 @@ How often metrics and dependency calls are read is not set here but in the contr
 
 An instance whose sidecar is gone is shown as Unhealthy until the sidecar returns. A sidecar that says goodbye on purpose, as during a rollout, does not cause that: the agent only forgets what the application reported. A pod that exists but has no sidecar keeps what the platform says about it.
 
+The sidecar's own settings (`Sidecar:` in its environment, `MONITORING_Sidecar__...`) include `Pod:Ip`, `Pod:Node` and `Pod:Namespace`, which the chart template and the injector fill from the Downward API. They are sent in the registration as the labels `pod.ip`, `node` and `namespace`, unless a label of that name is set by hand with `Labels:<name>`. The pod name is the host name, which is already the default instance id.
+
 ### Containers
 
 Each pod is shown down to its containers, taken from the same pod watch, so no extra permission is needed.

@@ -111,6 +111,26 @@ public class SidecarCompositionTests
     }
 
     [Fact]
+    public void CreateHost_sends_what_the_downward_api_tells_about_the_pod_as_labels_without_overriding_a_label_set_by_hand()
+    {
+        // Arrange
+        using var host = new SidecarSettings().Valid()
+            .With("Sidecar:Pod:Ip", "10.1.2.3")
+            .With("Sidecar:Pod:Node", "node-a")
+            .With("Sidecar:Pod:Namespace", "shop")
+            .With("Sidecar:Labels:namespace", "by-hand")
+            .Build();
+
+        // Act
+        var agent = host.Services.GetRequiredService<AgentLinkOptions>();
+
+        // Assert
+        agent.Labels["pod.ip"].ShouldBe("10.1.2.3");
+        agent.Labels["node"].ShouldBe("node-a");
+        agent.Labels["namespace"].ShouldBe("by-hand");
+    }
+
+    [Fact]
     public void CreateHost_uses_the_host_name_as_instance_id_unless_told_otherwise()
     {
         // Arrange

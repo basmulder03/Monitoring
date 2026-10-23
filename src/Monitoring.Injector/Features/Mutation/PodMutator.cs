@@ -52,6 +52,8 @@ public sealed class PodMutator(InjectorOptions options)
         return patch;
     }
 
+    private static readonly (string Setting, string Field)[] DownwardApi = [("Ip", "status.podIP"), ("Node", "spec.nodeName"), ("Namespace", "metadata.namespace")];
+
     /// <summary>The sidecar container.</summary>
     /// <returns>The container, as the pod spec has it.</returns>
     public JsonObject Sidecar()
@@ -59,6 +61,11 @@ public sealed class PodMutator(InjectorOptions options)
         var env = new JsonArray();
         Append(env, Json($$"""{"name":"MONITORING_Sidecar__Agent","value":{{Quote(options.AgentAddress)}}}"""));
         Append(env, Json($$"""{"name":"MONITORING_Sidecar__Library__Socket","value":"{{SocketPath}}"}"""));
+        foreach (var (setting, field) in DownwardApi)
+        {
+            Append(env, Json($$$$"""{"name":"MONITORING_Sidecar__Pod__{{{{setting}}}}","valueFrom":{"fieldRef":{"fieldPath":"{{{{field}}}}"}}}"""));
+        }
+
         foreach (var (key, value) in options.Labels.OrderBy(label => label.Key, StringComparer.Ordinal))
         {
             Append(env, Json($$"""{"name":"MONITORING_Sidecar__Labels__{{key}}","value":{{Quote(value)}}}"""));

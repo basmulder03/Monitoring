@@ -8,13 +8,19 @@ Usage: deploy/injector/check-definition.py        (needs helm and PyYAML)
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 
 import yaml
 
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-chart = os.path.join(root, "deploy", "helm", "test", "sample-app")
+# Rendered from a copy, so the packaged dependency of an earlier run (which can belong to another user) never gets in the way.
+workdir = tempfile.mkdtemp()
+shutil.copytree(os.path.join(root, "deploy", "helm", "test"), os.path.join(workdir, "test"), ignore=shutil.ignore_patterns("charts"))
+shutil.copytree(os.path.join(root, "deploy", "helm", "monitoring-sidecar"), os.path.join(workdir, "monitoring-sidecar"))
+chart = os.path.join(workdir, "test", "sample-app")
 subprocess.run(["helm", "dependency", "update"], cwd=chart, check=True, stdout=subprocess.DEVNULL)
 rendered = subprocess.run(["helm", "template", "t", "."], cwd=chart, check=True, capture_output=True, text=True).stdout
 

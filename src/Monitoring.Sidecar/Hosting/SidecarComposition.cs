@@ -47,6 +47,17 @@ internal static class SidecarComposition
                 options.InstanceId = sidecar.Text("InstanceId", options.InstanceId);
                 options.Labels = new Dictionary<string, string>(sidecar.Map("Labels"));
 
+                // What the Downward API tells about the pod; a label of the same name that was set by hand wins.
+                var pod = sidecar.Section("Pod");
+                foreach (var (label, setting) in new[] { ("pod.ip", "Ip"), ("node", "Node"), ("namespace", "Namespace") })
+                {
+                    var value = pod.Text(setting, "");
+                    if (value.Length > 0)
+                    {
+                        options.Labels.TryAdd(label, value);
+                    }
+                }
+
                 var reconnect = sidecar.Section("Reconnect");
                 options.ReconnectMinDelay = reconnect.Duration("MinDelay", options.ReconnectMinDelay);
                 options.ReconnectMaxDelay = reconnect.Duration("MaxDelay", options.ReconnectMaxDelay);

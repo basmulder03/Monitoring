@@ -55,6 +55,12 @@
       value: {{ default "monitoring-agent:9441" $m.agentAddress | quote }}
     - name: MONITORING_Sidecar__Library__Socket
       value: /var/run/monitoring/monitoring.sock
+    - name: MONITORING_Sidecar__Pod__Ip
+      valueFrom: { fieldRef: { fieldPath: status.podIP } }
+    - name: MONITORING_Sidecar__Pod__Node
+      valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+    - name: MONITORING_Sidecar__Pod__Namespace
+      valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
     {{- range $key, $value := $m.labels }}
     - name: MONITORING_Sidecar__Labels__{{ $key }}
       value: {{ $value | quote }}
