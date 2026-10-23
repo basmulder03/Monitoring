@@ -54,17 +54,17 @@ public class ScaleBudgetTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public async Task A_snapshot_of_a_hundred_instances_with_fifty_series_each_is_far_below_the_frame_limit()
+    public async Task A_snapshot_of_a_thousand_instances_with_fifty_series_each_fits_in_a_frame_with_room_to_spare()
     {
         // Arrange
-        var snapshot = new Snapshot(1, "scope", [.. Enumerable.Range(0, 100).Select(Instance)]);
+        var snapshot = new Snapshot(1, "scope", [.. Enumerable.Range(0, 1000).Select(Instance)]);
         using var stream = new MemoryStream();
 
         // Act
         await FrameCodec.WriteAsync(stream, snapshot, ct: TestContext.Current.CancellationToken);
 
         // Assert
-        output.WriteLine($"100 instances x {SeriesPerInstance} series: {stream.Length / 1024.0:F0} KB per snapshot (limit {FrameCodec.DefaultMaxFrameBytes / 1024} KB)");
-        stream.Length.ShouldBeLessThan(FrameCodec.DefaultMaxFrameBytes / 2, "a namespace of this size must fit with room to spare");
+        output.WriteLine($"1000 instances x {SeriesPerInstance} series: {stream.Length / 1024.0:F0} KB per snapshot (limit {FrameCodec.DefaultMaxFrameBytes / 1024} KB)");
+        stream.Length.ShouldBeLessThan(FrameCodec.DefaultMaxFrameBytes / 2, "a namespace of a thousand instances must fit with room to spare");
     }
 }

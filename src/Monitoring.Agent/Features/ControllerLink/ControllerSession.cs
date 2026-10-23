@@ -108,7 +108,7 @@ internal sealed class ControllerSession(
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
         try
         {
-            var reply = await FrameCodec.ReadAsync(stream, options.MaxFrameBytes, linked.Token).ConfigureAwait(false);
+            var reply = await FrameCodec.ReadAsync(stream, Math.Min(options.MaxFrameBytes, FrameCodec.HandshakeMaxFrameBytes), linked.Token).ConfigureAwait(false);
             if (reply is Config config)
             {
                 return config;

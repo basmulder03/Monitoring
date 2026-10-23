@@ -12,8 +12,14 @@ public static class FrameCodec
 {
     /// <summary>Size in bytes of the length prefix.</summary>
     public const int HeaderSize = 4;
-    /// <summary>Default upper bound for a frame payload, which protects a peer from unbounded allocation.</summary>
-    public const int DefaultMaxFrameBytes = 1024 * 1024;
+    /// <summary>
+    /// Default upper bound for a frame payload, which protects a peer from unbounded allocation. A snapshot of a whole scope is the largest frame:
+    /// a hundred instances with fifty series each take about 460 KB, so this leaves room for several thousand instances.
+    /// </summary>
+    public const int DefaultMaxFrameBytes = 16 * 1024 * 1024;
+
+    /// <summary>Upper bound for the first frame of a connection, read before the peer has proved who it is: a hello or the configuration that answers it.</summary>
+    public const int HandshakeMaxFrameBytes = 64 * 1024;
 
     /// <summary>Writes one message as a single frame and flushes the stream.</summary>
     /// <param name="stream">Destination stream.</param>

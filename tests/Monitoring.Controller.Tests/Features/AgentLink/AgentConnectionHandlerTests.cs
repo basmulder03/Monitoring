@@ -12,6 +12,7 @@ using Monitoring.Protocol.Framing;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Instances;
 using Monitoring.Protocol.Messages;
+using Monitoring.Protocol.Reports;
 using Monitoring.Protocol.Versioning;
 using Shouldly;
 using Xunit;
@@ -392,6 +393,40 @@ public class AgentConnectionHandlerTests
 
         // Assert
         reply.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task HandleAsync_refuses_a_first_frame_larger_than_a_hello_needs_before_reading_it()
+    {
+        // Arrange
+        var session = new HandlerFixture().WithToken(Token, Scope).Build();
+        var header = new byte[FrameCodec.HeaderSize];
+        BinaryPrimitives.WriteInt32BigEndian(header, FrameCodec.HandshakeMaxFrameBytes + 1);
+
+        // Act
+        await session.SendRawAsync(header);
+        var reply = await session.ReceiveAsync();
+
+        // Assert
+        reply.ShouldBeNull();
+        await session.Handling.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task HandleAsync_accepts_the_snapshot_of_a_scope_with_a_thousand_instances_of_fifty_series_each()
+    {
+        // Arrange
+        var session = await new HandlerFixture().WithToken(Token, Scope).Build().HandshakeAsync(Token);
+        IReadOnlyList<MetricSeries> series = [.. Enumerable.Range(0, 50).Select(i => new MetricSeries($"http.server.request.duration.series{i}", new Dictionary<string, string> { ["route"] = "/orders" }, i))];
+        var instances = Enumerable.Range(0, 1000).Select(i => HandlerFixture.Instance($"orders-{i:D5}-7d9f8b6c5d-x7k2p") with { Metrics = series }).ToList();
+
+        // Act
+        await session.SendAsync(new Snapshot(1, Scope, instances));
+        var reply = await session.ReceiveAsync();
+
+        // Assert
+        reply.ShouldBeOfType<Ack>().Sequence.ShouldBe(1);
+        session.Registry.GetInstances(Scope).Count.ShouldBe(1000);
     }
 
     [Fact]

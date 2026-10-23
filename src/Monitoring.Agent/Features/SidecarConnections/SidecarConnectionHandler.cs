@@ -99,7 +99,7 @@ internal sealed class SidecarConnectionHandler(
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
         try
         {
-            first = await FrameCodec.ReadAsync(stream, options.MaxFrameBytes, linked.Token).ConfigureAwait(false);
+            first = await FrameCodec.ReadAsync(stream, Math.Min(options.MaxFrameBytes, FrameCodec.HandshakeMaxFrameBytes), linked.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested && !ct.IsCancellationRequested)
         {
