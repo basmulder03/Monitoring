@@ -1,0 +1,40 @@
+image:
+  repository: monitoring-injector
+  tag: ""            # defaults to the chart's appVersion
+  pullPolicy: IfNotPresent
+
+# Two replicas, so that a pod that is replaced does not leave pods unmonitored. When the webhook cannot be reached pods start without the sidecar (failurePolicy
+# Ignore) and are shown as unmonitored in the dashboard; monitoring must never stop an application from starting.
+replicas: 2
+failurePolicy: Ignore
+
+# What is added to a pod. The same sidecar as the library chart includes; a test checks that the two are the same.
+sidecar:
+  image: { repository: monitoring-sidecar, tag: "" }
+  imagePullPolicy: IfNotPresent
+  agentAddress: monitoring-agent:9441     # the Service of the agent of the namespace
+  nativeSidecar: true                     # false on Kubernetes before 1.29
+  labels: {}                              # free-form labels the sidecar sends with the registration
+
+# Namespaces that are never changed, besides the one the injector runs in.
+excludedNamespaces: [kube-system, kube-public]
+
+# The certificate the API server checks the webhook with.
+tls:
+  # generate         makes a certificate for the service when the chart is installed or upgraded; fine to try it out, but it changes with every upgrade
+  # certManager      asks cert-manager (needs issuerRef), which also keeps the certificate of the webhook up to date
+  # openshift        lets the service CA of OpenShift make and inject it
+  # existingSecret   uses a secret with tls.crt and tls.key you made, and the caBundle that signed it
+  mode: generate
+  existingSecret: ""
+  caBundle: ""                            # base64, for existingSecret
+  issuerRef: { name: "", kind: ClusterIssuer }
+
+resources:
+  requests: { cpu: 25m, memory: 32Mi }
+  limits: { memory: 128Mi }
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}

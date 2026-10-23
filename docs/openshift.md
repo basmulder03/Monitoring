@@ -18,6 +18,10 @@ The sidecar and the application talk through a Unix socket on a shared in-memory
 
 The sidecar is a native sidecar (an init container with `restartPolicy: Always`), which needs Kubernetes 1.29, so OpenShift 4.16 or later. On an older cluster set `monitoring.nativeSidecar: false` in the application chart. The sidecar then becomes a second container and retries until the application is up.
 
+## The injector
+
+To add the sidecar to applications whose chart you do not own, install `deploy/helm/monitoring-injector` as a cluster administrator with `--set tls.mode=openshift`, which lets the service CA of OpenShift make the certificate of the webhook and put its authority in the registration. See [the injector](configuration.md#the-injector). The injector runs under the restricted security context like the other components, and needs nothing beyond the registration itself.
+
 ## Getting traffic in
 
 The charts create Services only. Routes carry HTTP and TLS, nothing else, so they fit the two ways in:

@@ -1,5 +1,5 @@
-# One Dockerfile for the three executables: docker build --build-arg PROJECT=Controller -f deploy/Dockerfile .
-# PROJECT is Controller, Agent or Sidecar (or SampleApp with PROJECT_PATH=samples/Monitoring.SampleApp). The result is a Native AOT binary on a minimal image that runs as a non-root user.
+# One Dockerfile for the executables: docker build --build-arg PROJECT=Controller -f deploy/Dockerfile .
+# PROJECT is Controller, Agent, Sidecar or Injector (or SampleApp with PROJECT_PATH=samples/Monitoring.SampleApp). The result is a Native AOT binary on a minimal image that runs as a non-root user.
 # On OpenShift, which starts the container with an arbitrary user of group 0, nothing needs to be written outside the volumes it is given.
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build

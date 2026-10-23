@@ -55,6 +55,33 @@ has 'serviceAccountName: monitoring-controller' "$out" "the controller must run 
 lacks 'MONITORING_Controller__AgentTokens' "$out" "no agent tokens are needed with service account authentication"
 lacks 'system:auth-delegator' "$(helm template t monitoring-controller "${controller[@]}")" "the controller must not get the right when it is not used"
 
+# The injector: a webhook registration that is cluster-wide, never stops a pod from starting, and asks for the right certificate.
+out="$(helm template t monitoring-injector -n monitoring)"
+has 'kind: MutatingWebhookConfiguration' "$out" "the injector needs a webhook registration"
+has 'failurePolicy: Ignore' "$out" "a webhook that is down must not stop pods from starting"
+has 'path: /mutate/namespace' "$out" "the registration for namespaces must say it comes from the namespace"
+has 'monitoring/inject: "true"' "$out" "the registrations must select on the label"
+has 'runAsNonRoot: true' "$out" "the injector must not run as root"
+has 'kind: Secret' "$out" "a certificate must be made in the generate mode"
+out="$(helm template t monitoring-injector -n monitoring --set tls.mode=certManager --set tls.issuerRef.name=ca)"
+has 'kind: Certificate' "$out" "cert-manager must be asked for a certificate"
+has 'cert-manager.io/inject-ca-from: monitoring/monitoring-injector' "$out" "cert-manager must put its authority in the registration"
+lacks 'kind: Secret' "$out" "cert-manager makes the secret itself"
+out="$(helm template t monitoring-injector -n monitoring --set tls.mode=openshift)"
+has 'inject-cabundle' "$out" "OpenShift must put its service authority in the registration"
+has 'serving-cert-secret-name' "$out" "OpenShift must make the certificate of the service"
+has "tls.caBundle" "$(helm template t monitoring-injector --set tls.mode=existingSecret --set tls.existingSecret=x 2>&1 || true)" "your own certificate needs the authority that signed it"
+out="$(helm template t monitoring-injector -n monitoring --set failurePolicy=Fail --set 'excludedNamespaces={a,b}')"
+has 'failurePolicy: Fail' "$out" "the failure policy must be settable"
+has '"a","b","monitoring"' "$out" "excluded namespaces and the namespace of the injector must never be changed"
+
+# The sidecar the injector adds must be the one the library chart includes.
+if command -v python3 >/dev/null 2>&1 && python3 -c 'import yaml' 2>/dev/null && command -v helm >/dev/null 2>&1; then
+  python3 "$root/../injector/check-definition.py" || fail "the injector and the Helm template add different sidecars"
+else
+  echo "skipped: the check that the injector and the template add the same sidecar needs python3 with PyYAML, and helm"
+fi
+
 # The sidecar template, in a chart that uses it.
 (
   cd test/sample-app

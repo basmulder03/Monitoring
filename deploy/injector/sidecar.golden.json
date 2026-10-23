@@ -1,0 +1,61 @@
+{
+  "sidecar": {
+    "name": "monitoring-sidecar",
+    "image": "monitoring-sidecar:0.1.0",
+    "imagePullPolicy": "IfNotPresent",
+    "restartPolicy": "Always",
+    "securityContext": {
+      "allowPrivilegeEscalation": false,
+      "readOnlyRootFilesystem": true,
+      "capabilities": {
+        "drop": [
+          "ALL"
+        ]
+      }
+    },
+    "env": [
+      {
+        "name": "MONITORING_Sidecar__Agent",
+        "value": "monitoring-agent:9441"
+      },
+      {
+        "name": "MONITORING_Sidecar__Library__Socket",
+        "value": "/var/run/monitoring/monitoring.sock"
+      },
+      {
+        "name": "MONITORING_Sidecar__Labels__team",
+        "value": "orders"
+      }
+    ],
+    "volumeMounts": [
+      {
+        "name": "monitoring-socket",
+        "mountPath": "/var/run/monitoring"
+      }
+    ],
+    "resources": {
+      "requests": {
+        "cpu": "10m",
+        "memory": "16Mi"
+      },
+      "limits": {
+        "memory": "64Mi"
+      }
+    }
+  },
+  "volume": {
+    "name": "monitoring-socket",
+    "emptyDir": {
+      "medium": "Memory",
+      "sizeLimit": "1Mi"
+    }
+  },
+  "appEnv": {
+    "name": "MONITORING_SOCKET",
+    "value": "/var/run/monitoring/monitoring.sock"
+  },
+  "appMount": {
+    "name": "monitoring-socket",
+    "mountPath": "/var/run/monitoring"
+  }
+}

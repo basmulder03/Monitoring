@@ -46,12 +46,13 @@ build() { docker build -q --build-arg PROJECT="$1" ${3:+--build-arg PROJECT_PATH
 build Controller monitoring-controller
 build Agent monitoring-agent
 build Sidecar monitoring-sidecar
+build Injector monitoring-injector
 build SampleApp monitoring-sampleapp samples/Monitoring.SampleApp
 
 step "Cluster"
 kind delete cluster --name "$cluster" >/dev/null 2>&1 || true
 kind create cluster --name "$cluster" --wait 120s >/dev/null
-for image in monitoring-controller monitoring-agent monitoring-sidecar monitoring-sampleapp; do
+for image in monitoring-controller monitoring-agent monitoring-sidecar monitoring-injector monitoring-sampleapp; do
   kind load docker-image "$image:dev" --name "$cluster" >/dev/null
 done
 
@@ -140,6 +141,60 @@ rolling() { api /api/scopes/shop | grep -q 'Rolling out: 2 replicas exist for 1 
 eventually 150 rolling || fail "the stuck rollout did not show on the pod that still serves"
 kubectl rollout undo deployment/orders -n shop >/dev/null
 kubectl rollout status deployment/orders -n shop --timeout=120s >/dev/null || fail "the rollout could not be undone"
+echo "ok"
+
+step "The injector adds the sidecar to the pods of a namespace that asks, and only to those"
+helm install monitoring-injector "$root/deploy/helm/monitoring-injector" -n monitoring \
+  --set image.repository=monitoring-injector --set image.tag=dev --set image.pullPolicy=Never \
+  --set sidecar.image.repository=monitoring-sidecar --set sidecar.image.tag=dev --set sidecar.imagePullPolicy=Never \
+  --set sidecar.agentAddress=monitoring-agent:9441 >/dev/null
+kubectl rollout status deployment/monitoring-injector -n monitoring --timeout=120s >/dev/null || fail "the injector did not become ready"
+
+# A plain application, without anything of monitoring in its manifest but the client in its code, in a namespace that has not asked yet.
+plain() { # name [label]
+  kubectl create deployment "$1" -n shop --image=monitoring-sampleapp:dev --dry-run=client -o json \
+    | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+pod = d['spec']['template']
+pod['spec']['containers'][0]['imagePullPolicy'] = 'Never'
+pod['spec']['containers'][0]['env'] = [{'name': 'SERVICE_NAME', 'value': '$1'}]
+if '${2:-}':
+    pod['metadata'].setdefault('labels', {})['monitoring/inject'] = '${2:-}'
+json.dump(d, sys.stdout)" | kubectl apply -f - >/dev/null
+}
+initnames() { kubectl get pod -n shop -l "app=$1" -o jsonpath='{.items[*].spec.initContainers[*].name}'; }
+plain before
+kubectl rollout status deployment/before -n shop --timeout=120s >/dev/null || fail "the application did not start"
+[ -z "$(initnames before)" ] || fail "a pod of a namespace that did not ask got a sidecar"
+
+kubectl label namespace shop monitoring/inject=true >/dev/null
+plain after
+plain optout false
+kubectl rollout status deployment/after -n shop --timeout=120s >/dev/null || fail "the application did not start after the namespace asked"
+kubectl rollout status deployment/optout -n shop --timeout=120s >/dev/null || fail "the pod that opted out did not start"
+[ "$(initnames after)" = "monitoring-sidecar" ] || fail "the pod of the namespace that asked did not get the sidecar (got '$(initnames after)')"
+[ -z "$(initnames optout)" ] || fail "a pod that opted out got a sidecar"
+shows() { api /api/scopes/shop | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+sys.exit(0 if any(s['name'] == 'after' and any(i['health'] == 'Healthy' and any(c['role'] == 'MonitoringSidecar' for c in i['containers']) for i in s['instances']) for s in d['services']) else 1)"; }
+eventually 120 shows || fail "the application that got its sidecar from the injector is not monitored"
+echo "ok"
+
+step "A pod that opts in with its own label is injected in a namespace that did not ask"
+kubectl label namespace shop monitoring/inject- >/dev/null
+plain labelled true
+kubectl rollout status deployment/labelled -n shop --timeout=120s >/dev/null || fail "the labelled application did not start"
+[ "$(initnames labelled)" = "monitoring-sidecar" ] || fail "a pod with the label did not get the sidecar (got '$(initnames labelled)')"
+echo "ok"
+
+step "Pods still start while the injector is down"
+kubectl scale deployment/monitoring-injector -n monitoring --replicas=0 >/dev/null
+kubectl wait --for=delete pod -l app.kubernetes.io/name=monitoring-injector -n monitoring --timeout=60s >/dev/null 2>&1 || true
+plain late true
+kubectl rollout status deployment/late -n shop --timeout=120s >/dev/null || fail "a pod could not start while the injector was down"
+[ -z "$(initnames late)" ] || fail "a pod got a sidecar from an injector that is down"
 echo "ok"
 
 echo

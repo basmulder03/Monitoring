@@ -570,3 +570,30 @@ The agent keeps the last values of the metrics of each instance, so the dashboar
 | `Agent:MetricsHistory:MaxSeriesPerInstance` | `200` | Series kept per instance; further ones are not recorded, which bounds the memory of an application that makes up new series without end |
 
 The history of an instance is dropped when its sidecar disconnects. The request is part of protocol version 2; a controller never sends it to an agent that announced version 1.
+
+
+## The injector
+
+The Helm template of the sidecar needs a change in the chart of every application. For applications whose chart you do not own, a small web server, the injector, adds the sidecar to a pod when it is created, the way a service mesh does. Install it once per cluster, as a cluster administrator, because the registration of the webhook is cluster-wide (`deploy/helm/monitoring-injector`):
+
+```sh
+helm install monitoring-injector deploy/helm/monitoring-injector -n monitoring \
+  --set sidecar.agentAddress=monitoring-agent:9441
+kubectl label namespace shop monitoring/inject=true     # every new pod of the namespace gets the sidecar
+```
+
+- **Who is changed.** A pod is given the sidecar when its namespace carries the label `monitoring/inject=true`, or the pod carries it itself, and not when the pod carries `monitoring/inject=false`. Only new pods are changed, so roll the deployments of a namespace after labelling it. The namespace of the injector itself and the ones under `excludedNamespaces` (by default `kube-system` and `kube-public`) are never changed.
+- **What is added.** The sidecar as a native sidecar (Kubernetes 1.29 and later; `sidecar.nativeSidecar=false` makes it a second container), a small in-memory volume for the socket, and for each container of the pod the volume and the variable `MONITORING_SOCKET`. This is the same sidecar the library chart includes: both are checked against one golden file (`deploy/injector/sidecar.golden.json`), so a pod does not depend on how it got its sidecar. The agent of the namespace has to be there, at `sidecar.agentAddress`.
+- **It never stops a pod.** The failure policy is `Ignore` by default, so when the injector is down pods start without the sidecar, and show up under "Pods without a monitoring sidecar" on the System page. Run two replicas (the default). With `failurePolicy=Fail` a pod that cannot be checked is refused, which keeps everything monitored and makes the injector a dependency of the whole cluster; be sure before you choose it.
+- **It does not make the application monitored by itself.** The application still needs the monitoring client in its code; the sidecar only carries what the client reports.
+- **Certificate.** The API server only talks to a webhook over TLS and has to trust its certificate: `tls.mode=generate` (the default) makes one when the chart is installed or upgraded and is meant for trying it out, `certManager` asks cert-manager (`tls.issuerRef`) and keeps it renewed, `openshift` lets the service CA of OpenShift make it, and `existingSecret` uses a secret you made together with the `tls.caBundle` that signed it. The injector reads the certificate when it starts, so new pods are needed after a renewal.
+
+| Setting (environment variable `MONITORING_Injector__...`) | Default | Meaning |
+| --- | --- | --- |
+| `SidecarImage` | required | The image of the sidecar |
+| `ImagePullPolicy` | `IfNotPresent` | When the image of the sidecar is pulled |
+| `AgentAddress` | `monitoring-agent:9441` | The agent of the namespace, as the sidecar reaches it |
+| `NativeSidecar` | `true` | A native sidecar, or an ordinary second container |
+| `Labels:<name>` | none | Labels the sidecar sends with the registration |
+| `Certificate`, `Key` | required | The PEM files with the certificate and the key |
+| `Web:Address`, `Web:Port` | `0.0.0.0`, `8443` | Where the webhook listens |

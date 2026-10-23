@@ -21,6 +21,7 @@ docker build --build-arg PROJECT=Sidecar    -t monitoring-sidecar    -f deploy/D
 | --- | --- |
 | `deploy/helm/monitoring-controller` | The controller as a stateful set of identical replicas, each with an address of its own through a headless service, a service for the dashboard, and the central configuration as a config map. Tokens, aligned packages, advisories and transport security are values |
 | `deploy/helm/monitoring-agent` | The agent of one namespace: a single replica, a service for the sidecars, and a role that can only read pods of its own namespace |
+| `deploy/helm/monitoring-injector` | The injector: a webhook that adds the sidecar to the pods of the namespaces and pods that carry the label `monitoring/inject=true`, for applications whose chart you do not own. It needs a cluster administrator, because the webhook registration is cluster-wide. See [the injector](../docs/configuration.md#the-injector) |
 | `deploy/helm/monitoring-sidecar` | A library chart: the sidecar for the chart of any application, as a native sidecar (Kubernetes 1.29 and later, OpenShift 4.16 and later) or, with `nativeSidecar: false`, as a second container |
 
 ```sh
@@ -41,6 +42,6 @@ An application chart gets monitored by depending on `monitoring-sidecar` and inc
 - Agents inside the cluster reach the replicas through the addresses of the stateful set. For agents in other clusters, give one address per replica in `replicaAddresses`, for example the host of a route per replica; that needs `tls` or `mtls`.
 - `deploy/helm/test.sh` lints and renders the charts and checks what they must contain; CI runs it. It uses Helm when installed and Docker otherwise.
 
-On OpenShift, see [docs/openshift.md](../docs/openshift.md): the security context, Routes and network policies. The label-based injector (#45) is not here yet.
+On OpenShift, see [docs/openshift.md](../docs/openshift.md): the security context, Routes and network policies. 
 
 For Windows servers, see [docs/windows.md](../docs/windows.md); `deploy/windows` holds the installation script, a script that tests it, and an Ansible playbook.

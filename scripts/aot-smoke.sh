@@ -62,4 +62,19 @@ curl -fsS "http://127.0.0.1:$web_port/api/sbom" >/dev/null
 curl -fsS "http://127.0.0.1:$web_port/api/vulnerabilities" >/dev/null
 
 kill -0 "$sidecar" 2>/dev/null || { echo "The sidecar stopped"; false; }
+
+# The injector answers an admission review over TLS, and adds the sidecar for a pod of a namespace that asked.
+injector_port=$((40000 + RANDOM % 10000))
+openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=localhost" -keyout "$logs/injector.key" -out "$logs/injector.crt" >/dev/null 2>&1
+MONITORING_Injector__SidecarImage=monitoring-sidecar:smoke MONITORING_Injector__Certificate="$logs/injector.crt" MONITORING_Injector__Key="$logs/injector.key" \
+  MONITORING_Injector__Web__Address=127.0.0.1 MONITORING_Injector__Web__Port="$injector_port" \
+  "$root/Injector/Monitoring.Injector" >"$logs/injector.log" 2>&1 &
+pids+=($!)
+for _ in $(seq 1 50); do
+  curl -fsSk "https://127.0.0.1:$injector_port/healthz" >/dev/null 2>&1 && break
+  sleep 0.2
+done
+review='{"apiVersion":"admission.k8s.io/v1","kind":"AdmissionReview","request":{"uid":"smoke","object":{"metadata":{"name":"p"},"spec":{"containers":[{"name":"app","image":"a:1"}]}}}}'
+answer="$(curl -fsSk -H 'Content-Type: application/json' -d "$review" "https://127.0.0.1:$injector_port/mutate/namespace")"
+echo "$answer" | grep -q '"patchType":"JSONPatch"' || { echo "The injector did not answer with a patch: $answer"; false; }
 echo "AOT smoke test passed"

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: monitoring-injector
+description: Adds the monitoring sidecar to the pods of the namespaces and pods that ask for it, with a label, so that applications whose chart you do not own can be monitored too.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
