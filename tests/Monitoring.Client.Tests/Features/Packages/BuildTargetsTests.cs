@@ -145,9 +145,9 @@ public class BuildTargetsTests
             {
                 System.IO.Directory.Delete(_directory, recursive: true);
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                // A temporary folder that stays behind is harmless.
+                // A temporary folder that stays behind is harmless; on Windows the assembly the test loaded keeps its file locked.
             }
         }
     }

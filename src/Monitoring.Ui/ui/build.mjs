@@ -1,13 +1,16 @@
 // Bundles the dashboard into the files the controller embeds: app.js, styles.css and index.html in ../wwwroot.
 import { build } from "esbuild";
 import { copyFile, mkdir } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 const out = new URL("../wwwroot/", import.meta.url);
+// A path, not the pathname of the address: on Windows that one reads /D:/..., which is no folder.
+const outdir = fileURLToPath(out);
 await mkdir(out, { recursive: true });
 
 await build({
   entryPoints: { app: "src/main.tsx" },
-  outdir: out.pathname,
+  outdir,
   bundle: true,
   minify: true,
   target: "es2022",
@@ -21,7 +24,7 @@ await build({
 // Not minified: the style sheet is small, and the tests read the design tokens from it.
 await build({
   entryPoints: { styles: "src/styles/index.css" },
-  outdir: out.pathname,
+  outdir,
   bundle: true,
   logLevel: "info",
 });
