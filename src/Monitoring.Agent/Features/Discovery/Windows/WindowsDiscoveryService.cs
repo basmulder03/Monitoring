@@ -14,13 +14,17 @@ namespace Monitoring.Agent.Features.Discovery.Windows;
 /// <param name="options">The allowlist and the interval.</param>
 /// <param name="time">Clock for the interval.</param>
 /// <param name="logger">Receives failures.</param>
+/// <param name="probe">Measures the machine and the processes of the services; optional, without it only the state of the services is shown.</param>
 internal sealed class WindowsDiscoveryService(
-    IServiceControlManager manager, IScopeStateStore store, WindowsDiscoveryOptions options, TimeProvider time, ILogger<WindowsDiscoveryService> logger)
+    IServiceControlManager manager, IScopeStateStore store, WindowsDiscoveryOptions options, TimeProvider time, ILogger<WindowsDiscoveryService> logger, IHostProbe? probe = null)
     : BackgroundService
 {
     private readonly Dictionary<string, InstanceInfo> _known = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, (WindowsServiceState Last, int Restarts)> _seen = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ProcessSample?> _processes = new(StringComparer.OrdinalIgnoreCase);
     private PeriodicTimer? _timer;
+    private DateTimeOffset _measuredAt = DateTimeOffset.MinValue;
+    private InstanceInfo? _host;
 
     /// <inheritdoc />
     public override Task StartAsync(CancellationToken cancellationToken)
@@ -51,10 +55,19 @@ internal sealed class WindowsDiscoveryService(
             return;
         }
 
+        var listed = services.Where(Listed).ToList();
+        Measure(listed);
+
         var current = new Dictionary<string, InstanceInfo>(StringComparer.OrdinalIgnoreCase);
-        foreach (var service in services.Where(Listed))
+        foreach (var service in listed)
         {
-            current[service.Name] = WindowsServiceMapper.Map(service, CountRestarts(service));
+            current[service.Name] = WindowsServiceMapper.Map(service, CountRestarts(service), _processes.GetValueOrDefault(service.Name));
+        }
+
+        // The machine itself, which is not a service and so is not on the allowlist.
+        if (_host is not null)
+        {
+            current[_host.Id] = _host;
         }
 
         foreach (var instance in current.Values)
@@ -86,6 +99,31 @@ internal sealed class WindowsDiscoveryService(
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
             // Shutdown requested.
+        }
+    }
+
+    /// <summary>Measures the machine and the processes of the running listed services, when it is time to.</summary>
+    private void Measure(List<WindowsServiceStatus> listed)
+    {
+        var now = time.GetUtcNow();
+        if (probe is null || now - _measuredAt < options.MeasureInterval)
+        {
+            return;
+        }
+
+        _measuredAt = now;
+        try
+        {
+            _host = HostMapper.Map(probe.ReadHost());
+            _processes.Clear();
+            foreach (var service in listed.Where(service => service.ProcessId is not null))
+            {
+                _processes[service.Name] = probe.ReadProcess(service.ProcessId!.Value);
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            logger.LogWarning("Cannot measure the machine: {Reason}", ex.Message);
         }
     }
 

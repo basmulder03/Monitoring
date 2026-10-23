@@ -14,7 +14,8 @@ internal static class WindowsServiceMapper
     /// <param name="service">The service as the Service Control Manager reports it.</param>
     /// <param name="restarts">How many times the agent has seen the service start again after it was not running.</param>
     /// <returns>The instance.</returns>
-    public static InstanceInfo Map(WindowsServiceStatus service, int restarts)
+    /// <param name="process">What the process of the service uses; <see langword="null"/> when it does not run or cannot be read.</param>
+    public static InstanceInfo Map(WindowsServiceStatus service, int restarts, ProcessSample? process = null)
     {
         var (lifecycle, health) = service.State switch
         {
@@ -39,7 +40,21 @@ internal static class WindowsServiceMapper
                 ["windows.start-type"] = service.StartType.ToString(),
             },
             Checks: service.State == WindowsServiceState.Stopped ? [new HealthCheckResult("windows service", HealthState.Unhealthy, CauseOfStop(service))] : null,
-            Metrics: [new MetricSeries(RestartsMetric, new Dictionary<string, string>(), restarts)]);
+            Metrics: Metrics(restarts, process));
+    }
+
+    private static List<MetricSeries> Metrics(int restarts, ProcessSample? process)
+    {
+        var none = new Dictionary<string, string>();
+        List<MetricSeries> metrics = [new(RestartsMetric, none, restarts)];
+        if (process is not null)
+        {
+            metrics.Add(new MetricSeries("windows.process.memory_bytes", none, process.MemoryBytes));
+            metrics.Add(new MetricSeries("windows.process.threads", none, process.Threads));
+            metrics.Add(new MetricSeries("windows.process.handles", none, process.Handles));
+        }
+
+        return metrics;
     }
 
     private static string CauseOfStop(WindowsServiceStatus service) => service.StartType switch

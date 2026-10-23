@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.ServiceProcess;
 
 namespace Monitoring.Agent.Features.Discovery.Windows;
@@ -13,7 +14,7 @@ internal sealed class ServiceControlManager : IServiceControlManager
         try
         {
             return [.. services.Select(service => new WindowsServiceStatus(
-                service.ServiceName, service.DisplayName, (WindowsServiceState)(int)service.Status, StartTypeOf(service)))];
+                service.ServiceName, service.DisplayName, (WindowsServiceState)(int)service.Status, StartTypeOf(service), ProcessIdOf(service)))];
         }
         finally
         {
@@ -23,6 +24,48 @@ internal sealed class ServiceControlManager : IServiceControlManager
             }
         }
     }
+
+    /// <summary>The process id of a running service, which the Service Control Manager knows and <see cref="ServiceController"/> does not say.</summary>
+    private static int? ProcessIdOf(ServiceController service)
+    {
+        if (service.Status != ServiceControllerStatus.Running)
+        {
+            return null;
+        }
+
+        try
+        {
+            var handle = service.ServiceHandle;
+            var found = QueryServiceStatusEx(handle.DangerousGetHandle(), ScStatusProcessInfo, out var status, Marshal.SizeOf<ServiceStatusProcess>(), out _);
+            GC.KeepAlive(handle);
+            return found && status.ProcessId != 0 ? (int)status.ProcessId : null;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            // A service this account may not open has no process to show.
+            return null;
+        }
+    }
+
+    private const int ScStatusProcessInfo = 0;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ServiceStatusProcess
+    {
+        public uint ServiceType;
+        public uint CurrentState;
+        public uint ControlsAccepted;
+        public uint Win32ExitCode;
+        public uint ServiceSpecificExitCode;
+        public uint CheckPoint;
+        public uint WaitHint;
+        public uint ProcessId;
+        public uint ServiceFlags;
+    }
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool QueryServiceStatusEx(IntPtr service, int infoLevel, out ServiceStatusProcess status, int bufferSize, out int bytesNeeded);
 
     private static WindowsServiceStartType StartTypeOf(ServiceController service)
     {

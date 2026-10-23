@@ -344,6 +344,7 @@ On a Windows server the agent runs as one process per machine and the machine is
 | --- | --- | --- |
 | `Agent:Discovery:Windows:Services` | none | The services to show, each an exact service name or a prefix ending in `*`, without regard to case. Only these are shown, because a server runs hundreds of services and few matter; with an empty list nothing is shown |
 | `Agent:Discovery:Windows:PollInterval` | `00:00:05` | How often the Service Control Manager is asked |
+| `Agent:Discovery:Windows:MeasureInterval` | `00:00:30` | How often the machine and the processes of the listed services are measured, which is slower because those figures change all the time |
 
 | Service | Instance |
 | --- | --- |
@@ -355,7 +356,13 @@ On a Windows server the agent runs as one process per machine and the machine is
 | Stopped | Unhealthy, with a check `windows service` that says why: the start type is Automatic so it should be running, or it is Disabled, or the start type is Manual |
 | Removed from the machine | Gone |
 
-The metric `windows.service.restarts` counts how often a service came back to Running after the agent saw it in another state; the first sighting counts for nothing, so the count starts at zero when the agent starts. It runs only on Windows, and asking for it elsewhere stops the agent from starting. Process data (memory, threads, handles) and the pipe the application library connects over are separate slices.
+The metric `windows.service.restarts` counts how often a service came back to Running after the agent saw it in another state; the first sighting counts for nothing, so the count starts at zero when the agent starts. It runs only on Windows, and asking for it elsewhere stops the agent from starting.
+
+**The machine** is shown as an instance of its own, named after the machine, in the service `windows-host`, whether or not it is on the allowlist. It carries the metrics `host.uptime_seconds`, `host.cpu_percent` (from the second measurement on), `host.memory_total_bytes`, `host.memory_available_bytes`, `host.pending_reboot` (1 while Windows waits for a restart to finish an update or installation) and, per fixed disk, `host.disk_total_bytes` and `host.disk_free_bytes` tagged `drive`. A disk with less than 10% free makes the host Degraded and one with less than 3% Unhealthy, with a check that names the disk. The operating system is the label `windows.os`.
+
+**The processes** of the listed services that are running carry `windows.process.memory_bytes` (working set), `windows.process.threads` and `windows.process.handles`. A service that shares a process, such as one of the many that run in `svchost`, shows the figures of that whole process.
+
+Clock skew is not measured: the agent has no trusted time to compare with. The pipe the application library connects over is a separate slice.
 
 ### Sidecars
 

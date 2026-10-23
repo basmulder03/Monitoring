@@ -5,7 +5,8 @@ namespace Monitoring.Agent.Features.Discovery.Windows;
 /// <param name="DisplayName">The name shown in the Services console.</param>
 /// <param name="State">What the service is doing.</param>
 /// <param name="StartType">How the service is started.</param>
-internal sealed record WindowsServiceStatus(string Name, string DisplayName, WindowsServiceState State, WindowsServiceStartType StartType);
+/// <param name="ProcessId">The process the service runs in; <see langword="null"/> while it does not run.</param>
+internal sealed record WindowsServiceStatus(string Name, string DisplayName, WindowsServiceState State, WindowsServiceStartType StartType, int? ProcessId = null);
 
 /// <summary>What a Windows service is doing. The numbers are the ones Windows uses, which start at 1.</summary>
 public enum WindowsServiceState : byte

@@ -47,6 +47,7 @@ public static class DiscoverySlice
     private static void AddWindows(IServiceCollection services, WindowsDiscoveryOptions options)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.PollInterval, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.MeasureInterval, TimeSpan.Zero);
         if (options.Services.Any(string.IsNullOrWhiteSpace))
         {
             throw new ArgumentException("A service in the list must have a name.", nameof(options));
@@ -56,6 +57,7 @@ public static class DiscoverySlice
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton(options);
         services.AddSingleton<IServiceControlManager>(_ => new ServiceControlManager());
+        services.AddSingleton<IHostProbe>(_ => new WindowsHostProbe());
         services.AddHostedService<WindowsDiscoveryService>();
     }
 

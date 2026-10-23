@@ -108,6 +108,7 @@ internal static class AgentComposition
         var windows = discovery.Section("Windows");
         options.Windows.Services = [.. windows.List("Services")];
         options.Windows.PollInterval = windows.Duration("PollInterval", options.Windows.PollInterval);
+        options.Windows.MeasureInterval = windows.Duration("MeasureInterval", options.Windows.MeasureInterval);
 
         var kubernetes = discovery.Section("Kubernetes");
         options.Kubernetes.Namespace = kubernetes.Optional("Namespace");

@@ -9,6 +9,9 @@ public sealed class WindowsDiscoveryOptions
     /// </summary>
     public List<string> Services { get; set; } = [];
 
+    /// <summary>How often the machine and the processes of the listed services are measured; slower than the services are asked, because the figures change all the time.</summary>
+    public TimeSpan MeasureInterval { get; set; } = TimeSpan.FromSeconds(30);
+
     /// <summary>How often the Service Control Manager is asked.</summary>
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(5);
 }
