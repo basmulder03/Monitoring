@@ -40,6 +40,9 @@ internal static class ControllerComposition
         yield return new("monitoring.controller.agents_connected", none, status.AgentsConnected);
         yield return new("monitoring.controller.event_clients", none, status.EventClients);
         yield return new("monitoring.controller.memory_bytes", none, status.MemoryBytes);
+        yield return new("monitoring.controller.frames_per_second", none, status.FramesPerSecond);
+        yield return new("monitoring.controller.instances", none, status.Instances);
+        yield return new("monitoring.controller.series", none, status.Series);
         yield return new("monitoring.controller.healthy", none, status.Healthy ? 1 : 0);
         if (status.AlertEvaluationMilliseconds is { } took)
         {

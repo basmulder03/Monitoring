@@ -4,7 +4,7 @@ import { all, mount, overview, scope } from "./harness";
 
 const status = (extra: Partial<SystemStatus> = {}): SystemStatus => ({
   replica: "monitoring-controller-0", uptimeSeconds: 600, scopes: 2, agentsConnected: 2, eventClients: 1, alertEvaluationMilliseconds: 3.2,
-  memoryBytes: 41943040, healthy: true, replicas: [], unmonitored: [], ...extra,
+  memoryBytes: 41943040, healthy: true, replicas: [], unmonitored: [], framesPerSecond: 12.5, instances: 40, series: 1200, ...extra,
 });
 
 async function openSystem(data: SystemStatus | null) {
@@ -17,6 +17,14 @@ async function openSystem(data: SystemStatus | null) {
 }
 
 describe("the system view", () => {
+  it("shows how busy the agents keep the replica and what it holds", async () => {
+    const page = await openSystem(status());
+
+    const text = page.main.textContent ?? "";
+    expect(text).toContain("12.5 per second");
+    expect(text).toContain("40 instances, 1200 metric series");
+  });
+
   it("shows each replica with how many agents are connected and how far behind it is, and marks the one that answers", async () => {
     const page = await openSystem(status({
       replicas: [

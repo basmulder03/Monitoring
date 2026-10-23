@@ -12,4 +12,7 @@ public interface ISystemTelemetry
     /// <summary>Records how long the latest run of the alert rules took.</summary>
     /// <param name="took">The duration.</param>
     void AlertsEvaluated(TimeSpan took);
+
+    /// <summary>Records that a frame arrived from an agent.</summary>
+    void FrameReceived();
 }

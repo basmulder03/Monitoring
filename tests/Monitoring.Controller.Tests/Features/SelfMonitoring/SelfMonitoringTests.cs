@@ -40,6 +40,32 @@ public class SelfMonitoringTests
     }
 
     [Fact]
+    public void Read_reports_the_frames_per_second_over_the_latest_window_and_the_size_of_what_is_held()
+    {
+        // Arrange
+        var time = new FakeTimeProvider();
+        var telemetry = new SystemTelemetry(TwoScopes(), new FakeAgentLiveness(), time);
+        for (var frame = 0; frame < 50; frame++)
+        {
+            telemetry.FrameReceived();
+        }
+
+        // Act
+        var early = telemetry.Read();
+        time.Advance(TimeSpan.FromSeconds(10));
+        var later = telemetry.Read();
+        time.Advance(TimeSpan.FromSeconds(1));
+        var sameWindow = telemetry.Read();
+
+        // Assert
+        early.FramesPerSecond.ShouldBe(0);
+        later.FramesPerSecond.ShouldBe(5);
+        sameWindow.FramesPerSecond.ShouldBe(5);
+        later.Instances.ShouldBe(2);
+        later.Series.ShouldBe(0);
+    }
+
+    [Fact]
     public void Read_reports_the_open_streams_the_latest_evaluation_and_the_uptime()
     {
         // Arrange

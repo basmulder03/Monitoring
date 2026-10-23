@@ -10,6 +10,9 @@ namespace Monitoring.Controller.Features.SelfMonitoring;
 /// <param name="MemoryBytes">The memory in use by the process.</param>
 /// <param name="Healthy">Whether every scope has a live agent and every agent is connected to every replica it knows.</param>
 /// <param name="Replicas">Every controller replica the agents connect to, with how many agents are connected and how far behind the replica is.</param>
+/// <param name="FramesPerSecond">How many frames the agents sent per second, over the last few seconds.</param>
+/// <param name="Instances">How many instances this replica holds.</param>
+/// <param name="Series">How many metric series those instances carry, which is what most of the memory goes to.</param>
 /// <param name="Unmonitored">Pods that run without a monitoring sidecar, so nothing is known of the application in them.</param>
 public sealed record SystemStatus(
     string Replica,
@@ -21,7 +24,10 @@ public sealed record SystemStatus(
     long MemoryBytes,
     bool Healthy,
     IReadOnlyList<ReplicaState> Replicas,
-    IReadOnlyList<UnmonitoredInstance> Unmonitored);
+    IReadOnlyList<UnmonitoredInstance> Unmonitored,
+    double FramesPerSecond,
+    int Instances,
+    long Series);
 
 /// <summary>One controller replica, as the agents see it.</summary>
 /// <param name="Address">The replica as <c>host:port</c>, as the agents connect to it.</param>

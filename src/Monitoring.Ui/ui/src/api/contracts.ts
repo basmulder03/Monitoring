@@ -156,6 +156,9 @@ export interface SystemStatus {
   healthy: boolean;
   replicas: ReplicaState[];
   unmonitored: UnmonitoredInstance[];
+  framesPerSecond: number;
+  instances: number;
+  series: number;
 }
 
 export interface TopologyEdge {

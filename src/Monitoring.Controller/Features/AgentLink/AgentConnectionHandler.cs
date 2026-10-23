@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Monitoring.Controller.Features.Configuration;
 using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Registry;
+using Monitoring.Controller.Features.SelfMonitoring;
 using Monitoring.Controller.Features.Security;
 using Monitoring.Protocol.Framing;
 using Monitoring.Protocol.Messages;
@@ -28,6 +29,7 @@ namespace Monitoring.Controller.Features.AgentLink;
 /// <param name="time">Clock for the hello timeout.</param>
 /// <param name="logger">Receives the reasons a connection was refused or ended.</param>
 /// <param name="connections">Keeps the live connections so requests can reach them; optional.</param>
+/// <param name="telemetry">Told about every frame that arrives, for the System view; optional.</param>
 internal sealed class AgentConnectionHandler(
     IAgentAuthenticator authenticator,
     IScopeRegistry registry,
@@ -38,7 +40,8 @@ internal sealed class AgentConnectionHandler(
     AgentLinkOptions options,
     TimeProvider time,
     ILogger<AgentConnectionHandler> logger,
-    AgentConnections? connections = null)
+    AgentConnections? connections = null,
+    ISystemTelemetry? telemetry = null)
 {
     /// <summary>Serves the connection until the agent leaves, misbehaves or the controller shuts down.</summary>
     /// <param name="stream">The connection to the agent.</param>
@@ -277,7 +280,13 @@ internal sealed class AgentConnectionHandler(
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, silence.Token);
         try
         {
-            return await FrameCodec.ReadAsync(stream, options.MaxFrameBytes, linked.Token).ConfigureAwait(false);
+            var message = await FrameCodec.ReadAsync(stream, options.MaxFrameBytes, linked.Token).ConfigureAwait(false);
+            if (message is not null)
+            {
+                telemetry?.FrameReceived();
+            }
+
+            return message;
         }
         catch (OperationCanceledException) when (silence.IsCancellationRequested && !ct.IsCancellationRequested)
         {

@@ -14,6 +14,15 @@ internal sealed class SystemTelemetry(IScopeRegistry registry, IAgentLiveness li
     private readonly long _started = time.GetTimestamp();
     private int _eventClients;
     private long _evaluationTicks = -1;
+    private long _frames;
+
+    private readonly Lock _rate = new();
+    private long _sampledAt = time.GetTimestamp();
+    private long _sampledFrames;
+    private double _framesPerSecond;
+
+    /// <summary>How long the frames are counted before the rate is worked out again.</summary>
+    private static readonly TimeSpan RateWindow = TimeSpan.FromSeconds(5);
 
     /// <inheritdoc />
     public void EventClientConnected() => Interlocked.Increment(ref _eventClients);
@@ -23,6 +32,27 @@ internal sealed class SystemTelemetry(IScopeRegistry registry, IAgentLiveness li
 
     /// <inheritdoc />
     public void AlertsEvaluated(TimeSpan took) => Interlocked.Exchange(ref _evaluationTicks, took.Ticks);
+
+    /// <inheritdoc />
+    public void FrameReceived() => Interlocked.Increment(ref _frames);
+
+    /// <summary>The frames per second over the latest window of at least five seconds; every reader sees the same number, however often they ask.</summary>
+    private double FramesPerSecond()
+    {
+        lock (_rate)
+        {
+            var elapsed = time.GetElapsedTime(_sampledAt);
+            if (elapsed >= RateWindow)
+            {
+                var frames = Interlocked.Read(ref _frames);
+                _framesPerSecond = (frames - _sampledFrames) / elapsed.TotalSeconds;
+                _sampledAt = time.GetTimestamp();
+                _sampledFrames = frames;
+            }
+
+            return _framesPerSecond;
+        }
+    }
 
     /// <summary>Reads the state of this replica now.</summary>
     /// <returns>The state.</returns>
@@ -43,7 +73,10 @@ internal sealed class SystemTelemetry(IScopeRegistry registry, IAgentLiveness li
             Environment.WorkingSet,
             connected == scopes.Count && replicas.All(replica => replica.AgentsConnected == replica.AgentsReporting),
             replicas,
-            UnmonitoredOf(instances));
+            UnmonitoredOf(instances),
+            FramesPerSecond(),
+            instances.Count,
+            instances.Sum(entry => (long)(entry.Instance.Metrics?.Count ?? 0)));
     }
 
     /// <summary>Every replica the agents connect to, put together from what each agent says about it.</summary>

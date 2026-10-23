@@ -579,7 +579,7 @@ Both report through the pipeline they already use, as metrics (no settings; the 
 
 **Towards each controller replica** the agent reports, tagged with the replica as `replica=host:port`, whether it is connected (`replica_connected`, 1 or 0) and, while it is, how many changes of its scope the replica has not yet acknowledged (`replica_lag`). A replica that is never reached shows as 0 and one that is taken out of the list disappears. Because every replica receives this from every agent, each of them can show the state of all of them without talking to the others.
 
-**The System page** of the dashboard (and the tile on the overview) shows this controller replica, then every replica the agents connect to with how many agents are connected and how far behind it is, then the pods that run without a monitoring sidecar. A replica that is behind or that an agent cannot reach raises the alerts `replica-behind` and `replica-unreachable` on any controller that sees it, including the others when one replica is down.
+**The System page** of the dashboard (and the tile on the overview) shows this controller replica (with the frames per second the agents send, measured over windows of five seconds, and how many instances and metric series it holds), then every replica the agents connect to with how many agents are connected and how far behind it is, then the pods that run without a monitoring sidecar. A replica that is behind or that an agent cannot reach raises the alerts `replica-behind` and `replica-unreachable` on any controller that sees it, including the others when one replica is down.
 
 ## Prometheus export
 
@@ -590,7 +590,7 @@ Each of the controller, the agent and the sidecar can serve its own values in th
 | `Controller:Prometheus:Port`, `Agent:Prometheus:Port`, `Sidecar:Prometheus:Port` | `0` (off) | The port that serves `GET /metrics` |
 | `Controller:Prometheus:Address`, `Agent:Prometheus:Address`, `Sidecar:Prometheus:Address` | `127.0.0.1` | The IP address to listen on. Local only until you change it; there is no authentication, so put it on a network you trust |
 
-The values are the ones described under "What the agent and the sidecar report about themselves", and for the controller the System view (`monitoring_controller_uptime_seconds`, `scopes`, `agents_connected`, `event_clients`, `memory_bytes`, `healthy` and `alert_evaluation_ms`). Dots in names become underscores, and every value is exposed as a gauge. The controller serves it from its own listener, not the dashboard's port.
+The values are the ones described under "What the agent and the sidecar report about themselves", and for the controller the System view (`monitoring_controller_uptime_seconds`, `scopes`, `agents_connected`, `event_clients`, `memory_bytes`, `healthy`, `alert_evaluation_ms`, `frames_per_second`, `instances` and `series`). Dots in names become underscores, and every value is exposed as a gauge. The controller serves it from its own listener, not the dashboard's port.
 
 ## Metric history
 

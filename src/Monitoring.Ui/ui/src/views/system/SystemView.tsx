@@ -27,6 +27,8 @@ export function SystemView({ refresh }: { refresh: unknown }) {
           <tr><th scope="row">Agents connected</th><td>{status.agentsConnected} of {status.scopes}</td></tr>
           <tr><th scope="row">Open dashboards</th><td>{status.eventClients}</td></tr>
           <tr><th scope="row">Alert evaluation</th><td>{status.alertEvaluationMilliseconds === null ? "not yet" : `${status.alertEvaluationMilliseconds.toFixed(1)} ms`}</td></tr>
+          <tr><th scope="row">Frames from agents</th><td>{status.framesPerSecond.toFixed(1)} per second</td></tr>
+          <tr><th scope="row">Held</th><td>{plural(status.instances, "instance", "instances")}, {plural(status.series, "metric series", "metric series")}</td></tr>
           <tr><th scope="row">Memory</th><td>{(status.memoryBytes / 1048576).toFixed(0)} MB</td></tr>
         </tbody>
       </table>
