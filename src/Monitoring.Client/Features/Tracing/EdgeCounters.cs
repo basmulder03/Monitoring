@@ -10,6 +10,18 @@ internal sealed class EdgeCounters(int maxEdges)
     private readonly Lock _gate = new();
     private readonly Dictionary<(string Type, string Target), Counter> _edges = [];
 
+    /// <summary>How many dependencies are counted now; at the limit, calls to further ones are not counted.</summary>
+    public int Count
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _edges.Count;
+            }
+        }
+    }
+
     /// <summary>Counts one finished call.</summary>
     /// <param name="type">Kind of dependency.</param>
     /// <param name="target">Which dependency.</param>

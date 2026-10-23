@@ -13,6 +13,18 @@ internal sealed class SpanBuffer(int capacity)
     /// <summary>How many spans were pushed out before anyone read them, which shows the buffer is too small for the traffic.</summary>
     public long Dropped { get; private set; }
 
+    /// <summary>How many spans are kept now.</summary>
+    public int Count
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return (int)Math.Min(_last, capacity);
+            }
+        }
+    }
+
     /// <summary>Adds a span, numbering it.</summary>
     /// <param name="build">Creates the span from the number it was given.</param>
     public void Add(Func<long, SpanReport> build)

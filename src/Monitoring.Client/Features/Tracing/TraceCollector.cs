@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Hosting;
 using Monitoring.Client.Features.LocalServer;
 using Monitoring.Protocol.Reports;
@@ -25,6 +26,7 @@ internal sealed class TraceCollector(MonitoringOptions options, EdgeCounters edg
     ];
 
     private ActivityListener? _listener;
+    private Meter? _meter;
 
     /// <summary>Starts listening.</summary>
     /// <param name="cancellationToken">Cancels the start.</param>
@@ -35,6 +37,12 @@ internal sealed class TraceCollector(MonitoringOptions options, EdgeCounters edg
         {
             return Task.CompletedTask;
         }
+
+        // What the library tells about itself: whether it keeps up. A rising number of dropped spans says the buffer is too small for the traffic.
+        _meter = new Meter("Monitoring.Client.Tracing");
+        _meter.CreateObservableGauge("monitoring.client.spans_buffered", () => spans.Count, description: "Spans kept in memory for drill-down.");
+        _meter.CreateObservableCounter("monitoring.client.spans_dropped", () => spans.Dropped, description: "Spans overwritten before anyone read them.");
+        _meter.CreateObservableGauge("monitoring.client.edges", () => edges.Count, description: "Dependencies counted; calls to further ones are ignored at the limit.");
 
         var sources = options.TraceSources.ToHashSet(StringComparer.Ordinal);
         _listener = new ActivityListener
@@ -61,6 +69,8 @@ internal sealed class TraceCollector(MonitoringOptions options, EdgeCounters edg
     {
         _listener?.Dispose();
         _listener = null;
+        _meter?.Dispose();
+        _meter = null;
     }
 
     private void OnStopped(Activity activity)

@@ -1,3 +1,4 @@
+using System.Diagnostics.Metrics;
 using System.Net.Sockets;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -15,6 +16,8 @@ namespace Monitoring.Client.Features.LocalServer;
 /// <param name="logger">Receives what goes wrong.</param>
 internal sealed class LocalServer(MonitoringOptions options, PullHandler handler, ILogger<LocalServer> logger) : BackgroundService
 {
+    private int _connections;
+
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -35,6 +38,10 @@ internal sealed class LocalServer(MonitoringOptions options, PullHandler handler
             logger.LogWarning("Monitoring is off: cannot listen on {Path}: {Reason}", options.SocketPath, ex.Message);
             return;
         }
+
+        // Whether a sidecar is connected: the state of the socket, for the container of the application.
+        using var meter = new Meter("Monitoring.Client.LocalServer");
+        meter.CreateObservableGauge("monitoring.client.sidecar_connections", () => Volatile.Read(ref _connections), description: "Sidecars connected to the application.");
 
         using (listener)
         {
@@ -108,6 +115,7 @@ internal sealed class LocalServer(MonitoringOptions options, PullHandler handler
     private async Task ServeAsync(Socket client, CancellationToken ct)
     {
         using var stream = new NetworkStream(client, ownsSocket: true);
+        Interlocked.Increment(ref _connections);
         try
         {
             while (await FrameCodec.ReadAsync(stream, ct: ct).ConfigureAwait(false) is { } message)
@@ -134,6 +142,10 @@ internal sealed class LocalServer(MonitoringOptions options, PullHandler handler
         {
             // Whatever a health check does, the application must not be taken down by it.
             logger.LogError(ex, "Answering the sidecar failed");
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _connections);
         }
     }
 }

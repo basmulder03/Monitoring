@@ -13,11 +13,13 @@ namespace Monitoring.Client.Features.Metrics;
 /// Memory is bounded: once <see cref="MonitoringOptions.MaxMetricSeries"/> series exist, new ones are ignored. All members are safe to call from any thread.
 /// </remarks>
 /// <param name="options">Which meters to leave out and how many series to keep.</param>
-internal sealed class MetricsCollector(MonitoringOptions options) : IHostedService, IDisposable
+/// <param name="accept">Narrows the instruments listened to, which a test needs to be sure of what counts towards the limit; every instrument that is not denied when it is <see langword="null"/>.</param>
+internal sealed class MetricsCollector(MonitoringOptions options, Func<Instrument, bool>? accept = null) : IHostedService, IDisposable
 {
     private readonly Lock _gate = new();
     private readonly Dictionary<SeriesKey, double> _values = [];
     private MeterListener? _listener;
+    private Meter? _meter;
 
     /// <summary>Starts listening, which also reports the instruments that already exist.</summary>
     /// <param name="cancellationToken">Cancels the start.</param>
@@ -28,6 +30,9 @@ internal sealed class MetricsCollector(MonitoringOptions options) : IHostedServi
         {
             return Task.CompletedTask;
         }
+
+        _meter = new Meter("Monitoring.Client.Metrics");
+        _meter.CreateObservableGauge("monitoring.client.metric_series", SeriesCount, description: "Metric series kept; at the limit, new ones are ignored.");
 
         var listener = new MeterListener { InstrumentPublished = OnPublished };
         listener.SetMeasurementEventCallback<byte>((i, v, t, _) => Record(i, v, t));
@@ -56,6 +61,16 @@ internal sealed class MetricsCollector(MonitoringOptions options) : IHostedServi
     {
         _listener?.Dispose();
         _listener = null;
+        _meter?.Dispose();
+        _meter = null;
+    }
+
+    private int SeriesCount()
+    {
+        lock (_gate)
+        {
+            return _values.Count;
+        }
     }
 
     /// <summary>Reads the latest value of every series, after asking the observable instruments for theirs.</summary>
@@ -75,7 +90,7 @@ internal sealed class MetricsCollector(MonitoringOptions options) : IHostedServi
 
     private void OnPublished(Instrument instrument, MeterListener listener)
     {
-        if (!IsDenied(instrument.Name))
+        if (!IsDenied(instrument.Name) && (accept?.Invoke(instrument) ?? true))
         {
             listener.EnableMeasurementEvents(instrument);
         }

@@ -465,6 +465,10 @@ using var process = MonitoredMessaging.StartProcess(MonitoredMessaging.ActiveMq,
 
 The graph then shows `sender → queue → receiver`. A message without a usable `traceparent` starts a trace of its own. Without monitoring both calls return `null` and do nothing, so the application code needs no check. The calls have been tested with plain dictionaries as the message, not with a real broker or its library.
 
+### What the library says about itself
+
+The client reports its own state as metrics, which the agent pulls with the rest and which show on the instance: `monitoring.client.spans_buffered` and `spans_dropped` (spans thrown away before anyone read them; a number that keeps rising says `SpanBufferSize` is too small for the traffic), `monitoring.client.edges` (dependencies counted; the limit is `MaxEdges`), `monitoring.client.metric_series` (the limit is `MaxMetricSeries`), `monitoring.client.sidecar_connections` (sidecars connected over the socket) and `monitoring.client.agent_connected` (1 while the agent of the machine has accepted the application, over the pipe on Windows).
+
 ### Raw TCP connections
 
 HTTP calls and the calls of database and broker packages that publish activities are counted without any code. For a protocol that has nothing of the sort, open the connection through the client:

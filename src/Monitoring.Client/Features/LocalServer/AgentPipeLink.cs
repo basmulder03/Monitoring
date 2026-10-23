@@ -1,3 +1,4 @@
+using System.Diagnostics.Metrics;
 using System.IO.Pipes;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -31,6 +32,7 @@ internal sealed class AgentPipeLink(
     private static readonly TimeSpan MaxWait = TimeSpan.FromSeconds(30);
 
     private readonly SemaphoreSlim _writing = new(1, 1);
+    private int _connected;
 
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -39,6 +41,10 @@ internal sealed class AgentPipeLink(
         {
             return;
         }
+
+        // Whether the agent has this application on its books, for the container of the application.
+        using var meter = new Meter("Monitoring.Client.AgentPipe");
+        meter.CreateObservableGauge("monitoring.client.agent_connected", () => Volatile.Read(ref _connected), description: "1 while the agent of the machine accepted this application.");
 
         var failures = 0;
         while (!stoppingToken.IsCancellationRequested)
@@ -126,6 +132,7 @@ internal sealed class AgentPipeLink(
         }
 
         logger.LogInformation("Reporting to the monitoring agent on '{Pipe}'", options.AgentPipe);
+        Volatile.Write(ref _connected, 1);
         try
         {
             await BeatAsync(pipe, config, ct).ConfigureAwait(false);
@@ -133,6 +140,10 @@ internal sealed class AgentPipeLink(
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             await SayGoodbyeAsync(pipe, instanceId).ConfigureAwait(false);
+        }
+        finally
+        {
+            Volatile.Write(ref _connected, 0);
         }
 
         return true;

@@ -212,6 +212,7 @@ public class MetricsCollectorTests
     private sealed class CollectorFixture : IDisposable
     {
         private readonly MonitoringOptions _options = new() { Enabled = true };
+        private bool _ownMeterOnly;
 
         public Meter Meter { get; } = new($"test-{Guid.NewGuid():N}");
 
@@ -226,12 +227,15 @@ public class MetricsCollectorTests
         public CollectorFixture WithLimit(int series)
         {
             _options.MaxMetricSeries = series;
+
+            // Only what this test makes counts towards the limit, whatever other tests of the process measure at the same time.
+            _ownMeterOnly = true;
             return this;
         }
 
         public async Task<CollectorFixture> StartAsync()
         {
-            Collector = new MetricsCollector(_options);
+            Collector = new MetricsCollector(_options, _ownMeterOnly ? instrument => instrument.Meter == Meter : null);
             await Collector.StartAsync(Ct);
             return this;
         }
