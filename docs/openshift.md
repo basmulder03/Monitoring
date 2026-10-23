@@ -7,12 +7,12 @@ The charts in `deploy/helm` run on OpenShift 4.16 and later without changes. Thi
 OpenShift starts each container with an arbitrary user id from a range of the namespace, always in group 0. Nothing has to be set for that to work:
 
 - The charts set `runAsNonRoot`, the `RuntimeDefault` seccomp profile, no privilege escalation and no capabilities, and they set **no** `runAsUser`, so OpenShift is free to pick one. Do not set `runAsUser`; the `restricted-v2` security context constraint would reject a fixed id outside the range of the namespace.
-- The images run as user 1654 elsewhere, but do not depend on it: they write nothing outside the volumes they are given, so any user of group 0 works.
+- The images default to user 1654, but nothing depends on that: they write nothing outside the volumes they are given, so any user of group 0 works.
 - The sidecar's root file system is read-only.
 
 ## The socket between the sidecar and the application
 
-The sidecar and the application talk through a Unix socket on a shared in-memory `emptyDir`. The application's client creates the socket with read and write for its user and for its group, and the volume belongs to the group of the pod. Because OpenShift runs the sidecar and the application as different users of the same group 0, both can use it. If the sidecar logs that it cannot reach the library while the application is up, check that both containers mount the same volume, which the `monitoring-sidecar` library chart does for you.
+The sidecar and the application talk through a Unix socket on a shared in-memory `emptyDir`. The application's client creates the socket with read and write for its user and for its group, and the volume belongs to the group of the pod. Because OpenShift runs the sidecar and the application as different users of the same group 0, both can use it. The `monitoring-sidecar` library chart mounts the same volume in both containers; if you write the pod yourself, do the same.
 
 ## Native sidecars
 
