@@ -5,8 +5,17 @@ Feature: Recovery
     Given the environment is running
     And the dashboard shows the service "payments" in the scope "shop" as Healthy within 60 seconds
     When the pod "payments-1" of "payments" is deleted
-    Then the dashboard shows no live instance of the service "payments" in the scope "shop" within 20 seconds
+    Then the dashboard shows 0 instances of the service "payments" in the scope "shop" within 20 seconds
     When the pod "payments-1" of "payments" is created
+    Then the dashboard shows the service "payments" in the scope "shop" as Healthy within 30 seconds
+
+  Scenario: A pod that is not ready is shown as a problem, and as healthy again when it is ready
+    Given the environment is running
+    And the dashboard shows the service "payments" in the scope "shop" as Healthy within 60 seconds
+    When the pod "payments-1" of "payments" is no longer ready
+    Then the dashboard shows the service "payments" in the scope "shop" as Degraded within 20 seconds
+    And the dashboard shows the service "orders" in the scope "shop" as Healthy within 20 seconds
+    When the pod "payments-1" of "payments" is ready again
     Then the dashboard shows the service "payments" in the scope "shop" as Healthy within 30 seconds
 
   Scenario: When the agent of a scope stops, the scope shows that nobody is listening, and recovers when the agent returns
@@ -17,8 +26,23 @@ Feature: Recovery
     When the agent is started
     Then the dashboard shows the service "orders" in the scope "shop" as Healthy within 90 seconds
 
+  Scenario: A scope whose agent stays away raises a critical alert, which ends when the agent returns
+    Given the environment is running
+    And the dashboard shows the service "orders" in the scope "shop" as Healthy within 60 seconds
+    When the agent is stopped
+    Then the dashboard shows the critical alert "scope-unknown" for "shop" within 120 seconds
+    When the agent is started
+    Then the dashboard shows no alert "scope-unknown" within 90 seconds
+
   Scenario: A restarted controller shows every scope again without help
     Given the environment is running
     And the dashboard shows the service "orders" in the scope "shop" as Healthy within 60 seconds
     When the controller is restarted
     Then the dashboard shows the service "orders" in the scope "shop" as Healthy within 90 seconds
+
+  Scenario: A restarted controller does not alarm anyone while the agents report in again
+    Given the environment is running
+    And the dashboard shows the service "orders" in the scope "shop" as Healthy within 60 seconds
+    When the controller is restarted
+    Then the dashboard shows the service "orders" in the scope "shop" as Healthy within 90 seconds
+    And the dashboard shows no alerts within 30 seconds

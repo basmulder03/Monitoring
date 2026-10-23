@@ -23,6 +23,9 @@ public static class MonitoringEnvironment
     /// <summary>The call chain: <c>testapi</c> puts a message on a queue, <c>testworker</c> takes it and asks <c>testdata</c>, which asks a database. The value is the role of the program.</summary>
     public static readonly IReadOnlyDictionary<string, string> Chain = new Dictionary<string, string> { ["testapi"] = "api", ["testworker"] = "worker", ["testdata"] = "data" };
 
+    /// <summary>Every process of the environment that the scenarios wait for.</summary>
+    public static IEnumerable<string> Processes => new[] { Cluster, Controller, Agent }.Concat(Applications).Concat(Chain.Keys);
+
     /// <summary>The queue the chain uses.</summary>
     public const string Queue = "orders";
 
@@ -40,6 +43,14 @@ public static class MonitoringEnvironment
     /// <returns>The folder.</returns>
     public static string StateFolder(string runId) => Path.Combine(Path.GetTempPath(), $"monitoring-e2e-{runId}");
 
+    /// <summary>What the central configuration file holds when nothing has changed it.</summary>
+    public const string DefaultCentralConfiguration = "{ \"defaults\": { \"pullSeconds\": 15, \"edgeFlushSeconds\": 10 } }";
+
+    /// <summary>The central configuration file of the controller, which a specification can rewrite to see the change reach the agent.</summary>
+    /// <param name="runId">Tells this run apart from others on the same machine.</param>
+    /// <returns>The path of the file.</returns>
+    public static string CentralConfiguration(string runId) => Path.Combine(StateFolder(runId), "central.json");
+
     /// <summary>The file whose existence makes an application unhealthy.</summary>
     /// <param name="runId">Tells this run apart from others on the same machine.</param>
     /// <param name="application">The application.</param>
@@ -54,6 +65,7 @@ public static class MonitoringEnvironment
     {
         var state = StateFolder(runId);
         Directory.CreateDirectory(state);
+        File.WriteAllText(CentralConfiguration(runId), DefaultCentralConfiguration);
         var tokenHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(AgentToken)));
 
         // The cluster the agent follows: one pod per application, named like the instance its sidecar registers as.
@@ -82,6 +94,11 @@ public static class MonitoringEnvironment
             // A short grace period and quick liveness, so the specifications do not wait minutes for what a real deployment would.
             .WithEnvironment("MONITORING_Controller__Alerting__StartupGrace", "00:00:05")
             .WithEnvironment("MONITORING_Controller__Alerting__InstanceUnhealthyWait", "00:00:05")
+            .WithEnvironment("MONITORING_Controller__Alerting__ScopeUnknownWait", "00:00:10")
+            .WithEnvironment("MONITORING_Controller__Configuration__File", CentralConfiguration(runId))
+            .WithEnvironment("MONITORING_Controller__Configuration__PollInterval", "00:00:01")
+            .WithHttpEndpoint(name: "metrics", env: "MONITORING_Controller__Prometheus__Port")
+            .WithEnvironment("MONITORING_Controller__Prometheus__Address", "127.0.0.1")
             .WithEnvironment("MONITORING_Controller__Dashboard__PushInterval", "00:00:00.5");
 
         var agentsEndpoint = controller.GetEndpoint("agents");
