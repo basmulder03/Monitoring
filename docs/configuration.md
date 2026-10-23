@@ -274,11 +274,11 @@ For example `/tv?filter=environment:prod&rotate=45&views=overview,dependencies&t
 
 ### Discovery
 
-The agent learns which instances exist from the platform it runs on. `Agent:Discovery:Kind` is `none` (the default) or `kubernetes`.
+The agent learns which instances exist from the platform it runs on. `Agent:Discovery:Kind` is `none` (the default), `kubernetes` or `windows`.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `Agent:Discovery:Kind` | `none` | Where instances come from: `none` or `kubernetes` |
+| `Agent:Discovery:Kind` | `none` | Where instances come from: `none`, `kubernetes` or `windows` |
 | `Agent:Discovery:Kubernetes:Namespace` | namespace of the pod | The namespace whose pods become instances |
 | `Agent:Discovery:Kubernetes:ApiServer` | in-cluster address | Address of the API server, for example `https://10.0.0.1:443` |
 | `Agent:Discovery:Kubernetes:TokenFile` | in-cluster token file | File with the service account token, read again for every request because Kubernetes rotates it |
@@ -335,6 +335,27 @@ How a pod becomes an instance:
 ```
 
 with the token in the environment: `MONITORING_Agent__Token=...`.
+
+### Windows services
+
+On a Windows server the agent runs as one process per machine and the machine is the scope; its labels come from `Agent:Labels` in the local configuration file like any other agent. With `Agent:Discovery:Kind` set to `windows` it asks the Service Control Manager every few seconds and shows the services you list, even when the application behind them knows nothing of the monitoring client.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Agent:Discovery:Windows:Services` | none | The services to show, each an exact service name or a prefix ending in `*`, without regard to case. Only these are shown, because a server runs hundreds of services and few matter; with an empty list nothing is shown |
+| `Agent:Discovery:Windows:PollInterval` | `00:00:05` | How often the Service Control Manager is asked |
+
+| Service | Instance |
+| --- | --- |
+| Name | Instance id and service name; the display name, state and start type are labels (`windows.display-name`, `windows.state`, `windows.start-type`) |
+| Running | Healthy |
+| Paused | Degraded |
+| Start or continue pending | Starting, health Unknown |
+| Stop or pause pending | Terminating, health Unknown |
+| Stopped | Unhealthy, with a check `windows service` that says why: the start type is Automatic so it should be running, or it is Disabled, or the start type is Manual |
+| Removed from the machine | Gone |
+
+The metric `windows.service.restarts` counts how often a service came back to Running after the agent saw it in another state; the first sighting counts for nothing, so the count starts at zero when the agent starts. It runs only on Windows, and asking for it elsewhere stops the agent from starting. Process data (memory, threads, handles) and the pipe the application library connects over are separate slices.
 
 ### Sidecars
 

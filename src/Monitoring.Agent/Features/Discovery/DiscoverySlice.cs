@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Monitoring.Agent.Features.Discovery.Kubernetes;
+using Monitoring.Agent.Features.Discovery.Windows;
 
 namespace Monitoring.Agent.Features.Discovery;
 
@@ -30,9 +31,32 @@ public static class DiscoverySlice
                 AddKubernetes(services, options.Kubernetes);
                 return services;
 
+            case DiscoveryKind.Windows when OperatingSystem.IsWindows():
+                AddWindows(services, options.Windows);
+                return services;
+
+            case DiscoveryKind.Windows:
+                throw new ArgumentException("Discovery of Windows services only works on Windows.", nameof(configure));
+
             default:
                 throw new ArgumentOutOfRangeException(nameof(configure), options.Kind, "Unknown kind of discovery.");
         }
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private static void AddWindows(IServiceCollection services, WindowsDiscoveryOptions options)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.PollInterval, TimeSpan.Zero);
+        if (options.Services.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new ArgumentException("A service in the list must have a name.", nameof(options));
+        }
+
+        services.AddLogging();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton(options);
+        services.AddSingleton<IServiceControlManager>(_ => new ServiceControlManager());
+        services.AddHostedService<WindowsDiscoveryService>();
     }
 
     private static void AddKubernetes(IServiceCollection services, KubernetesDiscoveryOptions options)

@@ -8,4 +8,7 @@ public sealed class DiscoveryOptions
 
     /// <summary>Settings used when <see cref="Kind"/> is <see cref="DiscoveryKind.Kubernetes"/>.</summary>
     public KubernetesDiscoveryOptions Kubernetes { get; set; } = new();
+
+    /// <summary>Settings used when <see cref="Kind"/> is <see cref="DiscoveryKind.Windows"/>.</summary>
+    public WindowsDiscoveryOptions Windows { get; set; } = new();
 }

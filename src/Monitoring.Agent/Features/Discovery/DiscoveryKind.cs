@@ -8,4 +8,7 @@ public enum DiscoveryKind : byte
 
     /// <summary>The pods of a Kubernetes namespace, through the Kubernetes API.</summary>
     Kubernetes,
+
+    /// <summary>The Windows services of the machine the agent runs on, through the Service Control Manager.</summary>
+    Windows,
 }

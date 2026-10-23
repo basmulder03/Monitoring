@@ -101,8 +101,13 @@ internal static class AgentComposition
         {
             "none" => DiscoveryKind.None,
             "kubernetes" => DiscoveryKind.Kubernetes,
-            var other => throw new ConfigurationException($"Setting 'Agent:Discovery:Kind' must be 'none' or 'kubernetes', but is '{other}'."),
+            "windows" => DiscoveryKind.Windows,
+            var other => throw new ConfigurationException($"Setting 'Agent:Discovery:Kind' must be 'none', 'kubernetes' or 'windows', but is '{other}'."),
         };
+
+        var windows = discovery.Section("Windows");
+        options.Windows.Services = [.. windows.List("Services")];
+        options.Windows.PollInterval = windows.Duration("PollInterval", options.Windows.PollInterval);
 
         var kubernetes = discovery.Section("Kubernetes");
         options.Kubernetes.Namespace = kubernetes.Optional("Namespace");

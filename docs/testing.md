@@ -37,6 +37,17 @@ export NODE_OPTIONS=--use-system-ca
 
 Proxy settings for downloads come from `HTTPS_PROXY`, and for npm from the usual `.npmrc`. The lockfile names the public npm registry; npm swaps in the registry you have configured.
 
+## Windows
+
+Code that talks to Windows (the Service Control Manager and the like) has tests that skip themselves with an explanation anywhere else. To run them on a Windows machine, publish the test project for it, which works from Linux too, copy the folder over and start the executable:
+
+```sh
+dotnet publish tests/Monitoring.Agent.Tests -c Release -r win-x64 --self-contained -p:PublishAot=false -o out
+# on Windows:  Monitoring.Agent.Tests.exe -class "Monitoring.Agent.Tests.Features.Discovery.Windows.ServiceControlManagerTests"
+```
+
+The numbers Windows uses are not the ones a Linux test can guess: the states of a service start at 1, for example, and an enum that counted from 0 passed every Linux test while it was wrong on the real thing. A mapping of a Windows value therefore needs a test that runs there.
+
 ## Budgets
 
 The executables that run next to applications have to stay small. Two checks keep them that way.
