@@ -42,7 +42,14 @@ internal sealed class SidecarConnectionHandler(
     /// <param name="stream">The connection to the sidecar.</param>
     /// <param name="ct">Ends the connection when the agent shuts down.</param>
     /// <returns>A task that completes when the connection has ended; it does not throw for connection problems.</returns>
-    public async Task HandleAsync(Stream stream, CancellationToken ct)
+    public Task HandleAsync(Stream stream, CancellationToken ct) => HandleAsync(stream, null, ct);
+
+    /// <summary>Serves the connection like <see cref="HandleAsync(Stream, CancellationToken)"/>, but lets the caller decide who the sender is once it has introduced itself.</summary>
+    /// <param name="stream">The connection to the sidecar.</param>
+    /// <param name="admit">Receives the hello and returns the one to go by, for example with the instance id of the platform's view; <see langword="null"/> refuses the connection.</param>
+    /// <param name="ct">Ends the connection when the agent shuts down.</param>
+    /// <returns>A task that completes when the connection has ended; it does not throw for connection problems.</returns>
+    public async Task HandleAsync(Stream stream, Func<Hello, Hello?>? admit, CancellationToken ct)
     {
         var connection = Guid.NewGuid();
         Hello? registered = null;
@@ -50,6 +57,20 @@ internal sealed class SidecarConnectionHandler(
         try
         {
             registered = await ReadHelloAsync(stream, ct).ConfigureAwait(false);
+            if (registered is not null && admit is not null)
+            {
+                var admitted = admit(registered);
+                if (admitted is null)
+                {
+                    logger.LogWarning("Closing connection: the sender of instance '{Instance}' is not one of the services this agent reports", registered.InstanceId);
+                    registered = null;
+                }
+                else
+                {
+                    registered = admitted;
+                }
+            }
+
             if (registered is null)
             {
                 return;

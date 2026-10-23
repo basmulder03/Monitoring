@@ -15,6 +15,16 @@ public sealed class MonitoringOptions
             ? fromEnvironment
             : "/var/run/monitoring/monitoring.sock";
 
+    /// <summary>Environment variable that names the pipe of the monitoring agent on this machine.</summary>
+    public const string AgentPipeVariable = "MONITORING_AGENT_PIPE";
+
+    /// <summary>
+    /// The named pipe of the monitoring agent of this machine, which the application connects to and reports through, as it does through a sidecar on Kubernetes.
+    /// Defaults to the value of <c>MONITORING_AGENT_PIPE</c>, else <c>monitoring-agent</c> on Windows and none elsewhere; blank turns it off.
+    /// </summary>
+    public string? AgentPipe { get; set; } =
+        Environment.GetEnvironmentVariable(AgentPipeVariable) is { } named ? named : OperatingSystem.IsWindows() ? "monitoring-agent" : null;
+
     /// <summary>Whether the client runs. Defaults to <see langword="false"/> when <c>MONITORING_DISABLED</c> is <c>true</c>.</summary>
     public bool Enabled { get; set; } =
         !string.Equals(Environment.GetEnvironmentVariable(DisabledVariable), "true", StringComparison.OrdinalIgnoreCase);

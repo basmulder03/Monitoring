@@ -64,6 +64,28 @@ internal sealed class ApplicationHost(string instanceId) : IAsyncDisposable
         return this;
     }
 
+    /// <summary>Starts the application reporting over a named pipe to the agent of the machine, as on a Windows server, where there is no sidecar.</summary>
+    public ApplicationHost StartOverPipe(string pipeName)
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.Logging.ClearProviders();
+        builder.Services.AddMonitoring(o =>
+        {
+            o.SocketPath = _socket;
+            o.AgentPipe = pipeName;
+            o.ServiceName = "orders";
+            o.Version = "1.2.3";
+        });
+        foreach (var (name, status) in _checks)
+        {
+            builder.Services.AddHealthChecks().AddCheck(name, () => new HealthCheckResult(status, $"{name} is {status}"));
+        }
+
+        _application = builder.Build();
+        _application.StartAsync().GetAwaiter().GetResult();
+        return this;
+    }
+
     /// <summary>Stops the sidecar the way a pod shutdown does, so it says goodbye.</summary>
     public async Task StopSidecarAsync()
     {

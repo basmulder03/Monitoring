@@ -55,6 +55,7 @@ public static class MonitoringExtensions
         services.AddSingleton<IPullSource, PackagesPullSource>();
         services.TryAddSingleton<PullHandler>();
         services.AddHostedService<LocalServer>();
+        services.AddHostedService<AgentPipeLink>();
         return services;
     }
 }

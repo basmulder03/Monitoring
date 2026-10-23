@@ -83,14 +83,15 @@ internal static class AgentComposition
 
         // Sidecars only exist next to pods, so by default the agent listens for them only when it discovers Kubernetes pods.
         var sidecars = agent.Section("Sidecars");
-        var kubernetes = agent.Section("Discovery").Text("Kind", "none").Equals("kubernetes", StringComparison.OrdinalIgnoreCase);
-        if (sidecars.Text("Enabled", kubernetes ? "true" : "false").Equals("true", StringComparison.OrdinalIgnoreCase))
+        var kind = agent.Section("Discovery").Text("Kind", "none").ToLowerInvariant();
+        var windows = kind == "windows";
+        if (sidecars.Text("Enabled", kind is "kubernetes" or "windows" ? "true" : "false").Equals("true", StringComparison.OrdinalIgnoreCase))
         {
-            builder.Services.AddSidecarConnections(options => ReadSidecars(sidecars, options));
+            builder.Services.AddSidecarConnections(options => ReadSidecars(sidecars, options, windows));
         }
     }
 
-    private static void ReadSidecars(SettingsReader sidecars, SidecarConnectionsOptions options)
+    private static void ReadSidecars(SettingsReader sidecars, SidecarConnectionsOptions options, bool windows)
     {
         var listen = sidecars.Section("Listen");
         options.ListenAddress = listen.Text("Address", options.ListenAddress);
@@ -99,6 +100,10 @@ internal static class AgentComposition
         options.HeartbeatInterval = sidecars.Duration("HeartbeatInterval", options.HeartbeatInterval);
         options.MissedHeartbeats = sidecars.Int("MissedHeartbeats", options.MissedHeartbeats);
         options.HealthPullInterval = sidecars.Duration("HealthPullInterval", options.HealthPullInterval);
+        // On a Windows server the applications connect over a pipe, so no port is opened unless asked for.
+        options.TcpEnabled = listen.Text("Enabled", windows ? "false" : "true").Equals("true", StringComparison.OrdinalIgnoreCase);
+        options.PipeName = sidecars.Section("Pipe").Optional("Name") ?? (windows ? "monitoring-agent" : null);
+        options.PipeAllow = [.. sidecars.Section("Pipe").List("Allow")];
     }
 
     private static void ReadDiscovery(SettingsReader discovery, DiscoveryOptions options)

@@ -21,6 +21,34 @@ public class ApplicationToControllerTests
     private const string FastPulls = """{ "defaults": { "pullSeconds": 1, "edgeFlushSeconds": 1 } }""";
 
     [Fact]
+    public async Task An_application_on_a_windows_server_reports_over_the_pipe_through_the_agent_to_the_controller()
+    {
+        // Arrange
+        var pipe = $"mon-agent-{Guid.NewGuid():N}";
+        await using var controller = new ControllerHost().AcceptingEnrollment(Token).WithCentralConfiguration(FastPulls).Start();
+        await using var agent = new AgentHost("server-1", Token).ConnectingTo(controller)
+            .With("Agent:Sidecars:Enabled", "true")
+            .With("Agent:Sidecars:Listen:Port", "0")
+            .With("Agent:Sidecars:Listen:Address", "127.0.0.1")
+            .With("Agent:Sidecars:Pipe:Name", pipe)
+            .With("Agent:Sidecars:HeartbeatInterval", "00:00:01").Start();
+        agent.Report($"pid-{Environment.ProcessId}");
+
+        // Act
+        await using var application = new ApplicationHost("ignored").WithCheck("database", HealthStatus.Unhealthy).StartOverPipe(pipe);
+
+        // Assert
+        await Eventually.AssertAsync(() =>
+        {
+            var instance = controller.Registry.GetInstances("server-1").Single();
+            instance.Health.ShouldBe(HealthState.Unhealthy);
+            instance.Version.ShouldBe("1.2.3");
+            instance.Checks!.Single().Name.ShouldBe("database");
+            instance.Metrics!.ShouldContain(s => s.Name == "dotnet.process.memory.working_set");
+        });
+    }
+
+    [Fact]
     public async Task A_failing_health_check_of_the_application_shows_on_the_controller()
     {
         // Arrange

@@ -39,7 +39,21 @@ public static class SidecarConnectionsSlice
         services.AddSingleton(options);
         services.AddSingleton<SidecarConnectionHandler>();
         services.AddSingleton<ISidecarListener, SidecarListener>();
-        services.AddHostedService<SidecarListenerService>();
+        if (options.TcpEnabled)
+        {
+            services.AddHostedService<SidecarListenerService>();
+        }
+
+        if (options.PipeName is not null)
+        {
+            if (string.IsNullOrWhiteSpace(options.PipeName))
+            {
+                throw new ArgumentException("The name of the pipe must not be blank.", nameof(configure));
+            }
+
+            services.AddHostedService<PipeListenerService>();
+        }
+
         return services;
     }
 }

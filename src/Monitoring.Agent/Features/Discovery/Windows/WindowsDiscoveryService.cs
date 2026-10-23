@@ -17,11 +17,13 @@ namespace Monitoring.Agent.Features.Discovery.Windows;
 /// <param name="probe">Measures the machine and the processes of the services; optional, without it only the state of the services is shown.</param>
 internal sealed class WindowsDiscoveryService(
     IServiceControlManager manager, IScopeStateStore store, WindowsDiscoveryOptions options, TimeProvider time, ILogger<WindowsDiscoveryService> logger, IHostProbe? probe = null)
-    : BackgroundService
+    : BackgroundService, IWindowsProcessMap
 {
     private readonly Dictionary<string, InstanceInfo> _known = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, (WindowsServiceState Last, int Restarts)> _seen = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ProcessSample?> _processes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Lock _gate = new();
+    private Dictionary<int, string> _byProcess = [];
     private PeriodicTimer? _timer;
     private DateTimeOffset _measuredAt = DateTimeOffset.MinValue;
     private InstanceInfo? _host;
@@ -41,6 +43,15 @@ internal sealed class WindowsDiscoveryService(
         base.Dispose();
     }
 
+    /// <inheritdoc />
+    public string? InstanceOfProcess(int processId)
+    {
+        lock (_gate)
+        {
+            return _byProcess.GetValueOrDefault(processId);
+        }
+    }
+
     /// <summary>Asks the Service Control Manager once and makes the scope state match; a failure leaves it as it was.</summary>
     public void Poll()
     {
@@ -57,6 +68,11 @@ internal sealed class WindowsDiscoveryService(
 
         var listed = services.Where(Listed).ToList();
         Measure(listed);
+        lock (_gate)
+        {
+            _byProcess = listed.Where(service => service.ProcessId is not null && service.State == WindowsServiceState.Running)
+                .GroupBy(service => service.ProcessId!.Value).ToDictionary(group => group.Key, group => group.First().Name);
+        }
 
         var current = new Dictionary<string, InstanceInfo>(StringComparer.OrdinalIgnoreCase);
         foreach (var service in listed)

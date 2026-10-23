@@ -58,7 +58,9 @@ public static class DiscoverySlice
         services.AddSingleton(options);
         services.AddSingleton<IServiceControlManager>(_ => new ServiceControlManager());
         services.AddSingleton<IHostProbe>(_ => new WindowsHostProbe());
-        services.AddHostedService<WindowsDiscoveryService>();
+        services.AddSingleton<WindowsDiscoveryService>();
+        services.AddSingleton<IWindowsProcessMap>(provider => provider.GetRequiredService<WindowsDiscoveryService>());
+        services.AddHostedService(provider => provider.GetRequiredService<WindowsDiscoveryService>());
     }
 
     private static void AddKubernetes(IServiceCollection services, KubernetesDiscoveryOptions options)

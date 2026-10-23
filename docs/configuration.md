@@ -362,7 +362,15 @@ The metric `windows.service.restarts` counts how often a service came back to Ru
 
 **The processes** of the listed services that are running carry `windows.process.memory_bytes` (working set), `windows.process.threads` and `windows.process.handles`. A service that shares a process, such as one of the many that run in `svchost`, shows the figures of that whole process.
 
-Clock skew is not measured: the agent has no trusted time to compare with. The pipe the application library connects over is a separate slice.
+Clock skew is not measured: the agent has no trusted time to compare with.
+
+**Applications that use the monitoring client** report over a named pipe, as they do through a sidecar on Kubernetes, and the agent matches each with its service by process id. The service must be on the allowlist and running; an application in any other process is turned away. The library connects to the pipe `monitoring-agent` by default on Windows (set `MONITORING_AGENT_PIPE` or `MonitoringOptions.AgentPipe` for another name, or blank for none), introduces itself with its process id, program, name and version, sends heartbeats with its health and answers pulls for its health, metrics and calls exactly as a sidecar does. If there is no agent it retries quietly and the application is not affected.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Agent:Sidecars:Pipe:Name` | `monitoring-agent` with Windows discovery, else none | The name of the pipe the applications connect to |
+| `Agent:Sidecars:Pipe:Allow` | none | The accounts the monitored applications run as, such as `NT SERVICE\billing` or `DOMAIN\svc-orders`. The pipe lets in only these, the system, the administrators, the agent's own account and the built-in Local Service and Network Service accounts, so another user on the machine cannot report as an application. An account that does not exist stops the agent from starting |
+| `Agent:Sidecars:Listen:Enabled` | `false` with Windows discovery, else `true` | Whether to also listen on a TCP port for sidecars; a Windows server only needs the pipe
 
 ### Running as a Windows service
 
