@@ -1,5 +1,5 @@
 {{- if empty .Values.controller.addresses }}{{ fail "controller.addresses needs at least one host:port" }}{{ end }}
-{{- if empty .Values.token.existingSecret }}{{ fail "token.existingSecret must name a secret with the agent token" }}{{ end }}
+{{- if and (empty .Values.token.existingSecret) (ne .Values.auth.mode "serviceAccount") }}{{ fail "token.existingSecret must name a secret with the agent token, or auth.mode must be serviceAccount" }}{{ end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -37,11 +37,16 @@ spec:
           env:
             - name: MONITORING_Agent__ScopeName
               value: {{ default .Release.Namespace .Values.scope.name | quote }}
+            {{- if eq .Values.auth.mode "serviceAccount" }}
+            - name: MONITORING_Agent__TokenFile
+              value: /var/run/monitoring-auth/token
+            {{- else }}
             - name: MONITORING_Agent__Token
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.token.existingSecret }}
+                  name: {{ required "token.existingSecret is needed with auth.mode token" .Values.token.existingSecret }}
                   key: {{ .Values.token.key }}
+            {{- end }}
             {{- range $i, $address := .Values.controller.addresses }}
             - name: MONITORING_Agent__Controllers__{{ $i }}
               value: {{ $address | quote }}
@@ -73,18 +78,37 @@ spec:
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          {{- if ne .Values.transport.mode "none" }}
+          {{- if or (ne .Values.transport.mode "none") (eq .Values.auth.mode "serviceAccount") }}
           volumeMounts:
+            {{- if ne .Values.transport.mode "none" }}
             - name: transport
               mountPath: /etc/monitoring/transport
               readOnly: true
+            {{- end }}
+            {{- if eq .Values.auth.mode "serviceAccount" }}
+            - name: monitoring-auth
+              mountPath: /var/run/monitoring-auth
+              readOnly: true
+            {{- end }}
           {{- end }}
           resources: {{- toYaml .Values.resources | nindent 12 }}
-      {{- if ne .Values.transport.mode "none" }}
+      {{- if or (ne .Values.transport.mode "none") (eq .Values.auth.mode "serviceAccount") }}
       volumes:
+        {{- if ne .Values.transport.mode "none" }}
         - name: transport
           secret:
             secretName: {{ required "transport.existingSecret is needed for tls and mtls" .Values.transport.existingSecret }}
+        {{- end }}
+        {{- if eq .Values.auth.mode "serviceAccount" }}
+        # A token made for the controller alone, short-lived and rotated by Kubernetes; the token of the service account itself is not used.
+        - name: monitoring-auth
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  audience: {{ .Values.auth.audience | quote }}
+                  expirationSeconds: 3600
+        {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector: {{- toYaml . | nindent 8 }}

@@ -11,6 +11,14 @@ replicas: 2
 agentTokens: []
 # - { scope: "*", tokenHash: "<sha-256 of the enrollment token>" }
 
+# Let agents prove who they are with the token of their Kubernetes service account instead of a shared secret. The controller asks the API server
+# whether a token is valid (a cluster role binding to system:auth-delegator is created for that), and an agent may only report as the scope named
+# after the namespace of its service account, or the one given under scopes. The agent chart's auth.mode must be serviceAccount, with the same audience.
+serviceAccountAuth:
+  enabled: false
+  audience: monitoring-controller
+  scopes: {}          # for example: { shop-prod: shop } to let the namespace shop-prod report as the scope shop
+
 # The individual address of every replica as agents must reach it, host:port. By default the pods of the stateful set, which is enough
 # for agents inside the cluster. For agents elsewhere give one address per replica, for example the host of a route per replica.
 replicaAddresses: []

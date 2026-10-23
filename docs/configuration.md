@@ -199,6 +199,20 @@ The hash is the SHA-256 of the token as lower-case hexadecimal text: `printf '%s
 }
 ```
 
+### Service account tokens
+
+Agents in Kubernetes need no shared secret. With `Controller:ServiceAccounts:Enabled` the controller also accepts the token of the agent's own service account: Kubernetes projects a token made for the controller (a given *audience*) into the agent's pod and rotates it, the agent reads it from a file for every connection (`Agent:TokenFile`), and the controller asks the API server whether it is valid (a `TokenReview`). The agent can only report as the scope named after the namespace of its service account, so an agent in one namespace can never report for another. The configured tokens keep working beside it.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Controller:ServiceAccounts:Enabled` | `false` | Accept service account tokens |
+| `Controller:ServiceAccounts:Audience` | `monitoring-controller` | The audience the tokens must be made for; the agent's projected token has to ask for the same one, so a token made for another service never opens this one |
+| `Controller:ServiceAccounts:Scopes:<namespace>` | the namespace itself | The scope a namespace reports as, when it is not named after the namespace |
+| `Controller:ServiceAccounts:ApiServer`, `TokenFile`, `CaFile` | the pod's own | How the controller reaches the API server, for a controller that does not run in the cluster of its agents |
+| `Agent:TokenFile` | none | A file with the token, read again for every connection; instead of `Agent:Token` |
+
+With the Helm charts: `serviceAccountAuth.enabled=true` on the controller chart (which creates a service account for the controller and binds it to `system:auth-delegator`, the right to review tokens and nothing else) and `auth.mode=serviceAccount` on the agent chart (which projects the token and needs no secret). Use the same audience on both. A token is only asked about when it has the three parts of a JWT, so the configured tokens cost no question to the API server, and when the API server cannot be reached the agent is turned away and tries again by itself. Use transport security as well: the token is a credential and travels in the hello.
+
 ### Transport security
 
 | Mode | What it does | When to use |

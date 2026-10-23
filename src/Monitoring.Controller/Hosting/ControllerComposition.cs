@@ -55,7 +55,9 @@ internal static class ControllerComposition
     public static void Compose(IHostApplicationBuilder builder, SettingsReader settings)
     {
         var controller = settings.Section("Controller");
-        var tokens = ReadAgentTokens(controller);
+        var accounts = controller.Section("ServiceAccounts");
+        var accountsEnabled = accounts.Text("Enabled", "false").Equals("true", StringComparison.OrdinalIgnoreCase);
+        var tokens = ReadAgentTokens(controller, accountsEnabled);
 
         builder.Services
             .AddRegistry(options =>
@@ -148,7 +150,16 @@ internal static class ControllerComposition
                     options.GroupBy = groupBy is [var only] && only.Equals("none", StringComparison.OrdinalIgnoreCase) ? [] : [.. groupBy];
                 }
             })
-            .AddSecurity(options => options.AgentTokens.AddRange(tokens))
+            .AddSecurity(options =>
+            {
+                options.AgentTokens.AddRange(tokens);
+                options.ServiceAccounts.Enabled = accountsEnabled;
+                options.ServiceAccounts.Audience = accounts.Text("Audience", options.ServiceAccounts.Audience);
+                options.ServiceAccounts.ApiServer = accounts.Optional("ApiServer");
+                options.ServiceAccounts.TokenFile = accounts.Optional("TokenFile");
+                options.ServiceAccounts.CaFile = accounts.Optional("CaFile");
+                options.ServiceAccounts.Scopes = new Dictionary<string, string>(accounts.Map("Scopes"), StringComparer.Ordinal);
+            })
             .AddAgentLink(options =>
             {
                 var listen = controller.Section("Listen");
@@ -231,15 +242,15 @@ internal static class ControllerComposition
             : throw new ConfigurationException($"Setting '{item.NameOf("Until")}' must be a date and time like 2026-11-02T06:00:00Z, but is '{until}'.");
     }
 
-    private static List<AgentTokenEntry> ReadAgentTokens(SettingsReader controller)
+    private static List<AgentTokenEntry> ReadAgentTokens(SettingsReader controller, bool serviceAccounts)
     {
         var tokens = controller.Items("AgentTokens")
             .Select(item => new AgentTokenEntry(item.Required("Scope"), item.Required("TokenHash")))
             .ToList();
 
         // A controller that accepts no agent is a mistake in the configuration, not a mode of operation.
-        return tokens.Count > 0
+        return tokens.Count > 0 || serviceAccounts
             ? tokens
-            : throw new ConfigurationException("Setting 'Controller:AgentTokens' needs at least one entry with a Scope and a TokenHash.");
+            : throw new ConfigurationException("Setting 'Controller:AgentTokens' needs at least one entry with a Scope and a TokenHash, or 'Controller:ServiceAccounts:Enabled' must be true.");
     }
 }

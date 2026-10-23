@@ -15,6 +15,12 @@ public sealed class ControllerLinkOptions
     /// <summary>The per-scope token that proves who the agent is; the controller only holds its hash.</summary>
     public string? Token { get; set; }
 
+    /// <summary>
+    /// A file with a token that proves who the agent is, read again for every connection, instead of <see cref="Token"/>. Meant for the token of the Kubernetes
+    /// service account, which Kubernetes projects into the pod and rotates; the controller then asks the API server whether it is valid.
+    /// </summary>
+    public string? TokenFile { get; set; }
+
     /// <summary>Id of this agent in the <c>Hello</c> message.</summary>
     public string AgentId { get; set; } = Environment.MachineName;
 

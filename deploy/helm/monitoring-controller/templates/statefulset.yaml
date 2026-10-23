@@ -1,4 +1,4 @@
-{{- if empty .Values.agentTokens }}{{ fail "agentTokens needs at least one entry with a scope and a tokenHash" }}{{ end }}
+{{- if and (empty .Values.agentTokens) (not .Values.serviceAccountAuth.enabled) }}{{ fail "agentTokens needs at least one entry with a scope and a tokenHash, or serviceAccountAuth.enabled must be true" }}{{ end }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -15,11 +15,15 @@ spec:
       labels: {{- include "monitoring-controller.selector" . | nindent 8 }}
       annotations:
         # A new central configuration needs no restart, but a changed setting here does.
-        checksum/settings: {{ toYaml (dict "tokens" .Values.agentTokens "dashboard" .Values.dashboard "aligned" .Values.alignedPackages "replicas" .Values.replicaAddresses "transport" .Values.transport) | sha256sum }}
+        checksum/settings: {{ toYaml (dict "tokens" .Values.agentTokens "dashboard" .Values.dashboard "aligned" .Values.alignedPackages "replicas" .Values.replicaAddresses "transport" .Values.transport "auth" .Values.serviceAccountAuth) | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
+      {{- if .Values.serviceAccountAuth.enabled }}
+      # The controller asks the API server whether the token of an agent is valid, as this service account.
+      serviceAccountName: {{ include "monitoring-controller.name" . }}
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         seccompProfile: { type: RuntimeDefault }
@@ -42,6 +46,16 @@ spec:
               value: {{ $token.scope | quote }}
             - name: MONITORING_Controller__AgentTokens__{{ $i }}__TokenHash
               value: {{ $token.tokenHash | quote }}
+            {{- end }}
+            {{- if .Values.serviceAccountAuth.enabled }}
+            - name: MONITORING_Controller__ServiceAccounts__Enabled
+              value: "true"
+            - name: MONITORING_Controller__ServiceAccounts__Audience
+              value: {{ .Values.serviceAccountAuth.audience | quote }}
+            {{- range $namespace, $scope := .Values.serviceAccountAuth.scopes }}
+            - name: MONITORING_Controller__ServiceAccounts__Scopes__{{ $namespace }}
+              value: {{ $scope | quote }}
+            {{- end }}
             {{- end }}
             {{- range $i, $address := (include "monitoring-controller.replicaAddresses" . | trim | splitList "\n") }}
             - name: MONITORING_Controller__Replicas__{{ $i }}

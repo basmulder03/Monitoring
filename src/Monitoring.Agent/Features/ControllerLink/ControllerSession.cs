@@ -109,8 +109,12 @@ internal sealed class ControllerSession(
         "monitoring-agent",
         options.AgentVersion,
         new Dictionary<string, string>(options.Labels),
-        options.Token,
+        ReadToken(),
         store.ScopeName);
+
+    /// <summary>The token to present: the one in the file when there is one, read now because it is rotated, else the one that was configured.</summary>
+    private string? ReadToken() =>
+        options.TokenFile is { } file ? File.ReadAllText(file).Trim() : options.Token;
 
     /// <summary>Waits for the controller's answer to the hello; null when it refuses, stays silent or answers with anything else.</summary>
     private async Task<Config?> ReadConfigAsync(Stream stream, CancellationTokenSource timeout, CancellationToken ct)

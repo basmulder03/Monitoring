@@ -8,8 +8,6 @@ set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 cluster="monitoring-test"
-token="k8s-test-token"
-hash="$(printf '%s' "$token" | sha256sum | cut -d' ' -f1)"
 web_forward=18080
 pids=()
 
@@ -59,18 +57,18 @@ done
 
 step "Controller"
 kubectl create namespace monitoring >/dev/null
+# The agents prove who they are with their service account, checked by the API server of the cluster: no secret is handed out.
 helm install monitoring-controller "$root/deploy/helm/monitoring-controller" -n monitoring \
   --set image.repository=monitoring-controller --set image.tag=dev --set image.pullPolicy=Never \
-  --set 'agentTokens[0].scope=*' --set "agentTokens[0].tokenHash=$hash" >/dev/null
+  --set serviceAccountAuth.enabled=true >/dev/null
 kubectl rollout status statefulset/monitoring-controller -n monitoring --timeout=180s >/dev/null \
   || fail "the controller did not become ready"
 
 step "Agent and the sample application"
 kubectl create namespace shop >/dev/null
-kubectl create secret generic agent-token -n shop --from-literal=token="$token" >/dev/null
 helm install monitoring-agent "$root/deploy/helm/monitoring-agent" -n shop \
   --set image.repository=monitoring-agent --set image.tag=dev --set image.pullPolicy=Never \
-  --set 'controller.addresses={monitoring-controller.monitoring.svc:9440}' --set token.existingSecret=agent-token \
+  --set 'controller.addresses={monitoring-controller.monitoring.svc:9440}' --set auth.mode=serviceAccount \
   --set scope.labels.environment=test --set scope.labels.datacenter=kind >/dev/null
 ( cd "$root/deploy/helm/test/sample-app" && helm dependency update >/dev/null )
 helm install sample "$root/deploy/helm/test/sample-app" -n shop \
@@ -84,6 +82,17 @@ kubectl rollout status deployment/orders -n shop --timeout=180s >/dev/null || fa
 kubectl port-forward -n monitoring pod/monitoring-controller-0 "$web_forward:8080" >/dev/null 2>&1 &
 pids+=($!)
 eventually 30 api /api/overview || fail "the dashboard of the controller cannot be reached"
+
+step "An agent with a token the API server does not know is turned away"
+# A token of the right shape (three parts) that nobody issued: the controller asks the API server, which says no.
+kubectl run intruder -n shop --image=monitoring-agent:dev --image-pull-policy=Never --restart=Never \
+  --env=MONITORING_Agent__ScopeName=intruder --env=MONITORING_Agent__Token=aaa.bbb.ccc \
+  --env=MONITORING_Agent__Controllers=monitoring-controller.monitoring.svc:9440 >/dev/null
+refused() { kubectl logs -n monitoring monitoring-controller-0 | grep -q "authentication failed"; }
+eventually 60 refused || fail "the controller did not turn the intruder away"
+api /api/overview | grep -q '"name":"intruder"' && fail "an agent with a made-up token got in"
+kubectl delete pod intruder -n shop --wait=false >/dev/null
+echo "ok"
 
 step "The scope and its instance show up, healthy"
 scope_ok() { api /api/scopes/shop | grep -q '"health":"Healthy"' && api /api/scopes/shop | grep -q '"name":"sample"'; }

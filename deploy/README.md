@@ -28,7 +28,8 @@ docker build --build-arg PROJECT=Sidecar    -t monitoring-sidecar    -f deploy/D
 helm install monitoring-controller deploy/helm/monitoring-controller \
   --set 'agentTokens[0].scope=*' --set "agentTokens[0].tokenHash=$(printf '%s' "$TOKEN" | sha256sum | cut -d' ' -f1)"
 
-# The agent, in each namespace that is to be monitored. The token comes from a secret you create.
+# The agent, in each namespace that is to be monitored. The token comes from a secret you create; or, with serviceAccountAuth.enabled on the controller,
+# use --set auth.mode=serviceAccount instead of the secret and the token, and nothing is handed out.
 kubectl create secret generic agent-token --from-literal=token="$TOKEN"
 helm install monitoring-agent deploy/helm/monitoring-agent \
   --set 'controller.addresses={monitoring-controller.monitoring.svc:9440}' --set token.existingSecret=agent-token \

@@ -23,7 +23,20 @@ public static class SecuritySlice
         }
 
         services.AddSingleton(options);
-        services.TryAddSingleton<IAgentAuthenticator, TokenAgentAuthenticator>();
+        if (options.ServiceAccounts.Enabled)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(options.ServiceAccounts.Audience, nameof(configure));
+            var accounts = options.ServiceAccounts;
+            var client = KubernetesTokenReviewer.CreateClient(accounts, Environment.GetEnvironmentVariable);
+            services.AddSingleton(accounts);
+            services.TryAddSingleton<IAgentAuthenticator>(provider => new CompositeAgentAuthenticator(
+                new TokenAgentAuthenticator(options), new ServiceAccountAgentAuthenticator(new KubernetesTokenReviewer(client), accounts, provider.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Monitoring.Controller.Security"))));
+        }
+        else
+        {
+            services.TryAddSingleton<IAgentAuthenticator, TokenAgentAuthenticator>();
+        }
+
         return services;
     }
 

@@ -12,7 +12,14 @@ controller:
   # The bootstrap address of the controller as host:port. The controller answers with the address of every replica.
   addresses: []
 
-# The token that proves who the agent is. Create the secret yourself; it needs one key, "token".
+# How the agent proves who it is. With serviceAccount it presents the token of its own Kubernetes service account, which Kubernetes projects into the pod and
+# rotates, and the controller (serviceAccountAuth in its chart, with the same audience) asks the API server whether it is valid; there is no secret to hand out.
+# With token it presents a shared token from a secret.
+auth:
+  mode: token         # token or serviceAccount
+  audience: monitoring-controller
+
+# The token that proves who the agent is, with auth.mode token. Create the secret yourself; it needs one key, "token".
 token:
   existingSecret: ""
   key: token

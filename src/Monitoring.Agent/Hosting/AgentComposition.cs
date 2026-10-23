@@ -33,7 +33,8 @@ internal static class AgentComposition
     {
         var agent = settings.Section("Agent");
         var scopeName = agent.Required("ScopeName");
-        var token = agent.Required("Token");
+        var tokenFile = agent.Optional("TokenFile");
+        var token = tokenFile is null ? agent.Required("Token") : agent.Optional("Token");
         var controllers = agent.List("Controllers");
         if (controllers.Count == 0)
         {
@@ -73,6 +74,7 @@ internal static class AgentComposition
             {
                 options.ControllerAddresses = [.. controllers];
                 options.Token = token;
+                options.TokenFile = tokenFile;
                 options.AgentId = agent.Text("Id", options.AgentId);
                 options.AgentVersion = agent.Optional("Version");
                 options.Labels = new Dictionary<string, string>(agent.Map("Labels"));

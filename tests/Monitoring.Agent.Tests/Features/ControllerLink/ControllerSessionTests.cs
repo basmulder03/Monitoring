@@ -126,6 +126,30 @@ public class ControllerSessionTests
     }
 
     [Fact]
+    public async Task RunAsync_presents_the_token_from_the_file_and_reads_the_file_again_for_every_session()
+    {
+        // Arrange
+        var file = Path.Combine(Path.GetTempPath(), $"token-{Guid.NewGuid():N}");
+        try
+        {
+            await File.WriteAllTextAsync(file, "first-token\n", TestContext.Current.CancellationToken);
+            var firstHello = (await new SessionFixture().WithTokenFile(file).Start().ReceiveAsync()).ShouldBeOfType<Hello>();
+
+            // Act: Kubernetes has rotated the token in the meantime
+            await File.WriteAllTextAsync(file, "second-token", TestContext.Current.CancellationToken);
+            var secondHello = (await new SessionFixture().WithTokenFile(file).Start().ReceiveAsync()).ShouldBeOfType<Hello>();
+
+            // Assert
+            firstHello.Token.ShouldBe("first-token");
+            secondHello.Token.ShouldBe("second-token");
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
     public async Task RunAsync_keeps_track_of_whether_it_is_connected_to_the_replica_and_what_the_replica_acknowledged()
     {
         // Arrange
@@ -438,6 +462,12 @@ public class ControllerSessionTests
             _options.AgentId = id;
             _options.AgentVersion = version;
             _options.Token = token;
+            return this;
+        }
+
+        public SessionFixture WithTokenFile(string path)
+        {
+            _options.TokenFile = path;
             return this;
         }
 

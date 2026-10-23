@@ -30,6 +30,14 @@ has 'MONITORING_Agent__Labels__environment' "$out" "labels must reach the agent"
 has 'runAsNonRoot: true' "$out" "the agent must not run as root"
 has "controller.addresses" "$(helm template t monitoring-agent 2>&1 || true)" "a missing controller address must be refused"
 
+# Service account authentication: a projected token made for the controller on the agent, no secret, and on the controller a right to review tokens.
+out="$(helm template t monitoring-agent --set 'controller.addresses={controller:9440}' --set auth.mode=serviceAccount --set auth.audience=mon)"
+has 'serviceAccountToken' "$out" "the agent needs a projected token"
+has 'audience: "mon"' "$out" "the token must be made for the controller"
+has 'MONITORING_Agent__TokenFile' "$out" "the agent must read the token from its file"
+lacks 'secretKeyRef' "$out" "service account authentication needs no secret"
+lacks 'MONITORING_Agent__Token$' "$out" "a fixed token must not be set as well"
+
 # The controller: a stateful set with an address per replica.
 out="$(helm template t monitoring-controller "${controller[@]}")"
 has 'kind: StatefulSet' "$out" "the controller needs an address per replica"
@@ -39,6 +47,13 @@ out="$(helm template t monitoring-controller "${controller[@]}" --set 'replicaAd
 has 'b.example:443' "$out" "given replica addresses must be used"
 lacks 'headless.default.svc' "$out" "given replica addresses must replace the generated ones"
 has "agentTokens" "$(helm template t monitoring-controller 2>&1 || true)" "a controller without tokens must be refused"
+out="$(helm template t monitoring-controller --set serviceAccountAuth.enabled=true --set serviceAccountAuth.scopes.shop-prod=shop)"
+has 'system:auth-delegator' "$out" "the controller must be allowed to review tokens"
+has 'MONITORING_Controller__ServiceAccounts__Enabled' "$out" "the controller must be told to accept service accounts"
+has 'ServiceAccounts__Scopes__shop-prod' "$out" "a configured scope for a namespace must reach the controller"
+has 'serviceAccountName: monitoring-controller' "$out" "the controller must run as the service account that may review tokens"
+lacks 'MONITORING_Controller__AgentTokens' "$out" "no agent tokens are needed with service account authentication"
+lacks 'system:auth-delegator' "$(helm template t monitoring-controller "${controller[@]}")" "the controller must not get the right when it is not used"
 
 # The sidecar template, in a chart that uses it.
 (

@@ -72,9 +72,9 @@ public static class ControllerLinkSlice
             throw new ArgumentException($"'{address}' is not a host:port address.", nameof(options));
         }
 
-        if (string.IsNullOrWhiteSpace(options.Token))
+        if (string.IsNullOrWhiteSpace(options.Token) && string.IsNullOrWhiteSpace(options.TokenFile))
         {
-            throw new ArgumentException("A token is required to authenticate with the controller.", nameof(options));
+            throw new ArgumentException("A token, or a file with one, is required to authenticate with the controller.", nameof(options));
         }
 
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.ReconnectMinDelay, TimeSpan.Zero);
