@@ -227,6 +227,12 @@ internal sealed class AgentPipeLink(
         try
         {
             await WriteAsync(stream, new Goodbye(instanceId), grace.Token).ConfigureAwait(false);
+
+            // Wait for the agent to close the connection. Closing first, with something it sent still unread, makes the system reset the connection,
+            // and a reset can throw away the goodbye before the agent has read it, which would show the application as lost instead of gone on purpose.
+            while (await FrameCodec.ReadAsync(stream, ct: grace.Token).ConfigureAwait(false) is not null)
+            {
+            }
         }
         catch (Exception ex) when (ex is OperationCanceledException or IOException or FrameException)
         {

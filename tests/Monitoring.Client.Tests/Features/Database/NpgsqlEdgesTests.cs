@@ -45,7 +45,9 @@ public class NpgsqlEdgesTests
 
         // Assert
         var edge = edges.Read().Edges.Single(e => e.Type == "DB");
-        edge.Target.ShouldStartWith("postgresql://127.0.0.1:");
+        // Npgsql leaves the port out when it is the default one.
+        edge.Target.ShouldStartWith("postgresql://127.0.0.1");
+        edge.Target.ShouldEndWith("/postgres");
         edge.Calls.ShouldBe(2);
         edge.Errors.ShouldBe(1);
         var details = spans.ReadAfter(0).Spans.Select(span => string.Join(", ", span.Details.Select(d => $"{d.Key}={d.Value}"))).ToList();

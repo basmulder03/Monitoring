@@ -142,6 +142,10 @@ public class AgentPipeLinkTests
         using var app = await StartAppAsync(name);
         await accepting;
 
+        // The application has said goodbye only if it was established, which an answer to a pull shows; stopping it earlier is not a goodbye.
+        await agent.SendAsync(new Pull(1, PullKind.Info, 0));
+        (await agent.ReceiveAsync()).ShouldBeOfType<PullResult>();
+
         // Act
         var stopping = app.StopAsync(Ct);
         var message = await agent.ReceiveAsync();
