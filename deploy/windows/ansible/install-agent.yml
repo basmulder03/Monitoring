@@ -1,0 +1,66 @@
+# Installs the monitoring agent as a Windows service on the hosts of the group "windows_servers".
+#
+#   ansible-playbook -i inventory.ini deploy/windows/ansible/install-agent.yml \
+#     -e agent_build=published/Agent -e controller_address=monitoring.example.com:443 -e @secrets.yml
+#
+# secrets.yml (keep it in a vault) holds agent_token. Variables you will want to set per environment are in vars below.
+- name: Install the monitoring agent
+  hosts: windows_servers
+  gather_facts: false
+  vars:
+    agent_dir: 'C:\MonitoringAgent'
+    agent_build: published/Agent            # the folder with the published Monitoring.Agent.exe, on the machine that runs Ansible
+    controller_address: ""                  # host:port of the controller; give one address per replica if they are reached separately
+    agent_scope_name: "{{ inventory_hostname_short }}"
+    agent_labels: {}                        # for example { environment: prod, datacenter: a }
+    agent_services: []                      # the Windows services to report, exact names or a prefix ending in *
+    agent_pipe_allow: []                    # the accounts the monitored applications run as, for example ['NT SERVICE\billing']
+  tasks:
+    - name: Check what is needed
+      ansible.builtin.assert:
+        that:
+          - controller_address | length > 0
+          - agent_token is defined
+        fail_msg: Give controller_address and agent_token.
+
+    - name: Create the folder
+      ansible.windows.win_file:
+        path: "{{ agent_dir }}"
+        state: directory
+
+    - name: Copy the program and the scripts
+      ansible.windows.win_copy:
+        src: "{{ item.src }}"
+        dest: "{{ agent_dir }}\\{{ item.dest }}"
+      loop:
+        - { src: "{{ agent_build }}/", dest: "" }
+        - { src: "{{ playbook_dir }}/../install-agent.ps1", dest: "install-agent.ps1" }
+
+    # The agent reads this file from the folder of the program, because a service starts in the system folder.
+    - name: Write the configuration
+      ansible.windows.win_copy:
+        dest: "{{ agent_dir }}\\monitoring.json"
+        content: "{{ config | to_nice_json }}"
+      vars:
+        config:
+          Agent:
+            ScopeName: "{{ agent_scope_name }}"
+            Token: "{{ agent_token }}"
+            Controllers: ["{{ controller_address }}"]
+            Labels: "{{ agent_labels }}"
+            Discovery:
+              Kind: windows
+              Windows:
+                Services: "{{ agent_services }}"
+            Sidecars:
+              Pipe:
+                Allow: "{{ agent_pipe_allow }}"
+      no_log: true
+      register: configuration
+
+    # Installing again removes the service and creates it anew, so a changed program or configuration takes effect.
+    - name: Install and start the service
+      ansible.windows.win_powershell:
+        script: |
+          & '{{ agent_dir }}\install-agent.ps1' -Path '{{ agent_dir }}'
+      changed_when: true

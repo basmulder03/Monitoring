@@ -117,4 +117,4 @@ spec:
 
 ## Windows hosts
 
-Windows hosts report through an agent that runs as a Windows service, installed with Ansible. That agent is not built yet (issue #35), so there is nothing to install or script today. This section will be added with it.
+Windows servers report through an agent that runs as a Windows service and connect to the same controller. How to install it, with a script and with Ansible, is in [windows.md](windows.md). Hosts outside the cluster reach the controller through the passthrough routes described above, which needs transport mode `tls` or `mtls`.

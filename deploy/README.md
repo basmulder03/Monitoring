@@ -41,3 +41,5 @@ An application chart gets monitored by depending on `monitoring-sidecar` and inc
 - `deploy/helm/test.sh` lints and renders the charts and checks what they must contain; CI runs it. It uses Helm when installed and Docker otherwise.
 
 On OpenShift, see [docs/openshift.md](../docs/openshift.md): the security context, Routes and network policies. The label-based injector (#45) is not here yet.
+
+For Windows servers, see [docs/windows.md](../docs/windows.md); `deploy/windows` holds the installation script, a script that tests it, and an Ansible playbook.
