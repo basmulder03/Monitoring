@@ -40,7 +40,8 @@ internal static class InstanceMerger
             ServiceName = serviceName,
             Version = application.Version,
             Health = platform.Health.Worst(application.Health),
-            Checks = application.Checks,
+            // What the platform knows about the pod, such as a warning of the cluster or a rollout, stays beside what the application says about itself.
+            Checks = [.. platform.Checks ?? [], .. application.Checks],
             Metrics = application.Metrics,
             Edges = application.Edges,
             Packages = application.Packages,

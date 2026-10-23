@@ -67,6 +67,43 @@ public class KubernetesDiscoveryServiceTests
     }
 
     [Fact]
+    public async Task Service_shows_on_each_pod_of_a_deployment_that_it_is_rolling_out()
+    {
+        // Arrange
+        var fixture = new DiscoveryFixture().ListingPods("10",
+            new PodBuilder().Named("orders-7d9f-a").InPhase("Running").PodReady().WithContainer("app", ready: true).OwnedBy("ReplicaSet", "orders-7d9f").Build(),
+            new PodBuilder().Named("billing-1").InPhase("Running").PodReady().WithContainer("app", ready: true).OwnedBy("ReplicaSet", "billing-55c8").Build());
+        fixture.Api.Workloads = new Dictionary<string, KubernetesWorkload>
+        {
+            ["Deployment/orders"] = new(new WorkloadMetadata("orders", 4), new WorkloadSpec(3), new WorkloadStatus(4, ReadyReplicas: 2, UpdatedReplicas: 1)),
+            ["Deployment/billing"] = new(new WorkloadMetadata("billing", 2), new WorkloadSpec(1), new WorkloadStatus(2, ReadyReplicas: 1, UpdatedReplicas: 1)),
+        };
+
+        // Act
+        await fixture.StartAsync();
+        await fixture.WaitUntilAsync(() => fixture.InstanceIds().Count == 2);
+
+        // Assert
+        fixture.Instance("orders-7d9f-a")!.Checks!.Single(c => c.Name == "rollout").Description.ShouldBe("Rolling out: 1 of 3 replicas updated, 2 ready.");
+        fixture.Instance("billing-1")!.Checks.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Service_still_follows_the_pods_when_the_workloads_cannot_be_read()
+    {
+        // Arrange
+        var fixture = new DiscoveryFixture().ListingPods("10", Running("a"));
+        fixture.Api.Workloads = new KubernetesApiException("forbidden");
+
+        // Act
+        await fixture.StartAsync();
+        await fixture.WaitUntilAsync(() => fixture.InstanceIds().Count == 1);
+
+        // Assert
+        fixture.Instance("a")!.Checks.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task Service_does_not_show_a_warning_on_a_pod_that_is_healthy()
     {
         // Arrange
@@ -476,6 +513,12 @@ public class KubernetesDiscoveryServiceTests
 
             return Task.FromResult(_lastList);
         }
+
+        /// <summary>The workloads the API answers with, or the exception it fails with.</summary>
+        public object Workloads { get; set; } = (IReadOnlyDictionary<string, KubernetesWorkload>)new Dictionary<string, KubernetesWorkload>();
+
+        public Task<IReadOnlyDictionary<string, KubernetesWorkload>> ListWorkloadsAsync(string namespaceName, CancellationToken ct) =>
+            Workloads is Exception exception ? throw exception : Task.FromResult((IReadOnlyDictionary<string, KubernetesWorkload>)Workloads);
 
         public Task<IReadOnlyList<KubernetesEvent>> ListWarningEventsAsync(string namespaceName, CancellationToken ct) =>
             Events is Exception exception ? throw exception : Task.FromResult((IReadOnlyList<KubernetesEvent>)Events);

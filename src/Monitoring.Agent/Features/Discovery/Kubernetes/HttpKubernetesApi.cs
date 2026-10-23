@@ -39,6 +39,33 @@ internal sealed class HttpKubernetesApi(HttpClient http) : IKubernetesApi, IDisp
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<string, KubernetesWorkload>> ListWorkloadsAsync(string namespaceName, CancellationToken ct)
+    {
+        var workloads = new Dictionary<string, KubernetesWorkload>(StringComparer.Ordinal);
+        foreach (var (resource, kind) in new[] { ("deployments", "Deployment"), ("statefulsets", "StatefulSet") })
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(ListTimeout);
+
+            using var response = await http.GetAsync($"apis/apps/v1/namespaces/{Uri.EscapeDataString(namespaceName)}/{resource}", timeout.Token).ConfigureAwait(false);
+            await EnsureSuccessAsync(response, timeout.Token).ConfigureAwait(false);
+
+            await using var body = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false);
+            var list = await ReadAsync(() => JsonSerializer.DeserializeAsync(body, KubernetesJsonContext.Default.WorkloadList, timeout.Token).AsTask())
+                .ConfigureAwait(false);
+            foreach (var workload in list?.Items ?? [])
+            {
+                if (workload.Metadata?.Name is { } name)
+                {
+                    workloads[$"{kind}/{name}"] = workload;
+                }
+            }
+        }
+
+        return workloads;
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<KubernetesEvent>> ListWarningEventsAsync(string namespaceName, CancellationToken ct)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);

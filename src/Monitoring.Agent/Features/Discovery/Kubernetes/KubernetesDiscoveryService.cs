@@ -36,6 +36,9 @@ internal sealed class KubernetesDiscoveryService(
     /// <summary>The latest warning event per pod name, as of the last listing.</summary>
     private Dictionary<string, KubernetesEvent> _warnings = [];
 
+    /// <summary>What each Deployment and StatefulSet says about its rollout, for the ones that have something to say, as of the last listing.</summary>
+    private Dictionary<string, string> _rollouts = [];
+
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -92,11 +95,12 @@ internal sealed class KubernetesDiscoveryService(
     {
         var list = await api.ListPodsAsync(target.Namespace, ct).ConfigureAwait(false);
         _warnings = await ListWarningsAsync(ct).ConfigureAwait(false);
+        _rollouts = await ListRolloutsAsync(ct).ConfigureAwait(false);
 
         var current = new Dictionary<string, InstanceInfo>();
         foreach (var pod in list.Pods)
         {
-            if (PodMapper.Map(pod, options.MonitoringSidecarContainer, _warnings.GetValueOrDefault(pod.Metadata.Name)) is { } instance)
+            if (PodMapper.Map(pod, options.MonitoringSidecarContainer, _warnings.GetValueOrDefault(pod.Metadata.Name), RolloutOf(pod)) is { } instance)
             {
                 current[instance.Id] = instance;
             }
@@ -144,6 +148,29 @@ internal sealed class KubernetesDiscoveryService(
         }
     }
 
+    private string? RolloutOf(Pod pod) => Rollout.KeyOf(pod) is { } key ? _rollouts.GetValueOrDefault(key) : null;
+
+    /// <summary>
+    /// Reads which Deployments and StatefulSets are changing or short of pods. Like the events this is a detail that the agent can do without, for example when its role
+    /// may not read workloads, so a failure only costs that.
+    /// </summary>
+    private async Task<Dictionary<string, string>> ListRolloutsAsync(CancellationToken ct)
+    {
+        try
+        {
+            var workloads = await api.ListWorkloadsAsync(target.Namespace, ct).ConfigureAwait(false);
+            return workloads
+                .Select(pair => (pair.Key, Text: Rollout.Describe(pair.Value)))
+                .Where(entry => entry.Text is not null)
+                .ToDictionary(entry => entry.Key, entry => entry.Text!, StringComparer.Ordinal);
+        }
+        catch (Exception ex) when (ex is KubernetesApiException or HttpRequestException or IOException)
+        {
+            logger.LogDebug("Cannot read the workloads of '{Namespace}': {Reason}", target.Namespace, ex.Message);
+            return [];
+        }
+    }
+
     /// <summary>Applies the changes of a watch to the store until the watch ends.</summary>
     private async Task WatchAsync(string version, CancellationToken ct)
     {
@@ -152,7 +179,7 @@ internal sealed class KubernetesDiscoveryService(
             switch (podEvent.Type)
             {
                 case PodEventType.Added or PodEventType.Modified when podEvent.Pod is { } pod:
-                    if (PodMapper.Map(pod, options.MonitoringSidecarContainer, _warnings.GetValueOrDefault(pod.Metadata.Name)) is { } instance)
+                    if (PodMapper.Map(pod, options.MonitoringSidecarContainer, _warnings.GetValueOrDefault(pod.Metadata.Name), RolloutOf(pod)) is { } instance)
                     {
                         Upsert(instance);
                     }

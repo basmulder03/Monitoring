@@ -28,6 +28,21 @@ public class InstanceMergerTests
     }
 
     [Fact]
+    public void Merge_keeps_the_checks_of_the_platform_beside_those_of_the_application()
+    {
+        // Arrange
+        var rollout = new HealthCheckResult("rollout", HealthState.Degraded, "Rolling out: 1 of 3 replicas updated, 2 ready.");
+        var database = new HealthCheckResult("database", HealthState.Healthy, null);
+        var pod = Pod() with { Checks = [rollout] };
+
+        // Act
+        var shown = InstanceMerger.Merge(pod, App(HealthState.Healthy, "orders", "1.2.3", database), sidecarLost: false);
+
+        // Assert
+        shown.Checks.ShouldBe([rollout, database]);
+    }
+
+    [Fact]
     public void Merge_takes_the_service_name_and_version_from_the_application()
     {
         // Arrange

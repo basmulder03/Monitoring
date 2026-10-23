@@ -28,7 +28,8 @@ internal static class PodMapper
     /// <param name="monitoringSidecar">Name of the container that is this system's own sidecar, whose failure must not make the application look down.</param>
     /// <returns>The instance, or <see langword="null"/> for a pod that completed successfully, which is not an outage and not worth showing.</returns>
     /// <param name="warning">The latest warning event the cluster recorded about the pod; shown as a check while the pod is not healthy.</param>
-    public static InstanceInfo? Map(Pod pod, string monitoringSidecar = DefaultMonitoringSidecar, KubernetesEvent? warning = null)
+    /// <param name="rollout">What the Deployment or StatefulSet of the pod says about its rollout, see <see cref="Rollout.Describe"/>; <see langword="null"/> when nothing is going on.</param>
+    public static InstanceInfo? Map(Pod pod, string monitoringSidecar = DefaultMonitoringSidecar, KubernetesEvent? warning = null, string? rollout = null)
     {
         if (pod.Status?.Phase == "Succeeded")
         {
@@ -42,6 +43,11 @@ internal static class PodMapper
         if (sidecar is { Health: HealthState.Unhealthy or HealthState.Degraded })
         {
             checks.Add(new HealthCheckResult("monitoring sidecar", HealthState.Degraded, sidecar.Reason ?? "The monitoring sidecar is not ready."));
+        }
+
+        if (rollout is not null)
+        {
+            checks.Add(new HealthCheckResult("rollout", HealthState.Degraded, rollout));
         }
 
         // An old warning about a pod that has recovered would only mislead.

@@ -22,6 +22,13 @@ internal interface IKubernetesApi
     /// <exception cref="KubernetesApiException">The API server answered with an error or something unreadable.</exception>
     IAsyncEnumerable<PodEvent> WatchPodsAsync(string namespaceName, string resourceVersion, TimeSpan duration, CancellationToken ct);
 
+    /// <summary>Lists the Deployments and StatefulSets of a namespace, which say how many pods they want and have.</summary>
+    /// <param name="namespaceName">The namespace.</param>
+    /// <param name="ct">Cancels the request.</param>
+    /// <returns>The workloads by key, as <see cref="Rollout.KeyOf"/> makes it for their pods.</returns>
+    /// <exception cref="KubernetesApiException">The API server answered with an error, for example because the role may not read them.</exception>
+    Task<IReadOnlyDictionary<string, KubernetesWorkload>> ListWorkloadsAsync(string namespaceName, CancellationToken ct);
+
     /// <summary>Lists the warning events of a namespace, which tell why a pod does not start.</summary>
     /// <param name="namespaceName">The namespace.</param>
     /// <param name="ct">Cancels the request.</param>

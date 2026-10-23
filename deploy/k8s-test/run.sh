@@ -132,5 +132,15 @@ back() { api /api/scopes/shop | grep -q '"name":"sample"'; }
 eventually 90 back || fail "the restarted replica did not get the state back from the agent"
 echo "ok"
 
+step "A rollout that is stuck shows on the pods of its deployment"
+# The new pod can never start, so the old one keeps serving and the deployment is short of updated pods.
+kubectl patch deployment orders -n shop --type=json \
+  -p '[{"op":"replace","path":"/spec/template/spec/containers/0/image","value":"does-not-exist:1"}]' >/dev/null
+rolling() { api /api/scopes/shop | grep -q 'Rolling out: 2 replicas exist for 1 wanted'; }
+eventually 150 rolling || fail "the stuck rollout did not show on the pod that still serves"
+kubectl rollout undo deployment/orders -n shop >/dev/null
+kubectl rollout status deployment/orders -n shop --timeout=120s >/dev/null || fail "the rollout could not be undone"
+echo "ok"
+
 echo
 echo "Kubernetes test passed"

@@ -59,6 +59,36 @@ public class HttpKubernetesApiTests
     }
 
     [Fact]
+    public async Task ListWorkloadsAsync_reads_deployments_and_statefulsets_by_kind_and_name()
+    {
+        // Arrange
+        const string deployments = """{"items":[{"metadata":{"name":"orders","generation":4},"spec":{"replicas":3},"status":{"observedGeneration":4,"readyReplicas":2,"updatedReplicas":1,"replicas":3}}]}""";
+        const string statefulsets = """{"items":[{"metadata":{"name":"db"},"spec":{"replicas":2},"status":{"readyReplicas":2,"updatedReplicas":2}}]}""";
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, deployments, statefulsets);
+
+        // Act
+        var workloads = await server.Api.ListWorkloadsAsync("shop", Ct);
+
+        // Assert
+        server.Requests.ShouldBe(["GET apis/apps/v1/namespaces/shop/deployments", "GET apis/apps/v1/namespaces/shop/statefulsets"]);
+        workloads.Keys.Order().ShouldBe(["Deployment/orders", "StatefulSet/db"]);
+        workloads["Deployment/orders"].Status!.ReadyReplicas.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task ListWorkloadsAsync_fails_with_an_api_exception_when_the_role_may_not_read_them()
+    {
+        // Arrange
+        var server = new FakeApiServer().Answering(HttpStatusCode.Forbidden, "{}");
+
+        // Act
+        var list = () => server.Api.ListWorkloadsAsync("shop", Ct);
+
+        // Assert
+        await list.ShouldThrowAsync<KubernetesApiException>();
+    }
+
+    [Fact]
     public async Task ListPodsAsync_escapes_the_namespace_in_the_path()
     {
         // Arrange
@@ -336,16 +366,31 @@ public class HttpKubernetesApiTests
         private readonly List<string> _requests = [];
         private HttpStatusCode _status = HttpStatusCode.OK;
         private string _body = "";
+        private List<string> _bodies = [];
 
         public IReadOnlyList<string> Requests => _requests;
 
         public HttpKubernetesApi Api => new(new HttpClient(new StubHandler(this)) { BaseAddress = new Uri("https://kubernetes.test/") });
 
-        public FakeApiServer Answering(HttpStatusCode status, string body)
+        /// <summary>Answers with these bodies in turn, the last one again and again.</summary>
+        public FakeApiServer Answering(HttpStatusCode status, params string[] bodies)
         {
             _status = status;
-            _body = body;
+            _bodies = [.. bodies];
+            _body = bodies[0];
             return this;
+        }
+
+        private string NextBody()
+        {
+            // The bodies are given in turn and the last one repeats.
+            var body = _bodies.Count > 0 ? _bodies[0] : _body;
+            if (_bodies.Count > 1)
+            {
+                _bodies.RemoveAt(0);
+            }
+
+            return body;
         }
 
         private sealed class StubHandler(FakeApiServer server) : HttpMessageHandler
@@ -356,7 +401,7 @@ public class HttpKubernetesApiTests
                 server._requests.Add($"{request.Method} {request.RequestUri!.PathAndQuery.TrimStart('/')}");
                 return Task.FromResult(new HttpResponseMessage(server._status)
                 {
-                    Content = new StringContent(server._body, Encoding.UTF8, "application/json"),
+                    Content = new StringContent(server.NextBody(), Encoding.UTF8, "application/json"),
                 });
             }
         }
