@@ -108,6 +108,15 @@ The controller checks every package version in use against advisories in the [OS
 
 A finding is raised for each advisory, package and version in use. Versions match through the ranges of the advisory (`introduced`, `fixed`, `last_affected`) or its list of versions; only the NuGet ecosystem is used. Advisories with severity HIGH or CRITICAL raise the critical alert `vulnerable-package-critical`; the rest, including advisories that do not give a severity, raise the warning `vulnerable-package`. Silences work as for any other alert.
 
+### Change markers
+
+When a service runs a version it did not run at the previous look, the controller records a marker, served newest first at `GET /api/changes` as `at`, `scope`, `service`, `from` and `to`. Markers are kept in memory only, so a restarted replica starts empty and treats the versions it first sees as the baseline.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Controller:ChangeMarkers:SampleInterval` | `00:00:05` | How often the versions are compared |
+| `Controller:ChangeMarkers:MaxMarkers` | `200` | How many markers are kept |
+
 ### Dead-man's switch
 
 Each controller replica can ping an external watchdog, which alerts when all pings stop. That covers the one failure the system cannot report itself: all replicas being down.

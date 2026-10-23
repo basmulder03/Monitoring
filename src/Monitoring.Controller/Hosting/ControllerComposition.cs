@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Monitoring.Controller.Features.AgentLink;
 using Monitoring.Controller.Features.Alerting;
+using Monitoring.Controller.Features.ChangeMarkers;
 using Monitoring.Controller.Features.Configuration;
 using Monitoring.Controller.Features.Dashboard;
 using Monitoring.Controller.Features.DeadMansSwitch;
@@ -60,6 +61,12 @@ internal static class ControllerComposition
             })
             .AddHealth()
             .AddSelfMonitoring()
+            .AddChangeMarkers(options =>
+            {
+                var changes = controller.Section("ChangeMarkers");
+                options.SampleInterval = changes.Duration("SampleInterval", options.SampleInterval);
+                options.MaxMarkers = changes.Int("MaxMarkers", options.MaxMarkers);
+            })
             .AddDeadMansSwitch(options =>
             {
                 var watchdog = controller.Section("DeadMansSwitch");
@@ -140,6 +147,7 @@ internal static class ControllerComposition
         var app = builder.Build();
         app.MapDashboard();
         app.MapSelfMonitoring();
+        app.MapChangeMarkers();
         app.MapPackages();
         app.MapVulnerabilities();
         return app;
