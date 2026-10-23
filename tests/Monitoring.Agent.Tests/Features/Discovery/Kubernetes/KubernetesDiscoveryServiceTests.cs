@@ -50,6 +50,52 @@ public class KubernetesDiscoveryServiceTests
     }
 
     [Fact]
+    public async Task Service_shows_the_latest_warning_of_the_cluster_on_a_pod_that_is_not_healthy()
+    {
+        // Arrange
+        var fixture = new DiscoveryFixture().ListingPods("10", Running("a", ready: false))
+            .WithWarning("a", "FailedScheduling", "older", minutesAgo: 5)
+            .WithWarning("a", "FailedScheduling", "0/3 nodes are available");
+
+        // Act
+        await fixture.StartAsync();
+        await fixture.WaitUntilAsync(() => fixture.InstanceIds().Count == 1);
+
+        // Assert
+        var check = fixture.Instance("a")!.Checks!.Single(c => c.Name == "kubernetes event");
+        check.Description.ShouldBe("FailedScheduling: 0/3 nodes are available");
+    }
+
+    [Fact]
+    public async Task Service_does_not_show_a_warning_on_a_pod_that_is_healthy()
+    {
+        // Arrange
+        var fixture = new DiscoveryFixture().ListingPods("10", Running("a")).WithWarning("a", "BackOff", "earlier");
+
+        // Act
+        await fixture.StartAsync();
+        await fixture.WaitUntilAsync(() => fixture.InstanceIds().Count == 1);
+
+        // Assert
+        fixture.Instance("a")!.Checks.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Service_still_follows_the_pods_when_the_events_cannot_be_read()
+    {
+        // Arrange
+        var fixture = new DiscoveryFixture().ListingPods("10", Running("a", ready: false));
+        fixture.Api.Events = new KubernetesApiException("forbidden");
+
+        // Act
+        await fixture.StartAsync();
+        await fixture.WaitUntilAsync(() => fixture.InstanceIds().Count == 1);
+
+        // Assert
+        fixture.Instance("a")!.Checks.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task Service_watches_from_the_version_of_the_list()
     {
         // Arrange
@@ -313,6 +359,14 @@ public class KubernetesDiscoveryServiceTests
             return this;
         }
 
+        public DiscoveryFixture WithWarning(string pod, string reason, string message, int minutesAgo = 0)
+        {
+            var events = ((IReadOnlyList<KubernetesEvent>)Api.Events).ToList();
+            events.Add(new KubernetesEvent(new ObjectReference("Pod", pod), reason, message, new DateTimeOffset(2026, 11, 2, 8, 0, 0, TimeSpan.Zero).AddMinutes(-minutesAgo)));
+            Api.Events = events;
+            return this;
+        }
+
         public DiscoveryFixture ListFailing(Exception exception)
         {
             Api.Lists.Enqueue(exception);
@@ -396,6 +450,9 @@ public class KubernetesDiscoveryServiceTests
 
         public Queue<object> Lists { get; } = new();
 
+        /// <summary>The warning events the API answers with, or the exception it fails with.</summary>
+        public object Events { get; set; } = (IReadOnlyList<KubernetesEvent>)[];
+
         public Queue<Func<CancellationToken, IAsyncEnumerable<PodEvent>>> Watches { get; } = new();
 
         public List<string> WatchVersions { get; } = [];
@@ -419,6 +476,9 @@ public class KubernetesDiscoveryServiceTests
 
             return Task.FromResult(_lastList);
         }
+
+        public Task<IReadOnlyList<KubernetesEvent>> ListWarningEventsAsync(string namespaceName, CancellationToken ct) =>
+            Events is Exception exception ? throw exception : Task.FromResult((IReadOnlyList<KubernetesEvent>)Events);
 
         public IAsyncEnumerable<PodEvent> WatchPodsAsync(string namespaceName, string resourceVersion, TimeSpan duration, CancellationToken ct)
         {

@@ -27,7 +27,8 @@ internal static class PodMapper
     /// <param name="pod">The pod as the Kubernetes API reports it.</param>
     /// <param name="monitoringSidecar">Name of the container that is this system's own sidecar, whose failure must not make the application look down.</param>
     /// <returns>The instance, or <see langword="null"/> for a pod that completed successfully, which is not an outage and not worth showing.</returns>
-    public static InstanceInfo? Map(Pod pod, string monitoringSidecar = DefaultMonitoringSidecar)
+    /// <param name="warning">The latest warning event the cluster recorded about the pod; shown as a check while the pod is not healthy.</param>
+    public static InstanceInfo? Map(Pod pod, string monitoringSidecar = DefaultMonitoringSidecar, KubernetesEvent? warning = null)
     {
         if (pod.Status?.Phase == "Succeeded")
         {
@@ -36,15 +37,26 @@ internal static class PodMapper
 
         var containers = ContainersOf(pod, monitoringSidecar);
         var sidecar = containers.FirstOrDefault(c => c.Role == ContainerRole.MonitoringSidecar);
+        var health = HealthOf(pod, monitoringSidecar);
+        List<HealthCheckResult> checks = [];
+        if (sidecar is { Health: HealthState.Unhealthy or HealthState.Degraded })
+        {
+            checks.Add(new HealthCheckResult("monitoring sidecar", HealthState.Degraded, sidecar.Reason ?? "The monitoring sidecar is not ready."));
+        }
+
+        // An old warning about a pod that has recovered would only mislead.
+        if (warning is not null && health != HealthState.Healthy)
+        {
+            checks.Add(new HealthCheckResult("kubernetes event", HealthState.Degraded, $"{warning.Reason}: {warning.Message}"));
+        }
+
         return new InstanceInfo(
             pod.Metadata.Name,
             ServiceNameOf(pod),
             LifecycleOf(pod),
-            HealthOf(pod, monitoringSidecar),
+            health,
             LabelsOf(pod),
-            Checks: sidecar is { Health: HealthState.Unhealthy or HealthState.Degraded }
-                ? [new HealthCheckResult("monitoring sidecar", HealthState.Degraded, sidecar.Reason ?? "The monitoring sidecar is not ready.")]
-                : null,
+            Checks: checks.Count > 0 ? checks : null,
             Containers: containers.Count > 0 ? containers : null);
     }
 

@@ -290,7 +290,7 @@ The agent learns which instances exist from the platform it runs on. `Agent:Disc
 Inside a cluster none of the Kubernetes settings are needed: the namespace, the API server address, the token and the certificate authority come from the pod's service account.
 The API server is always contacted directly, never through a proxy set in the environment.
 
-The agent needs a namespace-scoped role that can read pods, and nothing else:
+The agent needs a namespace-scoped role that can read pods and list events, and nothing else. Without the permission on events everything works, but a pod that does not start no longer shows the warning of the cluster as a check:
 
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -301,6 +301,9 @@ rules:
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list"]
 ```
 
 How a pod becomes an instance:

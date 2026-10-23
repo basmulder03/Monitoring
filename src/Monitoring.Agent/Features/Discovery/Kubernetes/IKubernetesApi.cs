@@ -1,3 +1,5 @@
+using Monitoring.Agent.Features.Discovery.Kubernetes.Models;
+
 namespace Monitoring.Agent.Features.Discovery.Kubernetes;
 
 /// <summary>The part of the Kubernetes API that discovery needs: list the pods of a namespace and watch them.</summary>
@@ -19,4 +21,11 @@ internal interface IKubernetesApi
     /// <exception cref="KubernetesResourceExpiredException">The version is too old; list again.</exception>
     /// <exception cref="KubernetesApiException">The API server answered with an error or something unreadable.</exception>
     IAsyncEnumerable<PodEvent> WatchPodsAsync(string namespaceName, string resourceVersion, TimeSpan duration, CancellationToken ct);
+
+    /// <summary>Lists the warning events of a namespace, which tell why a pod does not start.</summary>
+    /// <param name="namespaceName">The namespace.</param>
+    /// <param name="ct">Cancels the request.</param>
+    /// <returns>The events, in no particular order.</returns>
+    /// <exception cref="KubernetesApiException">The API server answered with an error, for example because the role may not read events.</exception>
+    Task<IReadOnlyList<KubernetesEvent>> ListWarningEventsAsync(string namespaceName, CancellationToken ct);
 }

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Monitoring.Agent.Features.ScopeState;
 using Monitoring.Agent.Features.SelfMonitoring;
+using Monitoring.Agent.Features.Discovery.Kubernetes.Models;
 using Monitoring.Common;
 using Monitoring.Protocol.Instances;
 
@@ -31,6 +32,9 @@ internal sealed class KubernetesDiscoveryService(
     private readonly Dictionary<string, InstanceInfo> _known = [];
 
     private bool _listedBefore;
+
+    /// <summary>The latest warning event per pod name, as of the last listing.</summary>
+    private Dictionary<string, KubernetesEvent> _warnings = [];
 
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -87,11 +91,12 @@ internal sealed class KubernetesDiscoveryService(
     private async Task<string> ListAsync(CancellationToken ct)
     {
         var list = await api.ListPodsAsync(target.Namespace, ct).ConfigureAwait(false);
+        _warnings = await ListWarningsAsync(ct).ConfigureAwait(false);
 
         var current = new Dictionary<string, InstanceInfo>();
         foreach (var pod in list.Pods)
         {
-            if (PodMapper.Map(pod, options.MonitoringSidecarContainer) is { } instance)
+            if (PodMapper.Map(pod, options.MonitoringSidecarContainer, _warnings.GetValueOrDefault(pod.Metadata.Name)) is { } instance)
             {
                 current[instance.Id] = instance;
             }
@@ -118,6 +123,27 @@ internal sealed class KubernetesDiscoveryService(
         return list.ResourceVersion;
     }
 
+    /// <summary>
+    /// Reads the latest warning event per pod. Events explain pods that never start, but the agent works without them, for example when its role
+    /// may not read events, so a failure only costs that detail.
+    /// </summary>
+    private async Task<Dictionary<string, KubernetesEvent>> ListWarningsAsync(CancellationToken ct)
+    {
+        try
+        {
+            var events = await api.ListWarningEventsAsync(target.Namespace, ct).ConfigureAwait(false);
+            return events
+                .Where(e => e.InvolvedObject is { Kind: "Pod", Name: { } })
+                .GroupBy(e => e.InvolvedObject!.Name!, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.MaxBy(e => e.LastTimestamp)!, StringComparer.Ordinal);
+        }
+        catch (Exception ex) when (ex is KubernetesApiException or HttpRequestException or IOException)
+        {
+            logger.LogDebug("Cannot read the warning events of '{Namespace}': {Reason}", target.Namespace, ex.Message);
+            return [];
+        }
+    }
+
     /// <summary>Applies the changes of a watch to the store until the watch ends.</summary>
     private async Task WatchAsync(string version, CancellationToken ct)
     {
@@ -126,7 +152,7 @@ internal sealed class KubernetesDiscoveryService(
             switch (podEvent.Type)
             {
                 case PodEventType.Added or PodEventType.Modified when podEvent.Pod is { } pod:
-                    if (PodMapper.Map(pod, options.MonitoringSidecarContainer) is { } instance)
+                    if (PodMapper.Map(pod, options.MonitoringSidecarContainer, _warnings.GetValueOrDefault(pod.Metadata.Name)) is { } instance)
                     {
                         Upsert(instance);
                     }
@@ -171,6 +197,7 @@ internal sealed class KubernetesDiscoveryService(
         && a.ServiceName == b.ServiceName
         && a.Lifecycle == b.Lifecycle
         && a.Health == b.Health
+        && (a.Checks ?? []).SequenceEqual(b.Checks ?? [])
         && a.Labels.Count == b.Labels.Count
         && a.Labels.All(label => b.Labels.TryGetValue(label.Key, out var value) && value == label.Value);
 }

@@ -27,6 +27,38 @@ public class HttpKubernetesApiTests
     }
 
     [Fact]
+    public async Task ListWarningEventsAsync_asks_for_warnings_only_and_reads_what_each_is_about()
+    {
+        // Arrange
+        const string json = """
+            {"items":[{"involvedObject":{"kind":"Pod","name":"orders-1"},"reason":"FailedScheduling","message":"0/3 nodes are available","lastTimestamp":"2026-11-02T08:00:00Z"}]}
+            """;
+        var server = new FakeApiServer().Answering(HttpStatusCode.OK, json);
+
+        // Act
+        var events = await server.Api.ListWarningEventsAsync("shop", Ct);
+
+        // Assert
+        server.Requests.Single().ShouldBe("GET api/v1/namespaces/shop/events?fieldSelector=type%3DWarning");
+        events.Single().InvolvedObject!.Name.ShouldBe("orders-1");
+        events.Single().Reason.ShouldBe("FailedScheduling");
+        events.Single().LastTimestamp.ShouldBe(new DateTimeOffset(2026, 11, 2, 8, 0, 0, TimeSpan.Zero));
+    }
+
+    [Fact]
+    public async Task ListWarningEventsAsync_fails_with_an_api_exception_when_the_role_may_not_read_events()
+    {
+        // Arrange
+        var server = new FakeApiServer().Answering(HttpStatusCode.Forbidden, "{}");
+
+        // Act
+        var list = () => server.Api.ListWarningEventsAsync("shop", Ct);
+
+        // Assert
+        await list.ShouldThrowAsync<KubernetesApiException>();
+    }
+
+    [Fact]
     public async Task ListPodsAsync_escapes_the_namespace_in_the_path()
     {
         // Arrange
