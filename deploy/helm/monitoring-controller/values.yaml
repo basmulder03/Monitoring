@@ -19,6 +19,22 @@ serviceAccountAuth:
   audience: monitoring-controller
   scopes: {}          # for example: { shop-prod: shop } to let the namespace shop-prod report as the scope shop
 
+# Where alerts are sent besides the dashboard. A channel hears of each alert once when it starts and once when it ends (what it was told is kept in the state store below).
+# Any value that is a secret can be read from a secret instead: urlSecret, secretSecret, userSecret, passwordSecret take { name, key }.
+notifications:
+  minSeverity: warning        # warning or critical
+  # Only one replica sends, chosen through a Kubernetes Lease (creates a service account and a role for that one object). Off: every replica sends,
+  # and the receiver de-duplicates by the key in each message.
+  oneSender: false
+  webhooks: []                # - { url: "https://hooks.example/alerts", secretSecret: { name: hook, key: secret } }  (JSON with an HMAC signature header when there is a secret)
+  chats: []                   # - { urlSecret: { name: slack, key: url }, format: slack }   (slack, also for Mattermost and Google Chat, or discord)
+  email: {}                   # { host: smtp.example, port: 587, from: monitoring@example, to: [oncall@example], user: x, passwordSecret: { name: smtp, key: password } }
+
+# What the controller keeps across a restart, such as the history of changes. In memory by default, which loses it.
+state:
+  sqlite:
+    enabled: false            # keep it in a SQLite file on an emptyDir: it survives a restart of the container, not a reschedule of the pod
+
 # The individual address of every replica as agents must reach it, host:port. By default the pods of the stateful set, which is enough
 # for agents inside the cluster. For agents elsewhere give one address per replica, for example the host of a route per replica.
 replicaAddresses: []

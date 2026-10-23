@@ -16,7 +16,9 @@ using Monitoring.Controller.Features.Packages;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Features.SelfMonitoring;
 using Monitoring.Controller.Features.Vulnerabilities;
+using Monitoring.Controller.Features.Notifications;
 using Monitoring.Controller.Features.Security;
+using Monitoring.Controller.Features.StateStore;
 using Monitoring.Controller.Features.Topology;
 using Monitoring.Common.Prometheus;
 using Monitoring.Hosting;
@@ -91,11 +93,35 @@ internal static class ControllerComposition
                     var self = provider.GetRequiredService<SystemTelemetry>();
                     return () => ControllerSamples(self.Read());
                 })
+            .AddStateStore(options => options.SqlitePath = controller.Section("State").Optional("SqlitePath"))
             .AddChangeMarkers(options =>
             {
                 var changes = controller.Section("ChangeMarkers");
                 options.SampleInterval = changes.Duration("SampleInterval", options.SampleInterval);
                 options.MaxMarkers = changes.Int("MaxMarkers", options.MaxMarkers);
+            })
+            .AddNotifications(options =>
+            {
+                var notifications = controller.Section("Notifications");
+                options.Interval = notifications.Duration("Interval", options.Interval);
+                options.MinSeverity = notifications.Text("MinSeverity", options.MinSeverity);
+                options.Source = notifications.Optional("Source");
+                options.Webhooks = [.. notifications.Items("Webhooks").Select(item => new WebhookTarget(new Uri(item.Required("Url"), UriKind.RelativeOrAbsolute), item.Optional("Secret")))];
+                options.Chats = [.. notifications.Items("Chats").Select(item => new ChatTarget(new Uri(item.Required("Url"), UriKind.RelativeOrAbsolute), item.Text("Format", "slack")))];
+                var email = notifications.Section("Email");
+                options.Email.Host = email.Optional("Host");
+                options.Email.Port = email.Int("Port", options.Email.Port);
+                options.Email.Ssl = email.Text("Ssl", "true").Equals("true", StringComparison.OrdinalIgnoreCase);
+                options.Email.User = email.Optional("User");
+                options.Email.Password = email.Optional("Password");
+                options.Email.From = email.Optional("From");
+                options.Email.To = [.. email.List("To")];
+                var election = notifications.Section("Leader");
+                options.Leader.Mode = election.Text("Mode", options.Leader.Mode);
+                options.Leader.LeaseName = election.Text("LeaseName", options.Leader.LeaseName);
+                options.Leader.LeaseNamespace = election.Optional("LeaseNamespace");
+                options.Leader.LeaseDuration = election.Duration("LeaseDuration", options.Leader.LeaseDuration);
+                options.Leader.ApiServer = election.Optional("ApiServer");
             })
             .AddDeadMansSwitch(options =>
             {

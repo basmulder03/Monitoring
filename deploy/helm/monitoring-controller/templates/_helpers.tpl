@@ -26,3 +26,23 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 {{- end -}}
 {{- end -}}
+
+{{/* Whether the controller needs a service account of its own: to review the tokens of agents, or to hold the lease that decides which replica sends alerts. */}}
+{{- define "monitoring-controller.needsServiceAccount" -}}
+{{- if or .Values.serviceAccountAuth.enabled .Values.notifications.oneSender -}}true{{- end -}}
+{{- end -}}
+
+{{/* One setting that is either given inline or read from a secret, as an environment variable. */}}
+{{- define "monitoring-controller.setting" -}}
+{{- $name := index . 0 -}}{{- $inline := index . 1 -}}{{- $secret := index . 2 -}}
+{{- if $secret }}
+- name: {{ $name }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ required "a secret reference needs a name" $secret.name }}
+      key: {{ required "a secret reference needs a key" $secret.key }}
+{{- else if $inline }}
+- name: {{ $name }}
+  value: {{ $inline | quote }}
+{{- end }}
+{{- end -}}

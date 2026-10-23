@@ -103,6 +103,28 @@ Layers, the most specific winning: the built-in defaults, then `defaults`, then 
 - Agents say in every heartbeat which version they use. When it differs from what the controller would give that agent now, the scope view says so and the tile shows "Configuration not yet up to date". A moment after a change this is normal; if it stays, the agent is not receiving it. Replicas that run different files during a rollout show up the same way.
 - The heartbeat interval is not part of it: it belongs together with how long silence is tolerated, and is set with `Controller:Liveness`.
 
+### Notifications
+
+Besides the dashboard, alerts can be sent to a webhook, a chat or an email address. Each channel hears about an alert **once when it starts and once when it ends**, not on every look. What a channel was told is kept in the state store (below), so a restart of the controller does not repeat it, and an alert that ended meanwhile is reported as resolved. Nothing is sent during the startup grace period, because then "nothing is firing" would only mean "nothing is known yet". A channel that cannot be reached is tried again at the next look, in order, and the other channels are not held up. Silenced alerts are not sent.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Controller:Notifications:Webhooks:<n>:Url` | none | A webhook that receives each notification as JSON: `status` (`firing` or `resolved`), `key` (stable, so a receiver can de-duplicate), `rule`, `subject`, `severity`, `since`, `source` |
+| `Controller:Notifications:Webhooks:<n>:Secret` | none | When set, each request carries `X-Monitoring-Signature: sha256=<hex>`, the HMAC-SHA256 of the body with this secret, so the receiver knows the controller sent it |
+| `Controller:Notifications:Chats:<n>:Url`, `:Format` | none, `slack` | An incoming webhook of a chat. `slack` posts `{"text": …}` (Slack, Mattermost, Google Chat), `discord` posts `{"content": …}`. The message is one line such as `[CRITICAL] service-down: shop/payments (prod-a, since …)` |
+| `Controller:Notifications:Email:Host`, `:Port`, `:Ssl`, `:User`, `:Password`, `:From`, `:To:<n>` | none, `587`, `true` | An SMTP server, the sender and the receivers; used when a host is set, and then the sender and at least one receiver are required |
+| `Controller:Notifications:MinSeverity` | `warning` | Only alerts of this severity and above are sent: `warning` or `critical` |
+| `Controller:Notifications:Interval` | `00:00:05` | How often the alerts are compared with what was sent |
+| `Controller:Notifications:Source` | host name | The name of this controller in what is sent, so receivers can tell environments apart |
+| `Controller:Notifications:Leader:Mode` | `none` | `none`: every replica sends, and the receiver de-duplicates by `key`. `lease`: one replica sends, chosen through a Kubernetes Lease |
+| `Controller:Notifications:Leader:LeaseName`, `:LeaseNamespace`, `:LeaseDuration`, `:ApiServer` | `monitoring-controller-alerts`, the namespace of the pod, `00:00:15`, the cluster of the pod | The Lease to hold. The replica that holds it renews it every third of the duration; another takes over when it has been silent for the whole duration. A replica that cannot reach the API server stops sending when its own lease would have run out, so a failure costs at worst a repeated message |
+
+With `Mode=lease` the controller needs the right to create the Lease and to get and update that one object; the chart does this with `notifications.oneSender=true`. The Helm values are `notifications.webhooks`, `chats` and `email`, with `urlSecret`, `secretSecret`, `userSecret` and `passwordSecret` to read a value from a secret instead of the values file. A message can arrive twice when the leader changes at the wrong moment; use `key` to de-duplicate if that matters to you.
+
+### State that survives a restart
+
+Almost everything the controller shows is rebuilt from what the agents send within seconds of a restart. What no agent can tell it again is kept in the **state store**: the history of changes (versions that appeared) and what each notification channel was told. By default it lives in memory and is gone after a restart. `Controller:State:SqlitePath` keeps it in a SQLite file instead; the chart does this with `state.sqlite.enabled=true`, on a volume that survives a restart of the container (an `emptyDir`; use your own volume to survive a reschedule). The file holds a few kilobytes. A file that cannot be written does not stop the controller: it says so in its log and keeps the values for the life of the process. The SQLite library is a native one, which the container image carries next to the binary.
+
 ### Aligned packages
 
 Different services may use different versions of a library, and often that is fine. For libraries that should match, such as a family of framework packages or your own shared libraries, list them. The packages view then marks a package whose versions are further apart than allowed, and the warning `package-drift` fires after `PackageDriftWait`, which is long by default because a rollout of a library passes through this state.

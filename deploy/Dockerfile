@@ -19,11 +19,14 @@ COPY src ./src
 COPY samples ./samples
 RUN case "${TARGETARCH:-amd64}" in arm64) rid=linux-arm64 ;; *) rid=linux-x64 ;; esac \
     && dotnet publish "${PROJECT_PATH}" -c Release -r "$rid" -o /out \
-    && rm -f /out/*.dbg /out/*.pdb /out/*.xml
+    && rm -f /out/*.dbg /out/*.pdb /out/*.xml \
+    && mkdir /native && (cp /out/*.so /native/ 2>/dev/null || true)
 
 # The runtime dependencies image has no shell, no package manager and a non-root user.
 FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled
 ARG PROJECT
 COPY --from=build /out/Monitoring.${PROJECT} /app/monitoring
+# Native libraries that a binary loads by name, such as SQLite of the controller; empty for the others.
+COPY --from=build /native/ /app/
 USER $APP_UID
 ENTRYPOINT ["/app/monitoring"]

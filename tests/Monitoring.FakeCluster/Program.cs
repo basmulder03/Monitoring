@@ -2,6 +2,7 @@
 // It answers what the agent asks (the pods, and empty lists of everything else), keeps watch connections open and has a control API to change the pods:
 //   PUT    /control/pods/{name}?service=orders&ready=true   adds a pod, or changes it
 //   DELETE /control/pods/{name}                              removes a pod
+//   POST   /receive/webhook   keeps what an alert webhook sends; GET lists it as a JSON array, DELETE forgets it
 // Pods to start with: FAKECLUSTER_PODS=orders-1:orders,payments-1:payments
 using System.Collections.Concurrent;
 using System.Text.Json;
@@ -57,6 +58,18 @@ app.MapPut("/control/pods/{name}", (string name, string? service, bool? ready) =
     return Results.NoContent();
 });
 app.MapDelete("/control/pods/{name}", (string name) => cluster.Delete(name) ? Results.NoContent() : Results.NotFound());
+var received = new ConcurrentQueue<string>();
+app.MapPost("/receive/webhook", async (HttpRequest request) =>
+{
+    received.Enqueue(await new StreamReader(request.Body).ReadToEndAsync());
+    return Results.Ok();
+});
+app.MapGet("/receive/webhook", () => Results.Text($"[{string.Join(",", received)}]", "application/json"));
+app.MapDelete("/receive/webhook", () =>
+{
+    received.Clear();
+    return Results.NoContent();
+});
 app.MapGet("/healthz", () => "ok");
 
 app.Run();

@@ -62,6 +62,9 @@ internal sealed class AlertEvaluator : IAlertEvaluator, IAlertState
     }
 
     /// <inheritdoc />
+    public bool IsReady => _time.GetUtcNow() >= _graceEnds;
+
+    /// <inheritdoc />
     public IReadOnlyList<Alert> GetActiveAlerts()
     {
         lock (_gate)

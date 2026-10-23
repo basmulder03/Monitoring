@@ -15,13 +15,13 @@ spec:
       labels: {{- include "monitoring-controller.selector" . | nindent 8 }}
       annotations:
         # A new central configuration needs no restart, but a changed setting here does.
-        checksum/settings: {{ toYaml (dict "tokens" .Values.agentTokens "dashboard" .Values.dashboard "aligned" .Values.alignedPackages "replicas" .Values.replicaAddresses "transport" .Values.transport "auth" .Values.serviceAccountAuth) | sha256sum }}
+        checksum/settings: {{ toYaml (dict "tokens" .Values.agentTokens "dashboard" .Values.dashboard "aligned" .Values.alignedPackages "replicas" .Values.replicaAddresses "transport" .Values.transport "auth" .Values.serviceAccountAuth "notifications" .Values.notifications "state" .Values.state) | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
-      {{- if .Values.serviceAccountAuth.enabled }}
-      # The controller asks the API server whether the token of an agent is valid, as this service account.
+      {{- if include "monitoring-controller.needsServiceAccount" . }}
+      # The controller asks the API server whether the token of an agent is valid, and holds the lease that picks the sender of alerts, as this service account.
       serviceAccountName: {{ include "monitoring-controller.name" . }}
       {{- end }}
       securityContext:
@@ -89,6 +89,43 @@ spec:
             - name: MONITORING_Controller__Transport__ClientCaFile
               value: /etc/monitoring/transport/ca.crt
             {{- end }}
+            - name: MONITORING_Controller__Notifications__MinSeverity
+              value: {{ .Values.notifications.minSeverity | quote }}
+            {{- range $i, $hook := .Values.notifications.webhooks }}
+            {{- include "monitoring-controller.setting" (list (printf "MONITORING_Controller__Notifications__Webhooks__%d__Url" $i) $hook.url $hook.urlSecret) | nindent 12 }}
+            {{- include "monitoring-controller.setting" (list (printf "MONITORING_Controller__Notifications__Webhooks__%d__Secret" $i) $hook.secret $hook.secretSecret) | nindent 12 }}
+            {{- end }}
+            {{- range $i, $chat := .Values.notifications.chats }}
+            {{- include "monitoring-controller.setting" (list (printf "MONITORING_Controller__Notifications__Chats__%d__Url" $i) $chat.url $chat.urlSecret) | nindent 12 }}
+            - name: MONITORING_Controller__Notifications__Chats__{{ $i }}__Format
+              value: {{ default "slack" $chat.format | quote }}
+            {{- end }}
+            {{- with .Values.notifications.email }}
+            {{- if .host }}
+            - name: MONITORING_Controller__Notifications__Email__Host
+              value: {{ .host | quote }}
+            - name: MONITORING_Controller__Notifications__Email__Port
+              value: {{ default 587 .port | quote }}
+            - name: MONITORING_Controller__Notifications__Email__From
+              value: {{ required "notifications.email.from is needed with a host" .from | quote }}
+            {{- range $i, $to := .to }}
+            - name: MONITORING_Controller__Notifications__Email__To__{{ $i }}
+              value: {{ $to | quote }}
+            {{- end }}
+            {{- include "monitoring-controller.setting" (list "MONITORING_Controller__Notifications__Email__User" .user .userSecret) | nindent 12 }}
+            {{- include "monitoring-controller.setting" (list "MONITORING_Controller__Notifications__Email__Password" "" .passwordSecret) | nindent 12 }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.notifications.oneSender }}
+            - name: MONITORING_Controller__Notifications__Leader__Mode
+              value: lease
+            - name: MONITORING_Controller__Notifications__Leader__LeaseName
+              value: {{ include "monitoring-controller.name" . }}-alerts
+            {{- end }}
+            {{- if .Values.state.sqlite.enabled }}
+            - name: MONITORING_Controller__State__SqlitePath
+              value: /var/lib/monitoring/state.db
+            {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -113,6 +150,10 @@ spec:
               mountPath: /etc/monitoring/advisories
               readOnly: true
             {{- end }}
+            {{- if .Values.state.sqlite.enabled }}
+            - name: state
+              mountPath: /var/lib/monitoring
+            {{- end }}
           resources: {{- toYaml .Values.resources | nindent 12 }}
       volumes:
         - name: central
@@ -127,6 +168,11 @@ spec:
         - name: advisories
           configMap:
             name: {{ .Values.advisories.existingConfigMap }}
+        {{- end }}
+        {{- if .Values.state.sqlite.enabled }}
+        # Survives a restart of the container, not a reschedule of the pod.
+        - name: state
+          emptyDir: {}
         {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector: {{- toYaml . | nindent 8 }}

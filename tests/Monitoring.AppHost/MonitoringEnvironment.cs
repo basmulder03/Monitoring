@@ -32,6 +32,9 @@ public static class MonitoringEnvironment
     /// <summary>The name of the resource that is the controller.</summary>
     public const string Controller = "controller";
 
+    /// <summary>The secret the controller signs the alert webhook with.</summary>
+    public const string WebhookSecret = "e2e-webhook-secret";
+
     /// <summary>The name of the resource that stands in for the Kubernetes API server.</summary>
     public const string Cluster = "cluster";
 
@@ -95,6 +98,9 @@ public static class MonitoringEnvironment
             .WithEnvironment("MONITORING_Controller__Alerting__StartupGrace", "00:00:05")
             .WithEnvironment("MONITORING_Controller__Alerting__InstanceUnhealthyWait", "00:00:05")
             .WithEnvironment("MONITORING_Controller__Alerting__ScopeUnknownWait", "00:00:10")
+            .WithEnvironment("MONITORING_Controller__Notifications__Interval", "00:00:01")
+            .WithEnvironment("MONITORING_Controller__Notifications__Webhooks__0__Url", ReferenceExpression.Create($"{cluster.GetEndpoint("api").Property(EndpointProperty.Url)}/receive/webhook"))
+            .WithEnvironment("MONITORING_Controller__Notifications__Webhooks__0__Secret", WebhookSecret)
             .WithEnvironment("MONITORING_Controller__Configuration__File", CentralConfiguration(runId))
             .WithEnvironment("MONITORING_Controller__Configuration__PollInterval", "00:00:01")
             .WithHttpEndpoint(name: "metrics", env: "MONITORING_Controller__Prometheus__Port")

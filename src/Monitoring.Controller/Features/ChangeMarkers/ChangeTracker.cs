@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Monitoring.Controller.Features.Registry;
+using Monitoring.Controller.Features.StateStore;
 using Monitoring.Protocol.Instances;
 
 namespace Monitoring.Controller.Features.ChangeMarkers;
@@ -10,11 +12,17 @@ namespace Monitoring.Controller.Features.ChangeMarkers;
 /// <param name="registry">Provides the instances.</param>
 /// <param name="options">Provides the number of markers to keep.</param>
 /// <param name="time">Clock for the markers.</param>
-internal sealed class ChangeTracker(IScopeRegistry registry, ChangeMarkersOptions options, TimeProvider time) : IChangeMarkers
+/// <param name="store">Keeps the markers across a restart; without one they live as long as the process.</param>
+internal sealed class ChangeTracker(IScopeRegistry registry, ChangeMarkersOptions options, TimeProvider time, IStateStore? store = null) : IChangeMarkers
 {
+    private const string Log = "change-markers";
+
     private readonly Lock _gate = new();
     private readonly Dictionary<(string Scope, string Service), SortedSet<string>> _versions = [];
-    private readonly List<ChangeMarker> _markers = [];
+    private readonly List<ChangeMarker> _markers = LoadMarkers(store);
+
+    private static List<ChangeMarker> LoadMarkers(IStateStore? store) =>
+        store is null ? [] : [.. store.Read(Log).Select(json => JsonSerializer.Deserialize(json, ChangeMarkersJsonContext.Default.ChangeMarker)).OfType<ChangeMarker>()];
 
     /// <summary>Reads the registry and records a marker for each version that is new to a service.</summary>
     public void Sample()
@@ -36,7 +44,9 @@ internal sealed class ChangeTracker(IScopeRegistry registry, ChangeMarkersOption
                         // Only versions that were not there at the last sample count: instances going away is not a change.
                         foreach (var added in versions.Except(before, StringComparer.Ordinal))
                         {
-                            _markers.Add(new ChangeMarker(now, scope, service, string.Join(", ", before), added));
+                            var marker = new ChangeMarker(now, scope, service, string.Join(", ", before), added);
+                            _markers.Add(marker);
+                            store?.Append(Log, JsonSerializer.Serialize(marker, ChangeMarkersJsonContext.Default.ChangeMarker), options.MaxMarkers);
                         }
                     }
 
