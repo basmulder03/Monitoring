@@ -540,7 +540,7 @@ try { producer.Send(message); } catch (Exception ex) { send.Fail(ex); throw; }
 using var process = MonitoredMessaging.StartProcess(MonitoredMessaging.ActiveMq, "invoices", name => message.Properties.GetString(name));
 ```
 
-The graph then shows `sender → queue → receiver`. A message without a usable `traceparent` starts a trace of its own. Without monitoring both calls return `null` and do nothing, so the application code needs no check. The calls have been tested with plain dictionaries as the message, not with a real broker or its library.
+The graph then shows `sender → queue → receiver`. A message without a usable `traceparent` starts a trace of its own. Without monitoring both calls return `null` and do nothing, so the application code needs no check. The calls are tested with plain dictionaries as the message, and against a real ActiveMQ Artemis broker through the Artemis .NET client (AMQP; the trace id arrives unchanged at the receiver). That test runs when `MONITORING_TEST_ARTEMIS=host:port:user:password` is set, as it is in CI. Classic ActiveMQ with OpenWire was not tried, but the calls only need a string property, which every client has.
 
 ### What the library says about itself
 

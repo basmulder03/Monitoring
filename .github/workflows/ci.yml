@@ -25,8 +25,18 @@ jobs:
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+      # A real broker for the test that checks the trace context travels through a message.
+      artemis:
+        image: apache/activemq-artemis:latest-alpine
+        env:
+          ARTEMIS_USER: art
+          ARTEMIS_PASSWORD: ci-only
+        ports: ["5672:5672"]
+        options: >-
+          --health-cmd "nc -z localhost 5672" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       MONITORING_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Username=postgres;Password=ci-only
+      MONITORING_TEST_ARTEMIS: 127.0.0.1:5672:art:ci-only
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
