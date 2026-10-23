@@ -11,4 +11,7 @@ public sealed class SecurityOptions
 
     /// <summary>Gets or sets whether and how agents may use the token of their Kubernetes service account instead.</summary>
     public ServiceAccountOptions ServiceAccounts { get; set; } = new();
+
+    /// <summary>Gets or sets whether agents may be let in by the client certificate of a mutual TLS connection, without a token.</summary>
+    public CertificateOptions Certificates { get; set; } = new();
 }

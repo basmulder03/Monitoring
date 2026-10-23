@@ -60,7 +60,8 @@ internal static class ControllerComposition
         var controller = settings.Section("Controller");
         var accounts = controller.Section("ServiceAccounts");
         var accountsEnabled = accounts.Text("Enabled", "false").Equals("true", StringComparison.OrdinalIgnoreCase);
-        var tokens = ReadAgentTokens(controller, accountsEnabled);
+        var certificatesEnabled = controller.Section("Certificates").Text("Enabled", "false").Equals("true", StringComparison.OrdinalIgnoreCase);
+        var tokens = ReadAgentTokens(controller, accountsEnabled || certificatesEnabled);
 
         builder.Services
             .AddRegistry(options =>
@@ -158,6 +159,9 @@ internal static class ControllerComposition
             .AddSecurity(options =>
             {
                 options.AgentTokens.AddRange(tokens);
+                var certificates = controller.Section("Certificates");
+                options.Certificates.Enabled = certificates.Text("Enabled", "false").Equals("true", StringComparison.OrdinalIgnoreCase);
+                options.Certificates.Scopes = new Dictionary<string, string>(certificates.Map("Scopes"), StringComparer.Ordinal);
                 options.ServiceAccounts.Enabled = accountsEnabled;
                 options.ServiceAccounts.Audience = accounts.Text("Audience", options.ServiceAccounts.Audience);
                 options.ServiceAccounts.ApiServer = accounts.Optional("ApiServer");

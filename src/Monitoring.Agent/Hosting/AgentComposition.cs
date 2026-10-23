@@ -34,7 +34,8 @@ internal static class AgentComposition
         var agent = settings.Section("Agent");
         var scopeName = agent.Required("ScopeName");
         var tokenFile = agent.Optional("TokenFile");
-        var token = tokenFile is null ? agent.Required("Token") : agent.Optional("Token");
+        var mutualTls = agent.Section("Transport").Text("Mode", "none").Equals("mtls", StringComparison.OrdinalIgnoreCase);
+        var token = tokenFile is null && !mutualTls ? agent.Required("Token") : agent.Optional("Token");
         var controllers = agent.List("Controllers");
         if (controllers.Count == 0)
         {

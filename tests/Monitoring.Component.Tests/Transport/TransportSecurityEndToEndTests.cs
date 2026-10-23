@@ -91,4 +91,55 @@ public class TransportSecurityEndToEndTests
         // Assert
         controller.InstanceIds("shop").ShouldBeEmpty();
     }
+
+    [Fact]
+    public async Task An_agent_is_known_by_its_client_certificate_and_needs_no_token()
+    {
+        // Arrange
+        using var pki = new TestPki();
+        await using var controller = new ControllerHost().With("Controller:Certificates:Enabled", "true").WithTls(pki.Issue(ControllerName), clientCa: pki).Start();
+
+        // Act
+        await using var agent = new AgentHost("shop", "").ConnectingTo(controller)
+            .WithTls(pki, ControllerName, clientCertificate: pki.Issue("shop", client: true)).Start();
+        agent.Report("pod-1");
+
+        // Assert
+        await Eventually.AssertAsync(() => controller.InstanceIds("shop").ShouldBe(["pod-1"]));
+    }
+
+    [Fact]
+    public async Task A_certificate_is_for_one_scope_so_an_agent_cannot_report_as_another()
+    {
+        // Arrange
+        using var pki = new TestPki();
+        await using var controller = new ControllerHost().With("Controller:Certificates:Enabled", "true").WithTls(pki.Issue(ControllerName), clientCa: pki).Start();
+
+        // Act
+        await using var agent = new AgentHost("billing", "").ConnectingTo(controller)
+            .WithTls(pki, ControllerName, clientCertificate: pki.Issue("shop", client: true)).Start();
+        agent.Report("pod-1");
+        await Task.Delay(1500, TestContext.Current.CancellationToken);
+
+        // Assert
+        controller.InstanceIds("billing").ShouldBeEmpty();
+        controller.InstanceIds("shop").ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_certificate_is_not_enough_when_the_controller_was_not_told_to_trust_certificates_for_identity()
+    {
+        // Arrange
+        using var pki = new TestPki();
+        await using var controller = new ControllerHost().AcceptingEnrollment(Token).WithTls(pki.Issue(ControllerName), clientCa: pki).Start();
+
+        // Act
+        await using var agent = new AgentHost("shop", "").ConnectingTo(controller)
+            .WithTls(pki, ControllerName, clientCertificate: pki.Issue("shop", client: true)).Start();
+        agent.Report("pod-1");
+        await Task.Delay(1500, TestContext.Current.CancellationToken);
+
+        // Assert
+        controller.InstanceIds("shop").ShouldBeEmpty();
+    }
 }

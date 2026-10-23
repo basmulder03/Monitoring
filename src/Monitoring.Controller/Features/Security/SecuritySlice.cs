@@ -23,6 +23,11 @@ public static class SecuritySlice
         }
 
         services.AddSingleton(options);
+        if (options.Certificates.Enabled)
+        {
+            services.AddSingleton<ICertificateIdentity>(new CertificateAgentIdentity(options.Certificates));
+        }
+
         if (options.ServiceAccounts.Enabled)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(options.ServiceAccounts.Audience, nameof(configure));

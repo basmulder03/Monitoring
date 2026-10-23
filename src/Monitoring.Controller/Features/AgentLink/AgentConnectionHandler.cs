@@ -1,3 +1,5 @@
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Monitoring.Controller.Features.Configuration;
@@ -30,6 +32,7 @@ namespace Monitoring.Controller.Features.AgentLink;
 /// <param name="logger">Receives the reasons a connection was refused or ended.</param>
 /// <param name="connections">Keeps the live connections so requests can reach them; optional.</param>
 /// <param name="telemetry">Told about every frame that arrives, for the System view; optional.</param>
+/// <param name="certificates">Lets an agent in by the client certificate of its connection, instead of a token; optional.</param>
 internal sealed class AgentConnectionHandler(
     IAgentAuthenticator authenticator,
     IScopeRegistry registry,
@@ -41,7 +44,8 @@ internal sealed class AgentConnectionHandler(
     TimeProvider time,
     ILogger<AgentConnectionHandler> logger,
     AgentConnections? connections = null,
-    ISystemTelemetry? telemetry = null)
+    ISystemTelemetry? telemetry = null,
+    ICertificateIdentity? certificates = null)
 {
     /// <summary>Serves the connection until the agent leaves, misbehaves or the controller shuts down.</summary>
     /// <param name="stream">The connection to the agent.</param>
@@ -144,7 +148,10 @@ internal sealed class AgentConnectionHandler(
             return null;
         }
 
-        var identity = await authenticator.AuthenticateAsync(hello, ct).ConfigureAwait(false);
+        var identity = stream is SslStream { RemoteCertificate: { } peer } && certificates is not null
+            ? certificates.Identify(hello, X509CertificateLoader.LoadCertificate(peer.GetRawCertData()))
+            : null;
+        identity ??= await authenticator.AuthenticateAsync(hello, ct).ConfigureAwait(false);
         if (identity is null)
         {
             // The token itself is never logged.

@@ -232,7 +232,9 @@ With the Helm charts: `serviceAccountAuth.enabled=true` on the controller chart 
 - The certificate files are read again when they change, so a renewed certificate is used for the next connection without a restart. Connections already open keep the old one.
 - A mistake in a file or setting stops the executable from starting, with exit code 78 and a message naming the file.
 - Revocation is not checked for a private authority (`CaFile`, `ClientCaFile`): such authorities rarely publish a list, and the check would fail every handshake offline. Use short-lived certificates. Without `CaFile` the agent uses the machine's authorities and the normal checks.
-- Authentication stays on whatever the mode: the agent token is still required, and `mtls` adds to it.
+- Authentication stays on whatever the mode: the agent token is still required, and `mtls` adds to it, unless the controller is told to know agents by their certificate (below).
+
+**Agents known by their certificate.** With `mtls` the certificate can stand in for the token: set `Controller:Certificates:Enabled` to `true` and an agent whose certificate the controller accepts (it was signed by `ClientCaFile`, for example by cert-manager or your own PKI) is let in without a token, as the scope named by the common name of the certificate. `Controller:Certificates:Scopes:<common name>` maps a name to another scope. A certificate is for one scope: an agent that announces another scope than its certificate says is turned away, and so is one whose certificate says nothing the controller accepts, unless it has a valid token. The agent needs no `Token` then, only `Agent:Transport:Mode=mtls` with its certificate and key. Tokens and service accounts keep working beside it. The controller does not issue certificates itself; renewing them is the job of the PKI.
 
 ```json
 {

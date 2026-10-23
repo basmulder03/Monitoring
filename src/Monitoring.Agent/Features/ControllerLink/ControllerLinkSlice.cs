@@ -72,9 +72,10 @@ public static class ControllerLinkSlice
             throw new ArgumentException($"'{address}' is not a host:port address.", nameof(options));
         }
 
-        if (string.IsNullOrWhiteSpace(options.Token) && string.IsNullOrWhiteSpace(options.TokenFile))
+        // With mutual TLS the controller can know the agent by its certificate.
+        if (string.IsNullOrWhiteSpace(options.Token) && string.IsNullOrWhiteSpace(options.TokenFile) && options.Transport.Mode != TransportMode.Mtls)
         {
-            throw new ArgumentException("A token, or a file with one, is required to authenticate with the controller.", nameof(options));
+            throw new ArgumentException("A token, or a file with one, is required to authenticate with the controller, unless the transport is mutual TLS.", nameof(options));
         }
 
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.ReconnectMinDelay, TimeSpan.Zero);
