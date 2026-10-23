@@ -32,6 +32,9 @@ public static class MonitoringEnvironment
     /// <summary>The name of the resource that is the controller.</summary>
     public const string Controller = "controller";
 
+    /// <summary>The token that lets a person or a wall display see the dashboard; the controller holds its hash.</summary>
+    public const string DashboardToken = "e2e-dashboard-token-0123456789";
+
     /// <summary>The secret the controller signs the alert webhook with.</summary>
     public const string WebhookSecret = "e2e-webhook-secret";
 
@@ -98,6 +101,8 @@ public static class MonitoringEnvironment
             .WithEnvironment("MONITORING_Controller__Alerting__StartupGrace", "00:00:05")
             .WithEnvironment("MONITORING_Controller__Alerting__InstanceUnhealthyWait", "00:00:05")
             .WithEnvironment("MONITORING_Controller__Alerting__ScopeUnknownWait", "00:00:10")
+            .WithEnvironment("MONITORING_Controller__Web__Auth__Tokens__0__Name", "e2e")
+            .WithEnvironment("MONITORING_Controller__Web__Auth__Tokens__0__Hash", Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(DashboardToken))))
             .WithEnvironment("MONITORING_Controller__Notifications__Interval", "00:00:01")
             .WithEnvironment("MONITORING_Controller__Notifications__Webhooks__0__Url", ReferenceExpression.Create($"{cluster.GetEndpoint("api").Property(EndpointProperty.Url)}/receive/webhook"))
             .WithEnvironment("MONITORING_Controller__Notifications__Webhooks__0__Secret", WebhookSecret)

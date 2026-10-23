@@ -18,6 +18,7 @@ using Monitoring.Controller.Features.SelfMonitoring;
 using Monitoring.Controller.Features.Vulnerabilities;
 using Monitoring.Controller.Features.Notifications;
 using Monitoring.Controller.Features.Security;
+using Monitoring.Controller.Features.WebAuth;
 using Monitoring.Controller.Features.StateStore;
 using Monitoring.Controller.Features.Topology;
 using Monitoring.Common.Prometheus;
@@ -93,6 +94,16 @@ internal static class ControllerComposition
                     var self = provider.GetRequiredService<SystemTelemetry>();
                     return () => ControllerSamples(self.Read());
                 })
+            .AddWebAuth(options =>
+            {
+                var auth = controller.Section("Web").Section("Auth");
+                options.TrustedProxies = [.. auth.List("TrustedProxies")];
+                options.UserHeader = auth.Text("UserHeader", options.UserHeader);
+                options.GroupsHeader = auth.Text("GroupsHeader", options.GroupsHeader);
+                options.OperatorGroup = auth.Optional("OperatorGroup");
+                options.Tokens = [.. auth.Items("Tokens").Select(item => new WebToken(
+                    item.Required("Name"), item.Required("Hash"), item.Text("Role", "viewer").Equals("operator", StringComparison.OrdinalIgnoreCase) ? WebRole.Operator : WebRole.Viewer))];
+            })
             .AddStateStore(options => options.SqlitePath = controller.Section("State").Optional("SqlitePath"))
             .AddChangeMarkers(options =>
             {
@@ -226,6 +237,7 @@ internal static class ControllerComposition
         ListenOn(builder, settings.Section("Controller").Section("Web"));
 
         var app = builder.Build();
+        app.UseWebAuth();
         app.MapDashboard();
         app.MapSelfMonitoring();
         app.MapChangeMarkers();

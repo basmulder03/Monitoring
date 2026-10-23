@@ -34,6 +34,7 @@ public sealed class DashboardDriver
         // A controller that is down leaves its port open for a while, so a request must not wait for the default hundred seconds.
         using var client = RunningEnvironment.App.CreateHttpClient(MonitoringEnvironment.Controller, "web");
         client.Timeout = RequestTimeout;
+        client.DefaultRequestHeaders.Authorization = new("Bearer", MonitoringEnvironment.DashboardToken);
         try
         {
             using var response = await client.GetAsync(path);
@@ -43,6 +44,18 @@ public sealed class DashboardDriver
         {
             return null;
         }
+    }
+
+    /// <summary>Asks for a page the way a visitor would, with or without the token, and says how the controller answered.</summary>
+    /// <param name="path">The path.</param>
+    /// <param name="token">The token to give in the address, or <see langword="null"/> for none.</param>
+    /// <returns>The status code and whether the answer sets the cookie that remembers the token.</returns>
+    public async Task<(int Status, bool SetsCookie)> VisitAsync(string path, string? token)
+    {
+        using var client = RunningEnvironment.App.CreateHttpClient(MonitoringEnvironment.Controller, "web");
+        client.Timeout = RequestTimeout;
+        using var response = await client.GetAsync(token is null ? path : $"{path}?token={Uri.EscapeDataString(token)}");
+        return ((int)response.StatusCode, response.Headers.TryGetValues("Set-Cookie", out var cookies) && cookies.Any(c => c.StartsWith("monitoring_token=", StringComparison.Ordinal)));
     }
 
     /// <summary>Reads the page of a scope.</summary>

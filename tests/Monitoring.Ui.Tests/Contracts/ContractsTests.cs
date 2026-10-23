@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using Monitoring.Controller.Features.Dashboard;
 using Monitoring.Controller.Features.Packages;
 using Monitoring.Controller.Features.SelfMonitoring;
+using Monitoring.Controller.Features.WebAuth;
 using Monitoring.Controller.Features.Topology;
 using Monitoring.Controller.Features.Vulnerabilities;
 using Monitoring.Protocol.Reports;
@@ -18,7 +19,7 @@ public class ContractsTests
     {
         // Arrange
         var path = ContractsPath();
-        var expected = new ContractWriter().Add(typeof(Overview)).Add(typeof(ScopeDetail)).Add(typeof(TopologyGraph)).Add(typeof(PackageCatalog)).Add(typeof(VulnerabilityReport)).Add(typeof(SystemStatus)).Add(typeof(MetricHistory)).Write();
+        var expected = new ContractWriter().Add(typeof(Overview)).Add(typeof(ScopeDetail)).Add(typeof(TopologyGraph)).Add(typeof(PackageCatalog)).Add(typeof(VulnerabilityReport)).Add(typeof(SystemStatus)).Add(typeof(MetricHistory)).Add(typeof(WhoAmI)).Write();
 
         if (Environment.GetEnvironmentVariable("UPDATE_CONTRACTS") == "1")
         {

@@ -30,6 +30,16 @@ notifications:
   chats: []                   # - { urlSecret: { name: slack, key: url }, format: slack }   (slack, also for Mattermost and Google Chat, or discord)
   email: {}                   # { host: smtp.example, port: 587, from: monitoring@example, to: [oncall@example], user: x, passwordSecret: { name: smtp, key: password } }
 
+# Who may look at the dashboard. With nothing set it is open, as before; keep it on a network you trust. Set a trusted proxy or a token and every request must prove who it is
+# (/healthz stays open for the platform). A proxy you run (oauth2-proxy, the OpenShift OAuth proxy, an ingress that authenticates) signs people in and says who they are in the header
+# X-Forwarded-User; it is only believed when it connects from one of trustedProxies (addresses or networks), because anyone else could write the same header.
+# A token is for a wall display or a script: it goes in /tv?token=... (kept in a cookie), or in the header Authorization: Bearer ...; only its hash is kept here.
+# Make one with: head -c 32 /dev/urandom | base64 | tr -d '=+/' ; hash it with: printf '%s' 'the-token' | sha256sum
+webAuth:
+  trustedProxies: []        # for example ["10.0.0.0/8"]
+  operatorGroup: ""         # people the proxy says belong to this group (header X-Forwarded-Groups) are operators, the rest viewers
+  tokens: []                # - { name: wall-display, hash: "<sha-256 of the token>", role: viewer }
+
 # What the controller keeps across a restart, such as the history of changes. In memory by default, which loses it.
 state:
   sqlite:

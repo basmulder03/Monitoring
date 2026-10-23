@@ -18,7 +18,10 @@ export class FakeServices implements Services {
   private readonly timers: { period: number; due: number; callback: () => void }[] = [];
   private readonly settings = new Map<string, string>();
 
+  me: import("../src/api/contracts").WhoAmI | null = null;
+
   async getJson<T>(path: string) {
+    if (path === "/api/me") return this.me ? { status: 200, body: this.me as T } : { status: 404, body: null };
     if (path === "/api/system") return this.system ? { status: 200, body: this.system as T } : { status: 404, body: null };
     if (path === "/api/topology") return { status: 200, body: this.topology as T };
     if (path === "/api/packages") return { status: 200, body: this.packages as T };

@@ -1,4 +1,6 @@
 import type { Route } from "../state/useRoute";
+import type { WhoAmI } from "../api/contracts";
+import { useJson } from "../state/useJson";
 import { Icon } from "./Icon";
 
 export function Header({ route, onSwitchTheme }: { route: Route; onSwitchTheme(): void }) {
@@ -14,9 +16,21 @@ export function Header({ route, onSwitchTheme }: { route: Route; onSwitchTheme()
         <a href="#/packages" aria-current={current("packages")}>Packages</a>
         <a href="#/system" aria-current={current("system")}>System</a>
       </nav>
+      <SignedIn />
       <button type="button" id="theme-toggle" class="icon-button" aria-label="Switch between light and dark theme" onClick={onSwitchTheme}>
         <Icon name="theme" />
       </button>
     </header>
+  );
+}
+
+/** Who the dashboard thinks is looking, when it asks at all; nothing is shown on a controller that is open to everyone. */
+function SignedIn() {
+  const who = useJson<WhoAmI>("/api/me", null);
+  if (who.state !== "found" || !who.value.authenticationEnabled || who.value.name === "") return null;
+  return (
+    <span class="muted" id="signed-in">
+      {who.value.name} ({who.value.role})
+    </span>
   );
 }

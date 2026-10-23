@@ -103,6 +103,24 @@ Layers, the most specific winning: the built-in defaults, then `defaults`, then 
 - Agents say in every heartbeat which version they use. When it differs from what the controller would give that agent now, the scope view says so and the tile shows "Configuration not yet up to date". A moment after a change this is normal; if it stays, the agent is not receiving it. Replicas that run different files during a rollout show up the same way.
 - The heartbeat interval is not part of it: it belongs together with how long silence is tolerated, and is set with `Controller:Liveness`.
 
+### Who may see the dashboard
+
+With nothing set the dashboard and its API are open, as before: keep them on a network you trust. Two settings turn on authentication, and either one is enough; every request must then prove who it sends it, except `GET /healthz`, which the platform's probes use and which says only `ok`.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Controller:Web:Auth:TrustedProxies:<n>` | none | Addresses or networks (`10.0.0.0/8`) of the reverse proxies whose word is believed. The proxy signs the person in (oauth2-proxy, the OpenShift OAuth proxy, an ingress with authentication) and names them in a header |
+| `Controller:Web:Auth:UserHeader` | `X-Forwarded-User` | The header with the name of the person |
+| `Controller:Web:Auth:GroupsHeader`, `:OperatorGroup` | `X-Forwarded-Groups`, none | People in this group (comma separated in the header) are operators, everyone else is a viewer |
+| `Controller:Web:Auth:Tokens:<n>:Name`, `:Hash`, `:Role` | none, none, `viewer` | A long-lived token for a person, a script or a wall display. Only its SHA-256 (64 hexadecimal characters) is kept. The role is `viewer` or `operator` |
+
+- **The header is only believed from a trusted address.** Anyone could write `X-Forwarded-User`, so a request from any other address gets no identity from it. Make sure the dashboard port is only reachable through the proxy.
+- **A token** goes in the header `Authorization: Bearer <token>`, or in the address of a page: open `/tv?token=<token>` once on a wall display and the controller keeps it in a cookie (`HttpOnly`, `SameSite=Strict`) so the page and its live stream carry it from then on. A token in an address ends up in logs of proxies and in browser history, so use it for displays and keep it read-only; a person should come through the proxy. There is no anonymous access once authentication is on, also not for `/tv`.
+- **Make a token** with `head -c 32 /dev/urandom | base64 | tr -d '=+/'` and hash it with `printf '%s' '<token>' | sha256sum`. The comparison is in constant time. A failed attempt is logged with the address, never with the token.
+- `GET /api/me` says who the page is signed in as (`{"authenticationEnabled":true,"name":"wall","role":"viewer"}`), which the page shows next to the title. Roles are in place for what the dashboard may change later; nothing in the dashboard changes state yet, so a viewer and an operator see and can do the same today.
+- Agents are not affected: they authenticate on their own port with tokens, service accounts or certificates. The metrics port (`Prometheus:Port`) has no authentication either; keep it local or protected by the network.
+- With the chart: `webAuth.trustedProxies`, `webAuth.operatorGroup` and `webAuth.tokens`; the probes of the chart use `/healthz`.
+
 ### Notifications
 
 Besides the dashboard, alerts can be sent to a webhook, a chat or an email address. Each channel hears about an alert **once when it starts and once when it ends**, not on every look. What a channel was told is kept in the state store (below), so a restart of the controller does not repeat it, and an alert that ended meanwhile is reported as resolved. Nothing is sent during the startup grace period, because then "nothing is firing" would only mean "nothing is known yet". A channel that cannot be reached is tried again at the next look, in order, and the other channels are not held up. Silenced alerts are not sent.

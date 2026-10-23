@@ -205,3 +205,9 @@ export interface VulnerabilityReport {
   advisories: number;
   loadedAt: string | null;
 }
+
+export interface WhoAmI {
+  authenticationEnabled: boolean;
+  name: string;
+  role: string;
+}

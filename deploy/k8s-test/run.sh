@@ -61,7 +61,9 @@ kubectl create namespace monitoring >/dev/null
 # The agents prove who they are with their service account, checked by the API server of the cluster: no secret is handed out.
 helm install monitoring-controller "$root/deploy/helm/monitoring-controller" -n monitoring \
   --set image.repository=monitoring-controller --set image.tag=dev --set image.pullPolicy=Never \
-  --set serviceAccountAuth.enabled=true >/dev/null
+  --set serviceAccountAuth.enabled=true \
+  --set notifications.oneSender=true --set 'notifications.webhooks[0].url=http://127.0.0.1:9/nobody-listens' \
+  --set state.sqlite.enabled=true >/dev/null
 kubectl rollout status statefulset/monitoring-controller -n monitoring --timeout=180s >/dev/null \
   || fail "the controller did not become ready"
 
@@ -99,6 +101,18 @@ step "The scope and its instance show up, healthy"
 scope_ok() { api /api/scopes/shop | grep -q '"health":"Healthy"' && api /api/scopes/shop | grep -q '"name":"sample"'; }
 eventually 90 scope_ok || fail "the scope 'shop' did not show a healthy service 'sample'"
 api /api/overview | grep -q '"environment":"test"' || fail "the labels of the scope did not arrive"
+echo "ok"
+
+step "One controller replica sends alerts, chosen through a lease"
+holder() { kubectl get lease monitoring-controller-alerts -n monitoring -o jsonpath='{.spec.holderIdentity}' 2>/dev/null; }
+renewed() { kubectl get lease monitoring-controller-alerts -n monitoring -o jsonpath='{.spec.renewTime}' 2>/dev/null; }
+eventually 30 holder
+[ -n "$(holder)" ] || fail "no replica holds the lease for sending alerts"
+case "$(holder)" in monitoring-controller-0|monitoring-controller-1) ;; *) fail "the lease is held by '$(holder)', which is not a controller replica" ;; esac
+first="$(renewed)"
+sleep 8
+[ "$(renewed)" != "$first" ] || fail "the holder of the lease does not renew it"
+kubectl exec -n monitoring monitoring-controller-0 -- true >/dev/null 2>&1 || true
 echo "ok"
 
 step "What the application says about itself reached the dashboard"

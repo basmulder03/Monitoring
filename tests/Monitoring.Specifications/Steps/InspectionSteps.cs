@@ -96,4 +96,24 @@ public sealed class InspectionSteps(DashboardDriver dashboard)
             var configuration = document!.RootElement.GetProperty("configuration");
             return configuration.GetProperty("inSync").GetBoolean() && configuration.GetProperty("applied").ValueKind == JsonValueKind.String;
         }, $"/api/scopes/{scope}");
+
+    [Then(@"a visitor without a token is refused the page ""(.*)""")]
+    public async Task ThenAVisitorWithoutATokenIsRefused(string path) =>
+        (await dashboard.VisitAsync(path, token: null)).Status.ShouldBe(401);
+
+    [Then(@"a visitor with a wrong token is refused the page ""(.*)""")]
+    public async Task ThenAVisitorWithAWrongTokenIsRefused(string path) =>
+        (await dashboard.VisitAsync(path, token: "not-the-token")).Status.ShouldBe(401);
+
+    [Then(@"a visitor without a token may ask the health probe ""(.*)""")]
+    public async Task ThenTheProbeIsOpen(string path) =>
+        (await dashboard.VisitAsync(path, token: null)).Status.ShouldBe(200);
+
+    [Then(@"a visitor with the dashboard token is shown the page ""(.*)"" and the token is kept in a cookie")]
+    public async Task ThenAVisitorWithTheTokenIsShownThePage(string path)
+    {
+        var (status, setsCookie) = await dashboard.VisitAsync(path, MonitoringEnvironment.DashboardToken);
+        status.ShouldBe(200);
+        setsCookie.ShouldBeTrue();
+    }
 }
