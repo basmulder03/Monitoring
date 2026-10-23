@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Monitoring.Common.Prometheus;
 using Monitoring.Hosting;
 using Monitoring.Sidecar.Features.AgentLink;
 using Monitoring.Sidecar.Features.LibraryLink;
@@ -33,6 +34,13 @@ internal static class SidecarComposition
             })
             .AddProbing(options => options.Interval = sidecar.Section("Probe").Duration("Interval", options.Interval))
             .AddSelfMonitoring()
+            .AddPrometheus(
+                options => PrometheusSettings.Read(sidecar.Section("Prometheus"), options),
+                provider =>
+                {
+                    var self = provider.GetRequiredService<ISelfMetrics>();
+                    return () => self.Read().Select(series => new PrometheusSample(series.Name, series.Labels, series.Value));
+                })
             .AddAgentLink(options =>
             {
                 options.AgentAddress = agent;

@@ -6,6 +6,7 @@ using Monitoring.Agent.Features.Discovery;
 using Monitoring.Agent.Features.ScopeState;
 using Monitoring.Agent.Features.SelfMonitoring;
 using Monitoring.Agent.Features.SidecarConnections;
+using Monitoring.Common.Prometheus;
 using Monitoring.Hosting;
 
 namespace Monitoring.Agent.Hosting;
@@ -43,6 +44,13 @@ internal static class AgentComposition
             })
             .AddAgentConfiguration()
             .AddSelfMonitoring()
+            .AddPrometheus(
+                options => PrometheusSettings.Read(agent.Section("Prometheus"), options),
+                provider =>
+                {
+                    var self = provider.GetRequiredService<SelfReportService>();
+                    return () => self.Read().Select(series => new PrometheusSample(series.Name, series.Labels, series.Value));
+                })
             .AddControllerLink(options =>
             {
                 options.ControllerAddresses = [.. controllers];

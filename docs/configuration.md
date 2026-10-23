@@ -388,3 +388,14 @@ Both report through the pipeline they already use, as metrics (no settings; the 
 
 - **Sidecar**: added to the metrics of its application, so they show on the instance: `monitoring.sidecar.memory_bytes`, `cpu_seconds`, `uptime_seconds`, `library_pull_ms` (the latest question to the application) and `library_connected` (1 when the application answered the latest question).
 - **Agent**: reported as the application of its own pod, which becomes the service `monitoring-agent` (only when the pod is in a namespace the agent discovers): `monitoring.agent.memory_bytes`, `cpu_seconds`, `uptime_seconds`, `instances_watched`, `controller_connections`, `sidecar_connections`, `frames_sent`, `pull_ms` (the latest answer of a sidecar), `kubernetes_errors` and `kubernetes_relists`.
+
+## Prometheus export
+
+Each of the controller, the agent and the sidecar can serve its own values in the Prometheus text format, for an observability stack that should watch the monitoring system without going through it. It is off by default.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Controller:Prometheus:Port`, `Agent:Prometheus:Port`, `Sidecar:Prometheus:Port` | `0` (off) | The port that serves `GET /metrics` |
+| `Controller:Prometheus:Address`, `Agent:Prometheus:Address`, `Sidecar:Prometheus:Address` | `127.0.0.1` | The IP address to listen on. Local only until you change it; there is no authentication, so put it on a network you trust |
+
+The values are the ones described under "What the agent and the sidecar report about themselves", and for the controller the System view (`monitoring_controller_uptime_seconds`, `scopes`, `agents_connected`, `event_clients`, `memory_bytes`, `healthy` and `alert_evaluation_ms`). Dots in names become underscores, and every value is exposed as a gauge. The controller serves it from its own listener, not the dashboard's port.

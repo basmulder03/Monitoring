@@ -24,7 +24,8 @@ public static class SelfMonitoringSlice
         services.AddSingleton(options);
         services.AddSingleton<AgentTelemetry>();
         services.AddSingleton<IAgentTelemetry>(provider => provider.GetRequiredService<AgentTelemetry>());
-        services.AddHostedService<SelfReportService>();
+        services.AddSingleton<SelfReportService>();
+        services.AddHostedService(provider => provider.GetRequiredService<SelfReportService>());
         return services;
     }
 }

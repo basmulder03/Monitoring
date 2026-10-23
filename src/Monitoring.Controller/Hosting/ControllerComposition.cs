@@ -18,6 +18,7 @@ using Monitoring.Controller.Features.SelfMonitoring;
 using Monitoring.Controller.Features.Vulnerabilities;
 using Monitoring.Controller.Features.Security;
 using Monitoring.Controller.Features.Topology;
+using Monitoring.Common.Prometheus;
 using Monitoring.Hosting;
 
 namespace Monitoring.Controller.Hosting;
@@ -30,6 +31,22 @@ namespace Monitoring.Controller.Hosting;
 /// </remarks>
 internal static class ControllerComposition
 {
+    /// <summary>The values of the system view as Prometheus samples; a value that is not known yet is left out.</summary>
+    private static IEnumerable<PrometheusSample> ControllerSamples(SystemStatus status)
+    {
+        IReadOnlyDictionary<string, string> none = new Dictionary<string, string>();
+        yield return new("monitoring.controller.uptime_seconds", none, status.UptimeSeconds);
+        yield return new("monitoring.controller.scopes", none, status.Scopes);
+        yield return new("monitoring.controller.agents_connected", none, status.AgentsConnected);
+        yield return new("monitoring.controller.event_clients", none, status.EventClients);
+        yield return new("monitoring.controller.memory_bytes", none, status.MemoryBytes);
+        yield return new("monitoring.controller.healthy", none, status.Healthy ? 1 : 0);
+        if (status.AlertEvaluationMilliseconds is { } took)
+        {
+            yield return new("monitoring.controller.alert_evaluation_ms", none, took);
+        }
+    }
+
     /// <summary>Registers every controller slice using the settings.</summary>
     /// <param name="builder">The host builder to add the slices to.</param>
     /// <param name="settings">The root of the configuration.</param>
@@ -61,6 +78,13 @@ internal static class ControllerComposition
             })
             .AddHealth()
             .AddSelfMonitoring()
+            .AddPrometheus(
+                options => PrometheusSettings.Read(controller.Section("Prometheus"), options),
+                provider =>
+                {
+                    var self = provider.GetRequiredService<SystemTelemetry>();
+                    return () => ControllerSamples(self.Read());
+                })
             .AddChangeMarkers(options =>
             {
                 var changes = controller.Section("ChangeMarkers");

@@ -33,6 +33,26 @@ public class SidecarCompositionTests
     }
 
     [Fact]
+    public async Task CreateHost_serves_the_values_of_the_sidecar_to_prometheus_when_a_port_is_set()
+    {
+        // Arrange
+        var probe = new TcpListener(IPAddress.Loopback, 0);
+        probe.Start();
+        var port = ((IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        using var host = new SidecarSettings().Valid().With("Sidecar:Prometheus:Port", port.ToString()).Build();
+        await host.StartAsync(TestContext.Current.CancellationToken);
+
+        // Act
+        using var http = new HttpClient();
+        var text = await http.GetStringAsync($"http://127.0.0.1:{port}/metrics", TestContext.Current.CancellationToken);
+        await host.StopAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        text.ShouldContain("monitoring_sidecar_memory_bytes ");
+    }
+
+    [Fact]
     public void CreateHost_names_the_required_agent_setting_when_it_is_missing()
     {
         // Arrange

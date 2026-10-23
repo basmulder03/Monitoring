@@ -32,6 +32,21 @@ public class AgentCompositionTests
     }
 
     [Fact]
+    public void CreateHost_serves_prometheus_only_when_a_port_is_set()
+    {
+        // Arrange
+        using var off = new AgentSettings().Valid().Build();
+        using var on = new AgentSettings().Valid().With("Agent:Prometheus:Port", "9100").Build();
+
+        // Act
+        string[] Hosted(IHost host) => [.. host.Services.GetServices<IHostedService>().Select(s => s.GetType().Name)];
+
+        // Assert
+        Hosted(off).ShouldNotContain("PrometheusService");
+        Hosted(on).ShouldContain("PrometheusService");
+    }
+
+    [Fact]
     public void CreateHost_runs_the_controller_link_in_the_background()
     {
         // Arrange

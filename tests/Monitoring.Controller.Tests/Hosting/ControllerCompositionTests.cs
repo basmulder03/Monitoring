@@ -55,6 +55,26 @@ public class ControllerCompositionTests
     }
 
     [Fact]
+    public async Task CreateHost_serves_the_state_of_the_replica_to_prometheus_when_a_port_is_set()
+    {
+        // Arrange
+        var probe = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        probe.Start();
+        var port = ((System.Net.IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        using var host = new ControllerSettings().WithToken("shop", "secret").With("Controller:Prometheus:Port", port.ToString()).Build();
+        await host.StartAsync(TestContext.Current.CancellationToken);
+
+        // Act
+        using var http = new HttpClient();
+        var text = await http.GetStringAsync($"http://127.0.0.1:{port}/metrics", TestContext.Current.CancellationToken);
+        await host.StopAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        text.ShouldContain("monitoring_controller_agents_connected 0\n");
+    }
+
+    [Fact]
     public void CreateHost_refuses_to_start_without_any_agent_token()
     {
         // Arrange
