@@ -1,5 +1,6 @@
 import { createElement } from "preact";
 import type { ScopeSummary } from "../../api/contracts";
+import { Icon, type IconName } from "../../components/Icon";
 import { Status } from "../../components/Status";
 import { SEVERITY, worstOf } from "../../format";
 import { Tiles } from "./Tiles";
@@ -12,6 +13,9 @@ interface GroupsProps {
   depth: number;
   now: number;
 }
+
+/** The label names that have an icon of their own. */
+const KEY_ICONS: Record<string, IconName | undefined> = { environment: "environment", datacenter: "datacenter", site: "datacenter" };
 
 /** Groups scopes by the first label, then by the next inside each group; scopes without the label go last. */
 export function Groups({ scopes, keys, depth, now }: GroupsProps) {
@@ -38,6 +42,8 @@ export function Groups({ scopes, keys, depth, now }: GroupsProps) {
             `h${Math.min(depth + 2, 6)}`,
             null,
             <Status health={worstOf(members.map((s) => s.health))} />,
+            " ",
+            ...(KEY_ICONS[key] ? [<Icon name={KEY_ICONS[key]} />] : []),
             ` ${key}: ${value ?? "not set"}`,
           )}
           <Groups scopes={members} keys={rest} depth={depth + 1} now={now} />

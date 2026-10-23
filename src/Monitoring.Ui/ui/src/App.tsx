@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "preact/hooks";
 import { Header } from "./components/Header";
 import { Sprite } from "./components/Sprite";
 import { StaleBanner } from "./components/StaleBanner";
@@ -20,6 +21,15 @@ export function App() {
   const { overview, lastHeard, announcement } = useOverview();
   useWallDisplay(overview);
   const seconds = useClock(1000);
+
+  // A new view starts at its top for someone who uses the keyboard or a screen reader, instead of leaving them on the link they came from.
+  const view = JSON.stringify(route);
+  const shown = useRef(view);
+  useEffect(() => {
+    if (shown.current === view) return;
+    shown.current = view;
+    document.getElementById("app")?.focus();
+  }, [view]);
   const halfMinutes = useClock(30000);
 
   return (

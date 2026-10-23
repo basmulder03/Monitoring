@@ -82,6 +82,7 @@ export function GraphSvg({ graph, selected, onSelect }: GraphSvgProps) {
             }}
           >
             <rect width={NODE_WIDTH} height={NODE_HEIGHT} rx="6" />
+            <use href={`#i-${node.kind === "Service" ? "service" : node.kind === "Database" ? "database" : node.kind === "Queue" ? "queue" : "external"}`} class="node-icon" x={NODE_WIDTH - 28} y="8" width="18" height="18" aria-hidden="true" />
             <text x="10" y="22" class="node-name">{fit(node.name, 24)}</text>
             <text x="10" y="40" class="node-kind">{KIND_TEXT[node.kind] + health}</text>
           </g>

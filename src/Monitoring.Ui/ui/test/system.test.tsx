@@ -1,3 +1,4 @@
+import { act } from "preact/test-utils";
 import type { SystemStatus } from "../src/api/contracts";
 import { all, mount, overview, scope } from "./harness";
 
@@ -73,5 +74,17 @@ describe("the system view", () => {
     page.services.send(overview([scope("shop", "Healthy")], []));
     await page.settle();
     expect(page.main.textContent).not.toContain("Monitoring system");
+  });
+
+  it("moves focus to the main content when another view is opened, and leaves it alone otherwise", async () => {
+    const page = mount("/");
+    page.services.send(overview([scope("shop", "Healthy")], []));
+    await page.settle();
+    (document.querySelector("a#home") as HTMLElement).focus();
+    expect(document.activeElement?.id).toBe("home");
+
+    act(() => { window.location.hash = "#/system"; });
+    await page.settle();
+    expect(document.activeElement?.id).toBe("app");
   });
 });

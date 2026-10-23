@@ -1,5 +1,6 @@
 import { useState } from "preact/hooks";
 import type { InstanceDetail } from "../../api/contracts";
+import { Icon } from "../../components/Icon";
 import { Status } from "../../components/Status";
 import { plural } from "../../format";
 import { useDisclosure } from "../../state/OpenState";
@@ -19,7 +20,7 @@ export function InstanceDetails({ scope, instance }: { scope: string; instance: 
   return (
     <details class="instance" open={disclosure.open} onToggle={onToggle}>
       <summary>
-        {instance.id}
+        <Icon name="instance" /> {instance.id}
         {instance.version && <span class="muted"> {instance.version}</span>}
       </summary>
 

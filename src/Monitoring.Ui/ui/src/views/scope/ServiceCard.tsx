@@ -1,4 +1,5 @@
 import type { ServiceDetail } from "../../api/contracts";
+import { Icon } from "../../components/Icon";
 import { Status } from "../../components/Status";
 import { labelText, plural } from "../../format";
 import { useDisclosure } from "../../state/OpenState";
@@ -11,7 +12,7 @@ export function ServiceCard({ scope, service }: { scope: string; service: Servic
   return (
     <details class="service" {...disclosure}>
       <summary>
-        <strong>{service.name}</strong>
+        <Icon name="service" /> <strong>{service.name}</strong>
         <Status health={service.health} />
         <span class="muted">
           {service.healthyInstances} of {plural(service.liveInstances, "instance", "instances")} healthy

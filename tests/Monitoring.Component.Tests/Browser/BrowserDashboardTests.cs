@@ -270,6 +270,12 @@ public class BrowserDashboardTests(BrowserFixture browser)
         { "scope view in the light theme", "/?theme=light#/scopes/shop", "details.service" },
         { "scope view in the dark theme", "/?theme=dark#/scopes/shop", "details.service" },
         { "scope view of a scope without its agent", "/?theme=light#/scopes/search", "main .banner" },
+        { "system view in the light theme", "/?theme=light#/system", "main table.instances" },
+        { "system view in the dark theme", "/?theme=dark#/system", "main table.instances" },
+        { "packages view in the light theme", "/?theme=light#/packages", "main h2" },
+        { "packages view in the dark theme", "/?theme=dark#/packages", "main h2" },
+        { "dependencies view in the light theme", "/?theme=light#/dependencies", "main h2" },
+        { "dependencies view in the dark theme", "/?theme=dark#/dependencies", "main h2" },
     };
 
     [Theory]

@@ -12,3 +12,4 @@ svg.graph .edge.failing path { stroke: var(--unhealthy); }
 svg.graph .arrow { fill: var(--muted); }
 svg.graph .edge-label { fill: var(--unhealthy); font-size: 12px; font-weight: 600; }
 svg.graph .dim { opacity: 0.25; }
+svg.graph .node-icon { fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
