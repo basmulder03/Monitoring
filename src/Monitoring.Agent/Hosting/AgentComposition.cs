@@ -21,6 +21,9 @@ namespace Monitoring.Agent.Hosting;
 /// </remarks>
 internal static class AgentComposition
 {
+    /// <summary>The name the agent is installed under as a Windows service.</summary>
+    public const string WindowsServiceName = "MonitoringAgent";
+
     /// <summary>Registers every agent slice using the settings.</summary>
     /// <param name="builder">The host builder to add the slices to.</param>
     /// <param name="settings">The root of the configuration.</param>
@@ -36,6 +39,9 @@ internal static class AgentComposition
         {
             throw new ConfigurationException("Setting 'Agent:Controllers' needs at least one controller address as host:port.");
         }
+
+        // Does nothing unless the agent was started by the Service Control Manager, and then lets it be stopped and logs to the event log.
+        builder.Services.AddWindowsService(options => options.ServiceName = WindowsServiceName);
 
         builder.Services
             .AddScopeState(options =>

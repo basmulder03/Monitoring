@@ -364,6 +364,21 @@ The metric `windows.service.restarts` counts how often a service came back to Ru
 
 Clock skew is not measured: the agent has no trusted time to compare with. The pipe the application library connects over is a separate slice.
 
+### Running as a Windows service
+
+`deploy/windows/install-agent.ps1` installs the agent as a service that starts with the machine. Put `Monitoring.Agent.exe` and its `monitoring.json` in one folder, and run from an elevated PowerShell:
+
+```powershell
+.\install-agent.ps1 -Path C:\MonitoringAgent                  # install and start
+.\install-agent.ps1 -Path C:\MonitoringAgent -Account 'DOMAIN\svc-monitoring'   # run as another account, asks for the password
+.\install-agent.ps1 -Path C:\MonitoringAgent -Uninstall
+```
+
+- A service starts in the system folder, so the agent reads `monitoring.json` from the folder of the program when it runs as a service; `MONITORING_CONFIG_FILE` still overrides that.
+- Recovery is set to restart after 5 seconds, again after 5, then after 30, and the count resets after a day without failures. A stop with a non-zero exit code counts as a failure, so a configuration error is retried and the server is not left unmonitored in silence.
+- The agent logs to the Windows event log (Application, source `MonitoringAgent`) as well as to the console.
+- The default account is Local System. For a smaller set of rights, use an account that may read the services and processes it is to report on.
+
 ### Sidecars
 
 The sidecar next to each application connects to the agent, registers its application and sends heartbeats. The agent follows the health of the application through it. By default the agent listens for sidecars when `Agent:Discovery:Kind` is `kubernetes`, and not otherwise.

@@ -11,7 +11,7 @@ public static class MonitoringHost
     /// <summary>Environment variable that names the configuration file; defaults to <see cref="DefaultConfigFile"/>.</summary>
     public const string ConfigFileVariable = "MONITORING_CONFIG_FILE";
 
-    /// <summary>Configuration file read from the current directory when no other is named. It is optional.</summary>
+    /// <summary>Configuration file read from the current directory when no other is named, or from the folder of the program when it runs as a Windows service, whose current directory is the system folder. It is optional.</summary>
     public const string DefaultConfigFile = "monitoring.json";
 
     /// <summary>Exit code for a configuration problem, as in sysexits.h.</summary>
@@ -36,7 +36,7 @@ public static class MonitoringHost
         string? configFile = null)
     {
         var file = configFile
-            ?? (Environment.GetEnvironmentVariable(ConfigFileVariable) is { Length: > 0 } named ? named : DefaultConfigFile);
+            ?? (Environment.GetEnvironmentVariable(ConfigFileVariable) is { Length: > 0 } named ? named : DefaultConfigFilePath());
         builder.Configuration.AddJsonFile(Path.GetFullPath(file), optional: true, reloadOnChange: false);
         builder.Configuration.AddEnvironmentVariables("MONITORING_");
         builder.Configuration.AddCommandLine(args);
@@ -54,6 +54,10 @@ public static class MonitoringHost
             options.TimestampFormat = "HH:mm:ss ";
         });
     }
+
+    /// <summary>A service has no console and starts in the system folder, so what is next to the program is the only place its file can be.</summary>
+    private static string DefaultConfigFilePath() =>
+        OperatingSystem.IsWindows() && !Environment.UserInteractive ? Path.Combine(AppContext.BaseDirectory, DefaultConfigFile) : DefaultConfigFile;
 
     /// <summary>Creates a plain host builder (no web server) set up with <see cref="Configure"/>.</summary>
     /// <param name="args">Command line arguments, such as <c>--Agent:ScopeName=shop</c>.</param>
