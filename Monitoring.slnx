@@ -15,6 +15,7 @@
     <Project Path="samples/Monitoring.SampleApp/Monitoring.SampleApp.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Monitoring.AppHost/Monitoring.AppHost.csproj" />
     <Project Path="tests/Monitoring.Agent.Tests/Monitoring.Agent.Tests.csproj" />
     <Project Path="tests/Monitoring.Architecture.Tests/Monitoring.Architecture.Tests.csproj" />
     <Project Path="tests/Monitoring.Client.Tests/Monitoring.Client.Tests.csproj" />
@@ -25,6 +26,8 @@
     <Project Path="tests/Monitoring.Injector.Tests/Monitoring.Injector.Tests.csproj" />
     <Project Path="tests/Monitoring.Protocol.Tests/Monitoring.Protocol.Tests.csproj" />
     <Project Path="tests/Monitoring.Sidecar.Tests/Monitoring.Sidecar.Tests.csproj" />
+    <Project Path="tests/Monitoring.FakeCluster/Monitoring.FakeCluster.csproj" />
+    <Project Path="tests/Monitoring.Specifications/Monitoring.Specifications.csproj" />
     <Project Path="tests/Monitoring.Tests.Shared/Monitoring.Tests.Shared.csproj" />
     <Project Path="tests/Monitoring.Ui.Tests/Monitoring.Ui.Tests.csproj" />
   </Folder>

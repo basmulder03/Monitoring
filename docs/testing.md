@@ -7,7 +7,18 @@ which are installed for you the first time they are needed, and are skipped with
 | --- | --- | --- | --- |
 | Unit and component tests | `tests/*` | .NET SDK | NuGet |
 | Dashboard components and logic, in a DOM (Vitest and jsdom) | `src/Monitoring.Ui/ui/test` | Node and npm | The build of `Monitoring.Ui` runs `npm ci` |
+| Specifications (Reqnroll) on the whole system, started by the Aspire app host | `tests/Monitoring.Specifications` | .NET SDK | NuGet |
 | Dashboard in a real browser, with axe accessibility checks | `tests/Monitoring.Component.Tests/Browser` | A Chromium build, and its system libraries | The test fixture runs Playwright's installer when the browser is missing |
+
+## The whole system, run and specified
+
+`tests/Monitoring.AppHost` is an [Aspire](https://aspire.dev) app host that starts the whole system as real processes: a controller, an agent, a stand-in for the Kubernetes API (`tests/Monitoring.FakeCluster`, with a control API to add and delete pods), and two applications (`orders` and `payments`, the sample application) that each have a sidecar. They talk over the ports a real deployment uses. The timers are shortened (a grace period of five seconds, not ten minutes), nothing else differs.
+
+- **To look at it:** `dotnet run --project tests/Monitoring.AppHost`, then open the Aspire dashboard it prints. It lists the processes with their logs and the address of the dashboard of the controller (`controller`, endpoint `web`). Break an application with `touch /tmp/monitoring-e2e-dev/payments.broken` and remove the file to repair it; delete or add a pod with `curl -X DELETE <cluster>/control/pods/payments-1` and `curl -X PUT '<cluster>/control/pods/payments-1?service=payments'`.
+- **To specify it:** `tests/Monitoring.Specifications` holds the functional requirements as Gherkin features (Reqnroll, xUnit v3), one file per area under `Features/`. The steps start the same app host, once for the whole run, and use the API of the controller (what the dashboard shows) and the control surfaces above; they stop and start the agent and the controller through Aspire. The scenarios share one environment and change it, so they run one after the other and leave it as they found it. Read the `.feature` files to learn what the system promises; they are the single source of truth for behaviour, and a requirement is only a requirement when a scenario states it.
+- **Areas so far:** registration and health, breaking and repairing an application, the dependency graph from real traffic, a pod that is deleted and returns, an agent that stops and returns, a restarted controller, and the alert of an application that stays unhealthy. The whole set takes about a minute.
+- **Not yet:** a queue (`TestWorker` with ActiveMQ) and a database (`TestData`) in the call chain, a fault-injection proxy, silences and the startup grace period, the multiple environments, and the dashboard in a browser (TV mode); the browser tests of `tests/Monitoring.Component.Tests` cover the last one at the moment. The applications are the sample application twice, not the three applications of the design.
+- **Add a scenario:** write it in a feature file, reuse a step if there is one (`Steps/`), else add a step; waits always have a deadline (`Eventually`), because nothing in a monitoring system is instant.
 
 ## Dashboard (TypeScript)
 
