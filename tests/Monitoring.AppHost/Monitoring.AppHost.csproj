@@ -10,6 +10,7 @@
     <PackageReference Include="Aspire.Hosting.AppHost" Version="13.6.3" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../Monitoring.TestApplications/Monitoring.TestApplications.csproj" />
     <ProjectReference Include="../Monitoring.FakeCluster/Monitoring.FakeCluster.csproj" />
     <ProjectReference Include="../../src/Monitoring.Controller/Monitoring.Controller.csproj" />
     <ProjectReference Include="../../src/Monitoring.Agent/Monitoring.Agent.csproj" />

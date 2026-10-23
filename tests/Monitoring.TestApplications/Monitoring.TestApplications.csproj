@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <IsAotCompatible>false</IsAotCompatible>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ArtemisNetClient" Version="3.1.2" />
+    <PackageReference Include="Npgsql" Version="9.0.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Monitoring.Client/Monitoring.Client.csproj" />
+  </ItemGroup>
+</Project>

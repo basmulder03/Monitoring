@@ -87,4 +87,51 @@ public sealed class EnvironmentSteps
             using var document = await RunningEnvironment.GetJsonAsync("/api/overview");
             return document is not null && document.RootElement.GetProperty("alerts").EnumerateArray().All(a => a.GetProperty("rule").GetString() != rule);
         });
+
+    [When(@"the application ""(.*)"" is asked for an order (\d+) times")]
+    public async Task WhenTheApplicationIsAskedForAnOrder(string application, int times)
+    {
+        using var client = RunningEnvironment.App.CreateHttpClient(application, "http");
+        for (var order = 0; order < times; order++)
+        {
+            using var response = await client.GetAsync("/order");
+            response.EnsureSuccessStatusCode();
+        }
+    }
+
+    [Then(@"the dependency graph has a ""(.*)"" call from ""(.*)"" to the queue ""(.*)"" within (\d+) seconds")]
+    public Task ThenTheGraphHasACallToTheQueue(string type, string caller, string queue, int seconds) =>
+        GraphHasAsync($"a {type} call from '{caller}' to the queue '{queue}'", seconds, edge =>
+            edge.Type == type && edge.From.EndsWith($"/{caller}", StringComparison.Ordinal) && edge.To.StartsWith("queue:", StringComparison.Ordinal) && edge.To.EndsWith($"//{queue}", StringComparison.Ordinal));
+
+    [Then(@"the dependency graph has a ""(.*)"" call from the queue ""(.*)"" to ""(.*)"" within (\d+) seconds")]
+    public Task ThenTheGraphHasACallFromTheQueue(string type, string queue, string callee, int seconds) =>
+        GraphHasAsync($"a {type} call from the queue '{queue}' to '{callee}'", seconds, edge =>
+            edge.Type == type && edge.To.EndsWith($"/{callee}", StringComparison.Ordinal) && edge.From.StartsWith("queue:", StringComparison.Ordinal) && edge.From.EndsWith($"//{queue}", StringComparison.Ordinal));
+
+    [Then(@"the dependency graph has a ""(.*)"" call from ""(.*)"" to a database within (\d+) seconds")]
+    public Task ThenTheGraphHasACallToADatabase(string type, string caller, int seconds) =>
+        GraphHasAsync($"a {type} call from '{caller}' to a database", seconds, edge =>
+            edge.Type == type && edge.From.EndsWith($"/{caller}", StringComparison.Ordinal) && edge.To.StartsWith("database:", StringComparison.Ordinal));
+
+    private sealed record Edge(string From, string To, string Type);
+
+    private static async Task GraphHasAsync(string what, int seconds, Func<Edge, bool> matches)
+    {
+        try
+        {
+            await Eventually.HoldsAsync(what, TimeSpan.FromSeconds(seconds), async () =>
+            {
+                using var document = await RunningEnvironment.GetJsonAsync("/api/topology");
+                return document is not null && document.RootElement.GetProperty("edges").EnumerateArray()
+                    .Select(e => new Edge(e.GetProperty("from").GetString()!, e.GetProperty("to").GetString()!, e.GetProperty("type").GetString()!))
+                    .Any(matches);
+            });
+        }
+        catch (TimeoutException ex)
+        {
+            using var document = await RunningEnvironment.GetJsonAsync("/api/topology");
+            throw new TimeoutException($"{ex.Message}. The graph is: {document?.RootElement.GetRawText() ?? "nothing"}");
+        }
+    }
 }

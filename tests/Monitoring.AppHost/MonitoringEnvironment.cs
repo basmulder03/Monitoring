@@ -20,6 +20,12 @@ public static class MonitoringEnvironment
     /// <summary>The applications of the environment; <c>orders</c> calls <c>payments</c> when asked to.</summary>
     public static readonly IReadOnlyList<string> Applications = ["orders", "payments"];
 
+    /// <summary>The call chain: <c>testapi</c> puts a message on a queue, <c>testworker</c> takes it and asks <c>testdata</c>, which asks a database. The value is the role of the program.</summary>
+    public static readonly IReadOnlyDictionary<string, string> Chain = new Dictionary<string, string> { ["testapi"] = "api", ["testworker"] = "worker", ["testdata"] = "data" };
+
+    /// <summary>The queue the chain uses.</summary>
+    public const string Queue = "orders";
+
     /// <summary>The name of the resource that is the controller.</summary>
     public const string Controller = "controller";
 
@@ -53,7 +59,18 @@ public static class MonitoringEnvironment
         // The cluster the agent follows: one pod per application, named like the instance its sidecar registers as.
         var cluster = builder.AddProject<Projects.Monitoring_FakeCluster>(Cluster)
             .WithHttpEndpoint(name: "api")
-            .WithEnvironment("FAKECLUSTER_PODS", string.Join(',', Applications.Select(application => $"{application}-1:{application}")));
+            .WithEnvironment("FAKECLUSTER_PODS", string.Join(',', Applications.Concat(Chain.Keys).Select(application => $"{application}-1:{application}")));
+
+        // What the chain depends on, as containers: a broker and a database.
+        var broker = builder.AddContainer("broker", "apache/activemq-artemis", "latest-alpine")
+            .WithEnvironment("ARTEMIS_USER", "art")
+            .WithEnvironment("ARTEMIS_PASSWORD", "e2e-broker")
+            .WithEndpoint(name: "amqp", targetPort: 5672, scheme: "tcp");
+        var database = builder.AddContainer("database", "postgres", "17-alpine")
+            .WithEnvironment("POSTGRES_PASSWORD", "e2e-database")
+            .WithEndpoint(name: "sql", targetPort: 5432, scheme: "tcp");
+        var brokerEndpoint = broker.GetEndpoint("amqp");
+        var databaseEndpoint = database.GetEndpoint("sql");
 
         var controller = builder.AddProject<Projects.Monitoring_Controller>(Controller)
             .WithEndpoint(name: "agents", scheme: "tcp", env: "MONITORING_Controller__Listen__Port")
@@ -97,6 +114,35 @@ public static class MonitoringEnvironment
                 .WithEnvironment("MONITORING_Sidecar__Agent", ReferenceExpression.Create($"{sidecarsEndpoint.Property(EndpointProperty.IPV4Host)}:{sidecarsEndpoint.Property(EndpointProperty.Port)}"))
                 .WithEnvironment("MONITORING_Sidecar__Library__Socket", socket)
                 .WithEnvironment("MONITORING_Sidecar__InstanceId", $"{application}-1")
+                .WaitFor(agent)
+                .WaitFor(app);
+        }
+
+        IResourceBuilder<ProjectResource>? data = null;
+        foreach (var (name, role) in Chain.OrderByDescending(entry => entry.Value == "data"))
+        {
+            var socket = Path.Combine(state, $"{name}.sock");
+            var app = builder.AddProject<Projects.Monitoring_TestApplications>(name)
+                .WithHttpEndpoint(name: "http")
+                .WithEnvironment("ROLE", role)
+                .WithEnvironment("SERVICE_NAME", name)
+                .WithEnvironment("MONITORING_SOCKET", socket)
+                .WithEnvironment("BROKEN_FILE", BrokenSwitch(runId, name))
+                .WithEnvironment("ARTEMIS", ReferenceExpression.Create($"{brokerEndpoint.Property(EndpointProperty.IPV4Host)}:{brokerEndpoint.Property(EndpointProperty.Port)}:art:e2e-broker"))
+                .WithEnvironment("POSTGRES", ReferenceExpression.Create($"Host={databaseEndpoint.Property(EndpointProperty.IPV4Host)};Port={databaseEndpoint.Property(EndpointProperty.Port)};Username=postgres;Password=e2e-database"));
+            if (role == "data")
+            {
+                data = app;
+            }
+            else if (role == "worker")
+            {
+                app.WithEnvironment("DATA_URL", data!.GetEndpoint("http"));
+            }
+
+            builder.AddProject<Projects.Monitoring_Sidecar>($"{name}-sidecar")
+                .WithEnvironment("MONITORING_Sidecar__Agent", ReferenceExpression.Create($"{sidecarsEndpoint.Property(EndpointProperty.IPV4Host)}:{sidecarsEndpoint.Property(EndpointProperty.Port)}"))
+                .WithEnvironment("MONITORING_Sidecar__Library__Socket", socket)
+                .WithEnvironment("MONITORING_Sidecar__InstanceId", $"{name}-1")
                 .WaitFor(agent)
                 .WaitFor(app);
         }

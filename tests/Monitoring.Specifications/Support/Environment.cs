@@ -33,7 +33,7 @@ public static class RunningEnvironment
         await _app.StartAsync();
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-        foreach (var name in new[] { MonitoringEnvironment.Cluster, MonitoringEnvironment.Controller, MonitoringEnvironment.Agent }.Concat(MonitoringEnvironment.Applications))
+        foreach (var name in new[] { MonitoringEnvironment.Cluster, MonitoringEnvironment.Controller, MonitoringEnvironment.Agent }.Concat(MonitoringEnvironment.Applications).Concat(MonitoringEnvironment.Chain.Keys))
         {
             await _app.ResourceNotifications.WaitForResourceAsync(name, KnownResourceStates.Running, timeout.Token);
         }

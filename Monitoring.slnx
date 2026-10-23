@@ -27,6 +27,7 @@
     <Project Path="tests/Monitoring.Protocol.Tests/Monitoring.Protocol.Tests.csproj" />
     <Project Path="tests/Monitoring.Sidecar.Tests/Monitoring.Sidecar.Tests.csproj" />
     <Project Path="tests/Monitoring.FakeCluster/Monitoring.FakeCluster.csproj" />
+    <Project Path="tests/Monitoring.TestApplications/Monitoring.TestApplications.csproj" />
     <Project Path="tests/Monitoring.Specifications/Monitoring.Specifications.csproj" />
     <Project Path="tests/Monitoring.Tests.Shared/Monitoring.Tests.Shared.csproj" />
     <Project Path="tests/Monitoring.Ui.Tests/Monitoring.Ui.Tests.csproj" />
