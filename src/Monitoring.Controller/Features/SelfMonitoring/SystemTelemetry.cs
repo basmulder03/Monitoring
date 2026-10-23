@@ -1,5 +1,7 @@
 using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Registry;
+using Monitoring.Protocol.Instances;
+using Monitoring.Protocol.Reports;
 
 namespace Monitoring.Controller.Features.SelfMonitoring;
 
@@ -28,6 +30,8 @@ internal sealed class SystemTelemetry(IScopeRegistry registry, IAgentLiveness li
     {
         var scopes = registry.GetScopeNames();
         var connected = scopes.Count(scope => liveness.GetScopeLiveness(scope).IsLive);
+        var instances = scopes.SelectMany(scope => registry.GetInstances(scope).Where(i => i.Lifecycle != InstanceLifecycle.Gone).Select(i => (Scope: scope, Instance: i))).ToList();
+        var replicas = ReplicasOf(instances);
         var ticks = Interlocked.Read(ref _evaluationTicks);
         return new SystemStatus(
             Environment.MachineName,
@@ -37,6 +41,45 @@ internal sealed class SystemTelemetry(IScopeRegistry registry, IAgentLiveness li
             Volatile.Read(ref _eventClients),
             ticks < 0 ? null : TimeSpan.FromTicks(ticks).TotalMilliseconds,
             Environment.WorkingSet,
-            connected == scopes.Count);
+            connected == scopes.Count && replicas.All(replica => replica.AgentsConnected == replica.AgentsReporting),
+            replicas,
+            UnmonitoredOf(instances));
     }
+
+    /// <summary>Every replica the agents connect to, put together from what each agent says about it.</summary>
+    private static IReadOnlyList<ReplicaState> ReplicasOf(List<(string Scope, InstanceInfo Instance)> instances)
+    {
+        var reports = instances
+            .Where(entry => entry.Instance.ServiceName == ReplicaMetrics.AgentService)
+            .SelectMany(entry => ReplicaMetrics.From(entry.Instance.Metrics))
+            .GroupBy(report => report.Replica, StringComparer.Ordinal)
+            .OrderBy(group => group.Key, StringComparer.Ordinal);
+
+        return
+        [
+            .. reports.Select(group => new ReplicaState(
+                group.Key,
+                IsThisReplica(group.Key),
+                group.Count(),
+                group.Count(report => report.Connected),
+                group.Max(report => report.Lag ?? 0))),
+        ];
+    }
+
+    /// <summary>A replica is this one when the host of its address starts with the name of the machine, as the pods of a stateful set do.</summary>
+    private static bool IsThisReplica(string address) =>
+        address.StartsWith(Environment.MachineName + ".", StringComparison.OrdinalIgnoreCase)
+        || address.StartsWith(Environment.MachineName + ":", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Pods that run without the monitoring sidecar; the agent and the controller themselves have none and are left out.</summary>
+    private static IReadOnlyList<UnmonitoredInstance> UnmonitoredOf(List<(string Scope, InstanceInfo Instance)> instances) =>
+        [
+            .. instances
+                .Where(entry => entry.Instance.Containers is { Count: > 0 } containers
+                    && entry.Instance.Lifecycle is InstanceLifecycle.Starting or InstanceLifecycle.Running
+                    && containers.All(container => container.Role != ContainerRole.MonitoringSidecar)
+                    && entry.Instance.ServiceName is not (ReplicaMetrics.AgentService or "monitoring-controller"))
+                .OrderBy(entry => entry.Scope, StringComparer.Ordinal).ThenBy(entry => entry.Instance.ServiceName, StringComparer.Ordinal).ThenBy(entry => entry.Instance.Id, StringComparer.Ordinal)
+                .Select(entry => new UnmonitoredInstance(entry.Scope, entry.Instance.ServiceName, entry.Instance.Id)),
+        ];
 }

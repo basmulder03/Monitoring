@@ -9,8 +9,13 @@ public interface IAgentTelemetry
     /// <param name="delta">The amount to add.</param>
     void Add(string name, double delta = 1);
 
+    /// <summary>Forgets everything that was measured about a replica, because the agent no longer connects to it.</summary>
+    /// <param name="replica">The replica as <c>host:port</c>.</param>
+    void Forget(string replica);
+
     /// <summary>Sets a value, for a gauge such as the duration of the latest pull.</summary>
     /// <param name="name">The metric name, <c>monitoring.agent.*</c>.</param>
     /// <param name="value">The value.</param>
-    void Set(string name, double value);
+    /// <param name="replica">The controller replica the value is about, as <c>host:port</c>; <see langword="null"/> for a value about the agent as a whole.</param>
+    void Set(string name, double value, string? replica = null);
 }

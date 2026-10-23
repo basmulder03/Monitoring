@@ -1,3 +1,4 @@
+using Monitoring.Protocol.Reports;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
@@ -58,6 +59,35 @@ public class SelfReportServiceTests
         // Assert
         series["monitoring.agent.instances_watched"].ShouldBe(2);
         series["monitoring.agent.memory_bytes"].ShouldBeGreaterThan(0);
+    }
+
+    [Fact]
+    public void Read_says_how_far_each_connected_replica_is_behind_and_whether_it_is_connected()
+    {
+        // Arrange
+        var fixture = new Fixture();
+        foreach (var id in new[] { "x", "y", "z" })
+        {
+            fixture.Store.Upsert(Pod(id));
+            fixture.Store.Publish();
+        }
+
+        var sequence = fixture.Store.CreateSnapshot().Sequence;
+        fixture.Telemetry.Set(ReplicaMetrics.Connected, 1, "c1:9440");
+        fixture.Telemetry.Set(ReplicaMetrics.AckedSequence, sequence - 2, "c1:9440");
+        fixture.Telemetry.Set(ReplicaMetrics.Connected, 0, "c2:9440");
+        fixture.Telemetry.Set(ReplicaMetrics.AckedSequence, 1, "c2:9440");
+
+        // Act
+        var series = fixture.Service.Read();
+
+        // Assert
+        double Value(string name, string replica) => series.Single(s => s.Name == name && s.Labels["replica"] == replica).Value;
+        Value(ReplicaMetrics.Connected, "c1:9440").ShouldBe(1);
+        Value(ReplicaMetrics.Lag, "c1:9440").ShouldBe(2);
+        Value(ReplicaMetrics.Connected, "c2:9440").ShouldBe(0);
+        series.ShouldNotContain(s => s.Name == ReplicaMetrics.Lag && s.Labels["replica"] == "c2:9440");
+        series.ShouldNotContain(s => s.Name == ReplicaMetrics.AckedSequence);
     }
 
     [Fact]

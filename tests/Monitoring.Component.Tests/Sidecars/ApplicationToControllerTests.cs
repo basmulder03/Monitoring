@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Monitoring.Agent.Features.Configuration;
 using Monitoring.Component.Tests.Support;
 using Monitoring.Controller.Features.AgentLink;
+using Monitoring.Controller.Features.SelfMonitoring;
 using Monitoring.Controller.Features.Topology;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Reports;
@@ -45,6 +46,30 @@ public class ApplicationToControllerTests
             instance.Version.ShouldBe("1.2.3");
             instance.Checks!.Single().Name.ShouldBe("database");
             instance.Metrics!.ShouldContain(s => s.Name == "dotnet.process.memory.working_set");
+        });
+    }
+
+    [Fact]
+    public async Task The_controller_shows_which_replica_the_agents_connect_to_and_that_they_are_up_to_date()
+    {
+        // Arrange
+        await using var controller = new ControllerHost().AcceptingEnrollment(Token).Start();
+        await using var agent = new AgentHost("shop", Token).ConnectingTo(controller)
+            .With("Agent:SelfMonitoring:Interval", "00:00:00.200")
+            .With("Agent:SelfMonitoring:PodName", "agent-pod").Start();
+
+        // Act
+        agent.Report("agent-pod");
+
+        // Assert
+        await Eventually.AssertAsync(() =>
+        {
+            var status = controller.Services.GetRequiredService<SystemTelemetry>().Read();
+            var replica = status.Replicas.Single();
+            replica.Address.ShouldBe(controller.Address);
+            replica.AgentsConnected.ShouldBe(1);
+            replica.MaxLag.ShouldBe(0);
+            status.Healthy.ShouldBeTrue();
         });
     }
 

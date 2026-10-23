@@ -54,7 +54,23 @@ internal sealed class SelfReportService(
             new("monitoring.agent.uptime_seconds", NoLabels, time.GetElapsedTime(_started).TotalSeconds),
             new("monitoring.agent.instances_watched", NoLabels, store.CreateSnapshot().Instances.Count(instance => instance.Id != own)),
         ];
-        series.AddRange(telemetry.Read().OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => new MetricSeries(pair.Key, NoLabels, pair.Value)));
+        var values = telemetry.Read();
+        series.AddRange(values.Where(pair => pair.Key.Replica is null).OrderBy(pair => pair.Key.Name, StringComparer.Ordinal)
+            .Select(pair => new MetricSeries(pair.Key.Name, NoLabels, pair.Value)));
+
+        // How far each replica is behind: the sequence of the scope now, less the last one the replica acknowledged. A replica that is not connected has no lag to speak of.
+        var sequence = store.CreateSnapshot().Sequence;
+        foreach (var replica in values.Keys.Where(key => key.Replica is not null).Select(key => key.Replica!).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal))
+        {
+            var labels = new Dictionary<string, string> { ["replica"] = replica };
+            var connected = values.GetValueOrDefault((ReplicaMetrics.Connected, replica));
+            series.Add(new MetricSeries(ReplicaMetrics.Connected, labels, connected));
+            if (connected > 0)
+            {
+                series.Add(new MetricSeries(ReplicaMetrics.Lag, labels, Math.Max(0, sequence - values.GetValueOrDefault((ReplicaMetrics.AckedSequence, replica)))));
+            }
+        }
+
         return series;
     }
 

@@ -24,6 +24,15 @@ public sealed class AlertingOptions
     /// <summary>A certificate with fewer days left than this, or already expired, raises the critical alert <c>certificate-expired-soon</c> instead.</summary>
     public int CertificateCriticalDays { get; set; } = 3;
 
+    /// <summary>A replica that has not acknowledged this many changes of a scope that an agent has sent raises the alert <c>replica-behind</c>.</summary>
+    public int ReplicaLagThreshold { get; set; } = 25;
+
+    /// <summary>How long a replica must stay behind before its alert fires.</summary>
+    public TimeSpan ReplicaBehindWait { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>How long a replica that an agent is not connected to must stay so before the alert <c>replica-unreachable</c> fires.</summary>
+    public TimeSpan ReplicaUnreachableWait { get; set; } = TimeSpan.FromMinutes(2);
+
     /// <summary>How many restarts of an instance within <see cref="RestartLoopWindow"/> raise the restart-loop alert.</summary>
     public int RestartLoopCount { get; set; } = 3;
 

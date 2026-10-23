@@ -95,6 +95,14 @@ export interface PackageVersion {
   usedBy: PackageUsage[];
 }
 
+export interface ReplicaState {
+  address: string;
+  thisReplica: boolean;
+  agentsReporting: number;
+  agentsConnected: number;
+  maxLag: number;
+}
+
 export interface ScopeConfiguration {
   applied: string | null;
   expected: string;
@@ -146,6 +154,8 @@ export interface SystemStatus {
   alertEvaluationMilliseconds: number | null;
   memoryBytes: number;
   healthy: boolean;
+  replicas: ReplicaState[];
+  unmonitored: UnmonitoredInstance[];
 }
 
 export interface TopologyEdge {
@@ -168,6 +178,12 @@ export interface TopologyNode {
   kind: NodeKind;
   scope: string | null;
   health: HealthState | null;
+}
+
+export interface UnmonitoredInstance {
+  scope: string;
+  service: string;
+  instance: string;
 }
 
 export interface VulnerabilityFinding {

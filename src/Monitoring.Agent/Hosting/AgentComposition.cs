@@ -50,7 +50,12 @@ internal static class AgentComposition
                 options.Labels = new Dictionary<string, string>(agent.Map("Labels"));
             })
             .AddAgentConfiguration()
-            .AddSelfMonitoring()
+            .AddSelfMonitoring(options =>
+            {
+                var self = agent.Section("SelfMonitoring");
+                options.Interval = self.Duration("Interval", options.Interval);
+                options.PodName = self.Text("PodName", options.PodName);
+            })
             .AddMetricsHistory(options =>
             {
                 var history = agent.Section("MetricsHistory");

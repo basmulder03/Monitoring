@@ -119,6 +119,9 @@ internal static class ControllerComposition
                 options.VulnerablePackageWait = alerting.Duration("VulnerablePackageWait", options.VulnerablePackageWait);
                 options.CertificateWarningDays = alerting.Int("CertificateWarningDays", options.CertificateWarningDays);
                 options.CertificateCriticalDays = alerting.Int("CertificateCriticalDays", options.CertificateCriticalDays);
+                options.ReplicaLagThreshold = alerting.Int("ReplicaLagThreshold", options.ReplicaLagThreshold);
+                options.ReplicaBehindWait = alerting.Duration("ReplicaBehindWait", options.ReplicaBehindWait);
+                options.ReplicaUnreachableWait = alerting.Duration("ReplicaUnreachableWait", options.ReplicaUnreachableWait);
                 options.RestartLoopCount = alerting.Int("RestartLoopCount", options.RestartLoopCount);
                 options.RestartLoopWindow = alerting.Duration("RestartLoopWindow", options.RestartLoopWindow);
                 options.ServiceDownWait = alerting.Duration("ServiceDownWait", options.ServiceDownWait);

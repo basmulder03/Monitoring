@@ -1,6 +1,8 @@
+using Monitoring.Protocol.Reports;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Monitoring.Agent.Features.ControllerLink;
+using Monitoring.Agent.Features.SelfMonitoring;
 using Monitoring.Protocol.Messages;
 using Shouldly;
 using Xunit;
@@ -50,6 +52,24 @@ public class ControllerConnectionTests
 
         // Assert
         fixture.ConnectAttempts.ShouldBe(failures + 1);
+    }
+
+    [Fact]
+    public async Task RunAsync_shows_a_replica_that_cannot_be_reached_as_not_connected_and_forgets_it_when_it_is_taken_out()
+    {
+        // Arrange
+        var fixture = new ConnectionFixture().WithConnectFailing();
+        fixture.Start();
+        await fixture.WaitForAttemptAsync(1);
+
+        // Act
+        var whileFailing = fixture.Telemetry.Read().GetValueOrDefault((ReplicaMetrics.Connected, "controller:9440"), -1);
+        fixture.Cancel();
+        await fixture.Completion;
+
+        // Assert
+        whileFailing.ShouldBe(0);
+        fixture.Telemetry.Read().Keys.ShouldNotContain(key => key.Replica == "controller:9440");
     }
 
     [Fact]
@@ -263,9 +283,11 @@ public class ControllerConnectionTests
 
         public void Start()
         {
-            var connection = new ControllerConnection(ConnectAsync, RunSessionAsync, _options, Clock, () => 1.0, NullLogger<ControllerConnection>.Instance);
+            var connection = new ControllerConnection(ConnectAsync, RunSessionAsync, _options, Clock, () => 1.0, NullLogger<ControllerConnection>.Instance, Telemetry);
             Completion = connection.RunAsync("controller:9440", ReceivedConfigs.Add, _cancel.Token);
         }
+
+        public AgentTelemetry Telemetry { get; } = new();
 
         public void Cancel() => _cancel.Cancel();
 
@@ -306,7 +328,7 @@ public class ControllerConnectionTests
             return ValueTask.FromResult<Stream>(stream);
         }
 
-        private Task<SessionResult> RunSessionAsync(Stream stream, Action<Config> onConfig, CancellationToken ct)
+        private Task<SessionResult> RunSessionAsync(string replica, Stream stream, Action<Config> onConfig, CancellationToken ct)
         {
             if (_configToSend is not null)
             {

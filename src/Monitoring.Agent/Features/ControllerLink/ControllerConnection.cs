@@ -1,6 +1,8 @@
+using Monitoring.Protocol.Reports;
 using System.Net.Sockets;
 using System.Security.Authentication;
 using Microsoft.Extensions.Logging;
+using Monitoring.Agent.Features.SelfMonitoring;
 using Monitoring.Common;
 using Monitoring.Protocol.Messages;
 
@@ -15,6 +17,7 @@ namespace Monitoring.Agent.Features.ControllerLink;
 /// <param name="options">The reconnect delays.</param>
 /// <param name="time">Clock for the waits.</param>
 /// <param name="random">Returns a random number from 0 up to 1 for the jitter.</param>
+/// <param name="telemetry">Told that the replica is not connected until it is, and to forget it when the loop ends; optional.</param>
 /// <param name="logger">Receives connection failures.</param>
 internal sealed class ControllerConnection(
     ConnectAsync connect,
@@ -22,7 +25,8 @@ internal sealed class ControllerConnection(
     ControllerLinkOptions options,
     TimeProvider time,
     Func<double> random,
-    ILogger<ControllerConnection> logger)
+    ILogger<ControllerConnection> logger,
+    IAgentTelemetry? telemetry = null)
 {
     /// <summary>Connects to the replica and keeps the connection up until cancelled.</summary>
     /// <param name="address">The replica as <c>host:port</c>.</param>
@@ -30,6 +34,21 @@ internal sealed class ControllerConnection(
     /// <param name="ct">Stops the loop.</param>
     /// <returns>A task that completes when cancelled or when the agent has said goodbye.</returns>
     public async Task RunAsync(string address, Action<Config> onConfig, CancellationToken ct)
+    {
+        // A replica that is never reached must show as not connected, not as nothing.
+        telemetry?.Set(ReplicaMetrics.Connected, 0, address);
+        try
+        {
+            await RunLoopAsync(address, onConfig, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            // The replica was taken out of the list: there is nothing left to say about it.
+            telemetry?.Forget(address);
+        }
+    }
+
+    private async Task RunLoopAsync(string address, Action<Config> onConfig, CancellationToken ct)
     {
         var failures = 0;
         while (!ct.IsCancellationRequested)
@@ -41,7 +60,7 @@ internal sealed class ControllerConnection(
                 var stream = await connect(address, ct).ConfigureAwait(false);
                 await using (stream.ConfigureAwait(false))
                 {
-                    result = await runSession(stream, onConfig, ct).ConfigureAwait(false);
+                    result = await runSession(address, stream, onConfig, ct).ConfigureAwait(false);
                 }
 
                 if (result.End == SessionEnd.Stopped)

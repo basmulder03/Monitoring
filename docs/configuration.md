@@ -57,6 +57,9 @@ Logging is controlled by the usual `Logging:LogLevel` settings, for example `MON
 | `Controller:Alerting:RestartLoopWindow` | `00:10:00` | The time within which that many restarts count as a loop |
 | `Controller:Alerting:CertificateWarningDays` | `14` | A watched certificate with fewer days left raises the warning `certificate-expiring` |
 | `Controller:Alerting:CertificateCriticalDays` | `3` | With fewer days left, or already expired, it raises the critical alert `certificate-expired-soon` instead |
+| `Controller:Alerting:ReplicaLagThreshold` | `25` | A replica that has not acknowledged this many changes of a scope that an agent sent raises the warning `replica-behind` |
+| `Controller:Alerting:ReplicaBehindWait` | `00:01:00` | How long a replica must stay behind before that alert fires |
+| `Controller:Alerting:ReplicaUnreachableWait` | `00:02:00` | How long an agent may be unable to reach a replica before the warning `replica-unreachable` fires |
 | `Controller:Alerting:ServiceDownWait` | `00:00:00` | How long a service must have no instance able to serve before its alert fires |
 | `Controller:Alerting:EvaluationInterval` | `00:00:05` | How often the alert rules run |
 
@@ -483,10 +486,19 @@ An application that references the monitoring client lists the packages it is bu
 
 ## What the agent and the sidecar report about themselves
 
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Agent:SelfMonitoring:Interval` | `00:00:15` | How often the agent reports about itself |
+| `Agent:SelfMonitoring:PodName` | the host name | The pod the report belongs to, which is how it finds the instance of the agent's own pod |
+
 Both report through the pipeline they already use, as metrics (no settings; the agent reports every 15 seconds, and only fixed names are used, so memory stays bounded).
 
 - **Sidecar**: added to the metrics of its application, so they show on the instance: `monitoring.sidecar.memory_bytes`, `cpu_seconds`, `uptime_seconds`, `library_pull_ms` (the latest question to the application) and `library_connected` (1 when the application answered the latest question).
 - **Agent**: reported as the application of its own pod, which becomes the service `monitoring-agent` (only when the pod is in a namespace the agent discovers): `monitoring.agent.memory_bytes`, `cpu_seconds`, `uptime_seconds`, `instances_watched`, `controller_connections`, `sidecar_connections`, `frames_sent`, `pull_ms` (the latest answer of a sidecar), `kubernetes_errors` and `kubernetes_relists`.
+
+**Towards each controller replica** the agent reports, tagged with the replica as `replica=host:port`, whether it is connected (`replica_connected`, 1 or 0) and, while it is, how many changes of its scope the replica has not yet acknowledged (`replica_lag`). A replica that is never reached shows as 0 and one that is taken out of the list disappears. Because every replica receives this from every agent, each of them can show the state of all of them without talking to the others.
+
+**The System page** of the dashboard (and the tile on the overview) shows this controller replica, then every replica the agents connect to with how many agents are connected and how far behind it is, then the pods that run without a monitoring sidecar. A replica that is behind or that an agent cannot reach raises the alerts `replica-behind` and `replica-unreachable` on any controller that sees it, including the others when one replica is down.
 
 ## Prometheus export
 

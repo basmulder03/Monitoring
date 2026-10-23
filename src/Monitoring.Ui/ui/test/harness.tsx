@@ -1,5 +1,5 @@
 import { act } from "preact/test-utils";
-import type { AlertSummary, MetricHistory, Overview, PackageCatalog, ScopeDetail, ScopeSummary, TopologyGraph, VulnerabilityReport } from "../src/api/contracts";
+import type { AlertSummary, MetricHistory, Overview, PackageCatalog, ScopeDetail, ScopeSummary, SystemStatus, TopologyGraph, VulnerabilityReport } from "../src/api/contracts";
 import type { Services } from "../src/services/Services";
 import { start } from "../src/start";
 
@@ -12,12 +12,14 @@ export class FakeServices implements Services {
   vulnerabilities: VulnerabilityReport = { findings: [], advisories: 0, loadedAt: null };
   streams = 0;
   histories: Record<string, MetricHistory> = {};
+  system: SystemStatus | null = null;
   historyRequests: string[] = [];
   private handlers: { onOverview(overview: Overview): void; onKeepAlive(): void } | null = null;
   private readonly timers: { period: number; due: number; callback: () => void }[] = [];
   private readonly settings = new Map<string, string>();
 
   async getJson<T>(path: string) {
+    if (path === "/api/system") return this.system ? { status: 200, body: this.system as T } : { status: 404, body: null };
     if (path === "/api/topology") return { status: 200, body: this.topology as T };
     if (path === "/api/packages") return { status: 200, body: this.packages as T };
     if (path === "/api/vulnerabilities") return { status: 200, body: this.vulnerabilities as T };

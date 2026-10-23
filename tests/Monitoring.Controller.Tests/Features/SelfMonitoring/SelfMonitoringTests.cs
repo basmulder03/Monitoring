@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Monitoring.Controller.Features.Liveness;
+using Monitoring.Controller.Tests.Features.Alerting;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Features.SelfMonitoring;
 using Monitoring.Controller.Tests.Shared;
@@ -94,5 +95,59 @@ public class SelfMonitoringTests
         json.RootElement.GetProperty("scopes").GetInt32().ShouldBe(2);
         json.RootElement.GetProperty("agentsConnected").GetInt32().ShouldBe(2);
         json.RootElement.GetProperty("healthy").GetBoolean().ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Read_puts_the_replicas_together_from_what_the_agents_say_and_is_not_healthy_while_one_is_not_connected()
+    {
+        // Arrange
+        var registry = new FakeScopeRegistry()
+            .WithInstance("shop", ReplicaRuleTests.Agent("a-1", ("c0:9440", true, 2), ("c1:9440", true, 7)))
+            .WithInstance("blog", ReplicaRuleTests.Agent("a-2", ("c0:9440", true, 11), ("c1:9440", false, null)));
+        var telemetry = new SystemTelemetry(registry, new FakeAgentLiveness(), new FakeTimeProvider());
+
+        // Act
+        var status = telemetry.Read();
+
+        // Assert
+        status.Replicas.Select(r => (r.Address, r.AgentsReporting, r.AgentsConnected, r.MaxLag)).ShouldBe(
+            [("c0:9440", 2, 2, 11L), ("c1:9440", 2, 1, 7L)]);
+        status.Healthy.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Read_knows_which_replica_it_is_from_the_machine_name()
+    {
+        // Arrange
+        var registry = new FakeScopeRegistry().WithInstance("shop", ReplicaRuleTests.Agent("a-1",
+            ($"{Environment.MachineName}.monitoring-headless:9440", true, 0), ("other.monitoring-headless:9440", true, 0)));
+
+        // Act
+        var status = new SystemTelemetry(registry, new FakeAgentLiveness(), new FakeTimeProvider()).Read();
+
+        // Assert
+        status.Replicas.Single(r => r.ThisReplica).Address.ShouldStartWith(Environment.MachineName);
+        status.Replicas.Count(r => r.ThisReplica).ShouldBe(1);
+    }
+
+    [Fact]
+    public void Read_lists_the_pods_that_run_without_a_sidecar_but_not_the_agent_or_those_that_have_one()
+    {
+        // Arrange
+        static InstanceInfo Pod(string id, string service, params ContainerInfo[] containers) =>
+            new(id, service, InstanceLifecycle.Running, HealthState.Healthy, new Dictionary<string, string>(), Containers: containers);
+        var app = new ContainerInfo("app", ContainerRole.App, ContainerPhase.Running, HealthState.Healthy, true);
+        var sidecar = new ContainerInfo("monitoring-sidecar", ContainerRole.MonitoringSidecar, ContainerPhase.Running, HealthState.Healthy, true);
+        var registry = new FakeScopeRegistry()
+            .WithInstance("shop", Pod("orders-1", "orders", app))
+            .WithInstance("shop", Pod("billing-1", "billing", app, sidecar))
+            .WithInstance("shop", Pod("agent-1", "monitoring-agent", app))
+            .WithInstance("shop", new InstanceInfo("legacy", "legacy", InstanceLifecycle.Running, HealthState.Healthy, new Dictionary<string, string>()));
+
+        // Act
+        var status = new SystemTelemetry(registry, new FakeAgentLiveness(), new FakeTimeProvider()).Read();
+
+        // Assert
+        status.Unmonitored.ShouldBe([new UnmonitoredInstance("shop", "orders", "orders-1")]);
     }
 }

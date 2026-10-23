@@ -43,7 +43,15 @@ internal sealed class ControllerSession(
     /// <param name="onConfig">Called with the replica's configuration, first after the hello and again whenever it changes.</param>
     /// <param name="ct">Ends the session when the agent shuts down.</param>
     /// <returns>How and why the session ended; it does not throw for connection problems.</returns>
-    public async Task<SessionResult> RunAsync(Stream stream, Action<Config> onConfig, CancellationToken ct)
+    public Task<SessionResult> RunAsync(Stream stream, Action<Config> onConfig, CancellationToken ct) => RunAsync("", stream, onConfig, ct);
+
+    /// <summary>Runs the session like <see cref="RunAsync(Stream, Action{Config}, CancellationToken)"/>, and names its measurements after the replica.</summary>
+    /// <param name="replica">The replica as <c>host:port</c>.</param>
+    /// <param name="stream">The connection to the replica.</param>
+    /// <param name="onConfig">Called with the replica's configuration, first after the hello and again whenever it changes.</param>
+    /// <param name="ct">Ends the session when the agent shuts down.</param>
+    /// <returns>How and why the session ended; it does not throw for connection problems.</returns>
+    public async Task<SessionResult> RunAsync(string replica, Stream stream, Action<Config> onConfig, CancellationToken ct)
     {
         var established = false;
         try
@@ -60,9 +68,10 @@ internal sealed class ControllerSession(
 
             established = true;
             telemetry?.Add("monitoring.agent.controller_connections");
+            telemetry?.Set(ReplicaMetrics.Connected, 1, replica);
             onConfig(config);
 
-            var end = await SendStateAsync(stream, config, onConfig, ct).ConfigureAwait(false);
+            var end = await SendStateAsync(stream, config, onConfig, replica, ct).ConfigureAwait(false);
             return new SessionResult(end, established);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -89,6 +98,7 @@ internal sealed class ControllerSession(
             if (established)
             {
                 telemetry?.Add("monitoring.agent.controller_connections", -1);
+                telemetry?.Set(ReplicaMetrics.Connected, 0, replica);
             }
         }
     }
@@ -125,7 +135,7 @@ internal sealed class ControllerSession(
     }
 
     /// <summary>Sends the snapshot, then everything that follows, until the session must end.</summary>
-    private async Task<SessionEnd> SendStateAsync(Stream stream, Config config, Action<Config> onConfig, CancellationToken ct)
+    private async Task<SessionEnd> SendStateAsync(Stream stream, Config config, Action<Config> onConfig, string replica, CancellationToken ct)
     {
         using var subscription = store.Subscribe();
         using var heartbeatTimer = new PeriodicTimer(TimeSpan.FromSeconds(config.HeartbeatSeconds), time);
@@ -138,7 +148,7 @@ internal sealed class ControllerSession(
         var resyncRequested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         // Answers to the replica's requests are written by the pump loop too, so only one place ever writes.
         var answers = Channel.CreateBounded<Message>(new BoundedChannelOptions(64) { FullMode = BoundedChannelFullMode.DropWrite });
-        var reader = ReadRepliesAsync(stream, heartbeatTimer, resyncRequested, onConfig, answers.Writer, pumpCts.Token);
+        var reader = ReadRepliesAsync(stream, heartbeatTimer, resyncRequested, onConfig, answers.Writer, replica, pumpCts.Token);
 
         Task<bool>? nextDelta = null;
         Task<bool>? nextHeartbeat = null;
@@ -240,7 +250,7 @@ internal sealed class ControllerSession(
 
     /// <summary>Reads the replica's messages until the connection ends.</summary>
     private async Task ReadRepliesAsync(
-        Stream stream, PeriodicTimer heartbeatTimer, TaskCompletionSource resyncRequested, Action<Config> onConfig, ChannelWriter<Message> answers, CancellationToken ct)
+        Stream stream, PeriodicTimer heartbeatTimer, TaskCompletionSource resyncRequested, Action<Config> onConfig, ChannelWriter<Message> answers, string replica, CancellationToken ct)
     {
         while (await FrameCodec.ReadAsync(stream, options.MaxFrameBytes, ct).ConfigureAwait(false) is { } message)
         {
@@ -248,6 +258,10 @@ internal sealed class ControllerSession(
             {
                 case Ack { SnapshotRequired: true }:
                     resyncRequested.TrySetResult();
+                    break;
+
+                case Ack ack:
+                    telemetry?.Set(ReplicaMetrics.AckedSequence, ack.Sequence, replica);
                     break;
 
                 case Config config:

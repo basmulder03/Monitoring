@@ -2,6 +2,7 @@ import type { Overview } from "../../api/contracts";
 import { Alerts } from "./Alerts";
 import { FilterControl } from "./FilterControl";
 import { Groups } from "./Groups";
+import { SystemTile } from "./SystemTile";
 import { useFilters } from "./useFilters";
 
 /** The first page: a tile per scope, grouped by the configured labels, and the alerts. */
@@ -20,6 +21,7 @@ export function OverviewView({ overview, now }: { overview: Overview | null; now
           <Groups scopes={visible} keys={overview.groupBy} depth={1} now={now} />
         </>
       )}
+      <SystemTile refresh={overview} />
       <Alerts alerts={overview?.alerts ?? []} now={now} />
     </div>
   );

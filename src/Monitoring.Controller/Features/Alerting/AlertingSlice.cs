@@ -26,6 +26,9 @@ public static class AlertingSlice
         ArgumentOutOfRangeException.ThrowIfLessThan(options.PackageDriftWait, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.VulnerablePackageWait, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.RestartLoopCount, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.ReplicaLagThreshold, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.ReplicaBehindWait, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.ReplicaUnreachableWait, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.CertificateCriticalDays, 0);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.CertificateWarningDays, options.CertificateCriticalDays);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.RestartLoopWindow, TimeSpan.Zero);
@@ -51,6 +54,10 @@ public static class AlertingSlice
             "certificate-expiring", AlertSeverity.Warning, provider.GetRequiredService<IScopeRegistry>(), options.CertificateWarningDays, options.CertificateCriticalDays));
         services.AddSingleton<IAlertRule>(provider => new CertificateExpiryRule(
             "certificate-expired-soon", AlertSeverity.Critical, provider.GetRequiredService<IScopeRegistry>(), options.CertificateCriticalDays, null));
+        services.AddSingleton<IAlertRule>(provider => new ReplicaRule(
+            "replica-behind", provider.GetRequiredService<IScopeRegistry>(), options.ReplicaBehindWait, report => report.Lag >= options.ReplicaLagThreshold));
+        services.AddSingleton<IAlertRule>(provider => new ReplicaRule(
+            "replica-unreachable", provider.GetRequiredService<IScopeRegistry>(), options.ReplicaUnreachableWait, report => !report.Connected));
         services.AddSingleton<AlertEvaluator>();
         services.AddSingleton<IAlertEvaluator>(provider => provider.GetRequiredService<AlertEvaluator>());
         services.AddSingleton<IAlertState>(provider => provider.GetRequiredService<AlertEvaluator>());

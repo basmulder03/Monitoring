@@ -1,4 +1,5 @@
 using Monitoring.Agent.Features.Configuration;
+using Monitoring.Agent.Features.SelfMonitoring;
 using Monitoring.Common;
 using Monitoring.Common.Transport;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,7 +33,7 @@ public static class ControllerLinkSlice
         services.AddSingleton<RunSessionAsync>(provider =>
         {
             var session = provider.GetRequiredService<ControllerSession>();
-            return session.RunAsync;
+            return (replica, stream, onConfig, ct) => session.RunAsync(replica, stream, onConfig, ct);
         });
         services.AddSingleton(provider => new ControllerConnection(
             provider.GetRequiredService<ConnectAsync>(),
@@ -40,7 +41,8 @@ public static class ControllerLinkSlice
             options,
             provider.GetRequiredService<TimeProvider>(),
             Random.Shared.NextDouble,
-            provider.GetRequiredService<ILogger<ControllerConnection>>()));
+            provider.GetRequiredService<ILogger<ControllerConnection>>(),
+            provider.GetService<IAgentTelemetry>()));
         services.AddSingleton<RunReplicaAsync>(provider =>
         {
             var connection = provider.GetRequiredService<ControllerConnection>();

@@ -5,6 +5,7 @@ using Monitoring.Agent.Features.Configuration;
 using Monitoring.Agent.Features.ControllerLink;
 using Monitoring.Agent.Features.MetricsHistory;
 using Monitoring.Agent.Features.ScopeState;
+using Monitoring.Agent.Features.SelfMonitoring;
 using Monitoring.Protocol.Framing;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Instances;
@@ -122,6 +123,36 @@ public class ControllerSessionTests
         // Assert
         first.ShouldBe(new Heartbeat(1, HealthState.Healthy, "built-in"));
         second.ShouldBe(new Heartbeat(2, HealthState.Healthy, "built-in"));
+    }
+
+    [Fact]
+    public async Task RunAsync_keeps_track_of_whether_it_is_connected_to_the_replica_and_what_the_replica_acknowledged()
+    {
+        // Arrange
+        var fixture = new SessionFixture();
+        var controller = fixture.Start();
+        await controller.AcceptAsync(new Config("v", [], HeartbeatSeconds: 3600));
+        var connected = fixture.Telemetry.Read()[(ReplicaMetrics.Connected, "c1:9440")];
+
+        // Act
+        await controller.SendAsync(new Ack(5));
+        await Eventually(() => fixture.Telemetry.Read().GetValueOrDefault((ReplicaMetrics.AckedSequence, "c1:9440")) == 5);
+        controller.Disconnect();
+        await fixture.Result;
+
+        // Assert
+        connected.ShouldBe(1);
+        fixture.Telemetry.Read()[(ReplicaMetrics.Connected, "c1:9440")].ShouldBe(0);
+    }
+
+    private static async Task Eventually(Func<bool> condition)
+    {
+        using var guard = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        guard.CancelAfter(TimeSpan.FromSeconds(5));
+        while (!condition())
+        {
+            await Task.Delay(5, guard.Token);
+        }
     }
 
     [Fact]
@@ -398,6 +429,8 @@ public class ControllerSessionTests
 
         public IMetricsHistory History { get; } = new RingMetricsHistory(new MetricsHistoryOptions());
 
+        public AgentTelemetry Telemetry { get; } = new();
+
         public Task<SessionResult> Result { get; private set; } = Task.FromException<SessionResult>(new InvalidOperationException("Not started."));
 
         public SessionFixture WithAgent(string id, string? version, string token)
@@ -445,7 +478,7 @@ public class ControllerSessionTests
         public FakeController Start()
         {
             _store ??= new StoreBuilder().WithInstances(_instanceIds).Build();
-            var session = new ControllerSession(_store, Configuration, _options, Clock, NullLogger<ControllerSession>.Instance, history: History);
+            var session = new ControllerSession(_store, Configuration, _options, Clock, NullLogger<ControllerSession>.Instance, Telemetry, History);
             var (server, client) = DuplexStream.CreatePair();
             Result = RunAsync(session, server);
             return new FakeController(client);
@@ -476,7 +509,7 @@ public class ControllerSessionTests
         {
             try
             {
-                return await session.RunAsync(server, config => { lock (Configs) { Configs.Add(config); } }, _shutdown.Token);
+                return await session.RunAsync("c1:9440", server, config => { lock (Configs) { Configs.Add(config); } }, _shutdown.Token);
             }
             finally
             {
