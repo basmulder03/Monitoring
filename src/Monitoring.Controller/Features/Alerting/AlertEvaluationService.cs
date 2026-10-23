@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Monitoring.Controller.Features.SelfMonitoring;
 
 namespace Monitoring.Controller.Features.Alerting;
 
@@ -8,11 +9,13 @@ namespace Monitoring.Controller.Features.Alerting;
 /// <param name="options">Provides the evaluation interval.</param>
 /// <param name="time">Clock for the interval.</param>
 /// <param name="logger">Receives evaluation failures.</param>
+/// <param name="telemetry">Told how long each run took; optional.</param>
 internal sealed class AlertEvaluationService(
     IAlertEvaluator evaluator,
     AlertingOptions options,
     TimeProvider time,
-    ILogger<AlertEvaluationService> logger) : BackgroundService
+    ILogger<AlertEvaluationService> logger,
+    ISystemTelemetry? telemetry = null) : BackgroundService
 {
     private PeriodicTimer? _timer;
 
@@ -41,7 +44,9 @@ internal sealed class AlertEvaluationService(
             {
                 try
                 {
+                    var started = time.GetTimestamp();
                     evaluator.Evaluate();
+                    telemetry?.AlertsEvaluated(time.GetElapsedTime(started));
                 }
                 catch (Exception ex)
                 {

@@ -12,6 +12,7 @@ using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Health;
 using Monitoring.Controller.Features.Packages;
 using Monitoring.Controller.Features.Registry;
+using Monitoring.Controller.Features.SelfMonitoring;
 using Monitoring.Controller.Features.Vulnerabilities;
 using Monitoring.Controller.Features.Security;
 using Monitoring.Controller.Features.Topology;
@@ -57,6 +58,7 @@ internal static class ControllerComposition
                 options.PollInterval = configuration.Duration("PollInterval", options.PollInterval);
             })
             .AddHealth()
+            .AddSelfMonitoring()
             .AddVulnerabilities(options =>
             {
                 var vulnerabilities = controller.Section("Vulnerabilities");
@@ -130,6 +132,7 @@ internal static class ControllerComposition
 
         var app = builder.Build();
         app.MapDashboard();
+        app.MapSelfMonitoring();
         app.MapPackages();
         app.MapVulnerabilities();
         return app;

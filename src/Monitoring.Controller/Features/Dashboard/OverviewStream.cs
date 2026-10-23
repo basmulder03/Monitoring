@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
+using Monitoring.Controller.Features.SelfMonitoring;
 
 namespace Monitoring.Controller.Features.Dashboard;
 
@@ -9,7 +10,8 @@ namespace Monitoring.Controller.Features.Dashboard;
 /// <param name="model">Builds the overview.</param>
 /// <param name="options">Provides the push and keep-alive intervals.</param>
 /// <param name="time">Clock for the intervals.</param>
-internal sealed class OverviewStream(DashboardModel model, DashboardOptions options, TimeProvider time)
+/// <param name="telemetry">Told how many pages have the stream open; optional.</param>
+internal sealed class OverviewStream(DashboardModel model, DashboardOptions options, TimeProvider time, ISystemTelemetry? telemetry = null)
 {
     /// <summary>Writes events to the response until the page goes away.</summary>
     /// <param name="response">The response to stream into.</param>
@@ -26,6 +28,7 @@ internal sealed class OverviewStream(DashboardModel model, DashboardOptions opti
         string? last = null;
         var silentSince = time.GetTimestamp();
 
+        telemetry?.EventClientConnected();
         try
         {
             do
@@ -53,6 +56,10 @@ internal sealed class OverviewStream(DashboardModel model, DashboardOptions opti
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             // The page went away or the controller is shutting down.
+        }
+        finally
+        {
+            telemetry?.EventClientDisconnected();
         }
     }
 }

@@ -126,6 +126,17 @@ export interface ServiceDetail {
   instances: InstanceDetail[];
 }
 
+export interface SystemStatus {
+  replica: string;
+  uptimeSeconds: number;
+  scopes: number;
+  agentsConnected: number;
+  eventClients: number;
+  alertEvaluationMilliseconds: number | null;
+  memoryBytes: number;
+  healthy: boolean;
+}
+
 export interface TopologyEdge {
   from: string;
   to: string;
