@@ -29,6 +29,36 @@ public class BuildTargetsTests
     }
 
     [Fact]
+    public async Task A_web_application_carries_the_list_too_although_its_sdk_names_the_resource_differently()
+    {
+        // Arrange
+        using var project = new TempProject().WithSdk("Microsoft.NET.Sdk.Web").WithPackage("Serilog", "4.2.0");
+
+        // Act
+        var (exitCode, output) = await project.BuildAsync("Monitoring.Client.targets");
+        var report = PackageList.Read(Assembly.LoadFrom(project.Assembly));
+
+        // Assert
+        exitCode.ShouldBe(0, output);
+        report.Packages.Single(p => p.Name == "Serilog").Direct.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task The_list_is_written_with_the_other_intermediate_files_and_not_into_the_project()
+    {
+        // Arrange
+        using var project = new TempProject().WithPackage("Microsoft.Extensions.Hosting.Abstractions", "10.0.13");
+
+        // Act
+        var (exitCode, output) = await project.BuildAsync("Monitoring.Client.targets");
+
+        // Assert
+        exitCode.ShouldBe(0, output);
+        File.Exists(Path.Combine(project.Directory, "monitoring.packages.txt")).ShouldBeFalse();
+        Directory.EnumerateFiles(Path.Combine(project.Directory, "obj"), "monitoring.packages.txt", SearchOption.AllDirectories).ShouldNotBeEmpty();
+    }
+
+    [Fact]
     public async Task An_application_can_turn_the_list_off()
     {
         // Arrange
@@ -48,7 +78,16 @@ public class BuildTargetsTests
 
     private sealed class TempProject : IDisposable
     {
-        private readonly string _directory = Directory.CreateTempSubdirectory("packages-").FullName;
+        private readonly string _directory = System.IO.Directory.CreateTempSubdirectory("packages-").FullName;
+        private string _sdk = "Microsoft.NET.Sdk";
+
+        public string Directory => _directory;
+
+        public TempProject WithSdk(string sdk)
+        {
+            _sdk = sdk;
+            return this;
+        }
         private readonly List<string> _packages = [];
         private readonly List<string> _properties = [];
 
@@ -73,7 +112,7 @@ public class BuildTargetsTests
         {
             var targetsFile = Path.Combine(RepositoryRoot(), "src", "Monitoring.Client", "build", targets);
             await File.WriteAllTextAsync(Path.Combine(_directory, "app.csproj"), $"""
-                <Project Sdk="Microsoft.NET.Sdk">
+                <Project Sdk="{_sdk}">
                   <PropertyGroup>
                     <OutputType>Exe</OutputType>
                     <TargetFramework>net10.0</TargetFramework>
@@ -104,7 +143,7 @@ public class BuildTargetsTests
         {
             try
             {
-                Directory.Delete(_directory, recursive: true);
+                System.IO.Directory.Delete(_directory, recursive: true);
             }
             catch (IOException)
             {

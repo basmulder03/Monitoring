@@ -36,3 +36,7 @@ export NODE_OPTIONS=--use-system-ca
 ```
 
 Proxy settings for downloads come from `HTTPS_PROXY`, and for npm from the usual `.npmrc`. The lockfile names the public npm registry; npm swaps in the registry you have configured.
+
+## Kubernetes nightly
+
+`deploy/k8s-test/run.sh` builds the images, installs the three charts and a sample application on a throwaway kind cluster and checks the dashboard API of the controller. It needs docker, kind, kubectl and helm; `KEEP=1` leaves the cluster. The `Kubernetes nightly` workflow runs it every night.

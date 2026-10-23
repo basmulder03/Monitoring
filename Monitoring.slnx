@@ -9,6 +9,9 @@
     <Project Path="src/Monitoring.Sidecar/Monitoring.Sidecar.csproj" />
     <Project Path="src/Monitoring.Ui/Monitoring.Ui.csproj" />
   </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Monitoring.SampleApp/Monitoring.SampleApp.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Monitoring.Agent.Tests/Monitoring.Agent.Tests.csproj" />
     <Project Path="tests/Monitoring.Architecture.Tests/Monitoring.Architecture.Tests.csproj" />

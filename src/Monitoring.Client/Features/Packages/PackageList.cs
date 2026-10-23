@@ -6,15 +6,20 @@ namespace Monitoring.Client.Features.Packages;
 /// <summary>Reads the list of packages that the build of the application embedded in it.</summary>
 internal static class PackageList
 {
-    /// <summary>The name of the embedded resource, written by <c>build/Monitoring.Client.targets</c>.</summary>
+    /// <summary>The name the build gives the embedded resource, written by <c>build/Monitoring.Client.targets</c>.</summary>
     public const string ResourceName = "Monitoring.Packages";
+
+    /// <summary>The end of the name under which some SDKs, such as the web SDK, embed the file instead, prefixed with the name of the project.</summary>
+    private const string FileSuffix = "monitoring.packages.txt";
 
     /// <summary>Reads the list from an assembly.</summary>
     /// <param name="application">The application, normally the entry assembly; <see langword="null"/> when there is none.</param>
     /// <returns>The packages; an empty list when the application was built without it, so it can be told from one that has no packages.</returns>
     public static PackagesReport Read(Assembly? application)
     {
-        using var stream = application?.GetManifestResourceStream(ResourceName);
+        var name = application?.GetManifestResourceNames()
+            .FirstOrDefault(candidate => candidate == ResourceName || candidate.EndsWith(FileSuffix, StringComparison.OrdinalIgnoreCase));
+        using var stream = name is null ? null : application!.GetManifestResourceStream(name);
         if (stream is null)
         {
             return new PackagesReport(Runtime(), []);

@@ -7,11 +7,14 @@
   -->
   <PropertyGroup>
     <MonitoringReportPackages Condition="'$(MonitoringReportPackages)' == ''">true</MonitoringReportPackages>
-    <MonitoringPackagesFile>$(IntermediateOutputPath)monitoring.packages.txt</MonitoringPackagesFile>
   </PropertyGroup>
 
   <Target Name="MonitoringWritePackages" BeforeTargets="AssignTargetPaths" DependsOnTargets="ResolvePackageAssets"
           Condition="'$(MonitoringReportPackages)' == 'true' And '$(OutputType)' != 'Library'">
+    <PropertyGroup>
+      <!-- Worked out here, not at the top: where the intermediate files go is only known once the SDK has been read. -->
+      <MonitoringPackagesFile>$([MSBuild]::NormalizePath($(MSBuildProjectDirectory), $(IntermediateOutputPath), monitoring.packages.txt))</MonitoringPackagesFile>
+    </PropertyGroup>
     <ItemGroup>
       <_MonitoringResolved Include="@(RuntimeCopyLocalItems);@(ResolvedCompileFileDefinitions)" Condition="'%(NuGetPackageId)' != ''" />
       <_MonitoringPackage Include="@(_MonitoringResolved->'P %(NuGetPackageId) %(NuGetPackageVersion)')" />

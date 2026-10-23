@@ -6,5 +6,5 @@ src/Monitoring.Ui/wwwroot/
 .git/
 .github/
 docs/
-tests/
 published/
+tests/

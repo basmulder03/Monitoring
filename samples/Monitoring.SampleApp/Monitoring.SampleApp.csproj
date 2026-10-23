@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <PublishAot>true</PublishAot>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- A package of its own, so there is something to list; the shared framework is not a package. -->
+    <PackageReference Include="Polly.Core" Version="8.5.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- In your own application this is a package reference to Monitoring.Client; the targets come with the package. -->
+    <ProjectReference Include="..\..\src\Monitoring.Client\Monitoring.Client.csproj" />
+  </ItemGroup>
+  <Import Project="..\..\src\Monitoring.Client\build\Monitoring.Client.targets" />
+</Project>
