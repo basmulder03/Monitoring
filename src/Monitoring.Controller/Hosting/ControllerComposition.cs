@@ -122,6 +122,12 @@ internal static class ControllerComposition
                 options.ReplicaLagThreshold = alerting.Int("ReplicaLagThreshold", options.ReplicaLagThreshold);
                 options.ReplicaBehindWait = alerting.Duration("ReplicaBehindWait", options.ReplicaBehindWait);
                 options.ReplicaUnreachableWait = alerting.Duration("ReplicaUnreachableWait", options.ReplicaUnreachableWait);
+                options.EdgeErrorWindow = alerting.Duration("EdgeErrorWindow", options.EdgeErrorWindow);
+                options.EdgeErrorShare = double.Parse(alerting.Text("EdgeErrorShare", options.EdgeErrorShare.ToString(System.Globalization.CultureInfo.InvariantCulture)), System.Globalization.CultureInfo.InvariantCulture);
+                options.EdgeErrorMinCalls = alerting.Int("EdgeErrorMinCalls", options.EdgeErrorMinCalls);
+                options.ConfigurationDriftWait = alerting.Duration("ConfigurationDriftWait", options.ConfigurationDriftWait);
+                options.DroppedDataWindow = alerting.Duration("DroppedDataWindow", options.DroppedDataWindow);
+                options.DroppedDataSpans = alerting.Int("DroppedDataSpans", options.DroppedDataSpans);
                 options.RestartLoopCount = alerting.Int("RestartLoopCount", options.RestartLoopCount);
                 options.RestartLoopWindow = alerting.Duration("RestartLoopWindow", options.RestartLoopWindow);
                 options.ServiceDownWait = alerting.Duration("ServiceDownWait", options.ServiceDownWait);

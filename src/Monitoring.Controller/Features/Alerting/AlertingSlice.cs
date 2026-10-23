@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Monitoring.Controller.Features.Configuration;
+using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Registry;
 using Monitoring.Controller.Features.Vulnerabilities;
 
@@ -9,7 +11,7 @@ namespace Monitoring.Controller.Features.Alerting;
 public static class AlertingSlice
 {
     /// <summary>
-    /// Adds the default rules, the evaluator and the background service that runs it. It reads from the registry and the liveness tracking, so <c>AddRegistry</c>, <c>AddLiveness</c>, <c>AddPackages</c> and <c>AddVulnerabilities</c> must be called as well.
+    /// Adds the default rules, the evaluator and the background service that runs it. It reads from the registry and the liveness tracking, so <c>AddRegistry</c>, <c>AddLiveness</c>, <c>AddConfiguration</c>, <c>AddPackages</c> and <c>AddVulnerabilities</c> must be called as well.
     /// </summary>
     /// <param name="services">The service collection to extend.</param>
     /// <param name="configure">Optionally changes the <see cref="AlertingOptions"/>.</param>
@@ -26,6 +28,13 @@ public static class AlertingSlice
         ArgumentOutOfRangeException.ThrowIfLessThan(options.PackageDriftWait, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.VulnerablePackageWait, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.RestartLoopCount, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.EdgeErrorWindow, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.EdgeErrorShare, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(options.EdgeErrorShare, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.EdgeErrorMinCalls, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.ConfigurationDriftWait, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.DroppedDataWindow, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.DroppedDataSpans, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.ReplicaLagThreshold, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.ReplicaBehindWait, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.ReplicaUnreachableWait, TimeSpan.Zero);
@@ -58,6 +67,10 @@ public static class AlertingSlice
             "replica-behind", provider.GetRequiredService<IScopeRegistry>(), options.ReplicaBehindWait, report => report.Lag >= options.ReplicaLagThreshold));
         services.AddSingleton<IAlertRule>(provider => new ReplicaRule(
             "replica-unreachable", provider.GetRequiredService<IScopeRegistry>(), options.ReplicaUnreachableWait, report => !report.Connected));
+        services.AddSingleton<IAlertRule>(provider => new EdgeErrorRateRule(provider.GetRequiredService<IScopeRegistry>(), options, provider.GetRequiredService<TimeProvider>()));
+        services.AddSingleton<IAlertRule>(provider => new DroppedDataRule(provider.GetRequiredService<IScopeRegistry>(), options, provider.GetRequiredService<TimeProvider>()));
+        services.AddSingleton<IAlertRule>(provider => new ConfigurationDriftRule(
+            provider.GetRequiredService<IScopeRegistry>(), provider.GetRequiredService<IAgentLiveness>(), provider.GetRequiredService<IAppliedConfigurations>(), options));
         services.AddSingleton<AlertEvaluator>();
         services.AddSingleton<IAlertEvaluator>(provider => provider.GetRequiredService<AlertEvaluator>());
         services.AddSingleton<IAlertState>(provider => provider.GetRequiredService<AlertEvaluator>());

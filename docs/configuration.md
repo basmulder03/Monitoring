@@ -60,6 +60,12 @@ Logging is controlled by the usual `Logging:LogLevel` settings, for example `MON
 | `Controller:Alerting:ReplicaLagThreshold` | `25` | A replica that has not acknowledged this many changes of a scope that an agent sent raises the warning `replica-behind` |
 | `Controller:Alerting:ReplicaBehindWait` | `00:01:00` | How long a replica must stay behind before that alert fires |
 | `Controller:Alerting:ReplicaUnreachableWait` | `00:02:00` | How long an agent may be unable to reach a replica before the warning `replica-unreachable` fires |
+| `Controller:Alerting:EdgeErrorWindow` | `00:05:00` | The window in which the calls of a service to a dependency are looked at for failures |
+| `Controller:Alerting:EdgeErrorShare` | `0.5` | The share of those calls that must fail to raise the warning `edge-error-rate`, from 0 to 1 |
+| `Controller:Alerting:EdgeErrorMinCalls` | `20` | The fewest calls within the window that can raise it, because a few failures of few calls say nothing |
+| `Controller:Alerting:ConfigurationDriftWait` | `00:10:00` | How long an agent may use another configuration than expected before the warning `configuration-drift` fires; a rollout passes through this state |
+| `Controller:Alerting:DroppedDataWindow` | `00:10:00` | The window in which spans thrown away by an application's client are counted |
+| `Controller:Alerting:DroppedDataSpans` | `100` | How many it may throw away within the window before the warning `dropped-data` fires: its buffer is too small for the traffic, and the spans someone opens in the dashboard are not all that happened |
 | `Controller:Alerting:ServiceDownWait` | `00:00:00` | How long a service must have no instance able to serve before its alert fires |
 | `Controller:Alerting:EvaluationInterval` | `00:00:05` | How often the alert rules run |
 

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Monitoring.Controller.Features.Alerting;
+using Monitoring.Controller.Features.Configuration;
 using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Packages;
 using Monitoring.Controller.Features.Registry;
@@ -15,7 +16,7 @@ public class AlertingSliceTests
     public void AddAlerting_shares_one_evaluator_between_the_driving_and_reading_contracts()
     {
         // Arrange
-        using var provider = new ServiceCollection().AddRegistry().AddLiveness().AddPackages().AddVulnerabilities().AddAlerting().BuildServiceProvider();
+        using var provider = new ServiceCollection().AddRegistry().AddLiveness().AddConfiguration().AddPackages().AddVulnerabilities().AddAlerting().BuildServiceProvider();
 
         // Act
         var evaluator = provider.GetRequiredService<IAlertEvaluator>();
@@ -29,13 +30,13 @@ public class AlertingSliceTests
     public void AddAlerting_registers_the_default_rules()
     {
         // Arrange
-        using var provider = new ServiceCollection().AddRegistry().AddLiveness().AddPackages().AddVulnerabilities().AddAlerting().BuildServiceProvider();
+        using var provider = new ServiceCollection().AddRegistry().AddLiveness().AddConfiguration().AddPackages().AddVulnerabilities().AddAlerting().BuildServiceProvider();
 
         // Act
         var rules = provider.GetServices<IAlertRule>().Select(r => r.Name);
 
         // Assert
-        rules.ShouldBe(["instance-unhealthy", "service-down", "scope-unknown", "restart-loop", "package-drift", "vulnerable-package", "vulnerable-package-critical", "certificate-expiring", "certificate-expired-soon", "replica-behind", "replica-unreachable"], ignoreOrder: true);
+        rules.ShouldBe(["instance-unhealthy", "service-down", "scope-unknown", "restart-loop", "package-drift", "vulnerable-package", "vulnerable-package-critical", "certificate-expiring", "certificate-expired-soon", "replica-behind", "replica-unreachable", "edge-error-rate", "dropped-data", "configuration-drift"], ignoreOrder: true);
     }
 
     [Fact]
@@ -125,7 +126,7 @@ public class AlertingSliceTests
     public void AddAlerting_registers_the_evaluation_service_as_a_hosted_service()
     {
         // Arrange
-        using var provider = new ServiceCollection().AddRegistry().AddLiveness().AddPackages().AddVulnerabilities().AddAlerting().BuildServiceProvider();
+        using var provider = new ServiceCollection().AddRegistry().AddLiveness().AddConfiguration().AddPackages().AddVulnerabilities().AddAlerting().BuildServiceProvider();
 
         // Act
         var hosted = provider.GetServices<Microsoft.Extensions.Hosting.IHostedService>();

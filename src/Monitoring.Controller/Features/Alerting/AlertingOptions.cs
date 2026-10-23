@@ -33,6 +33,24 @@ public sealed class AlertingOptions
     /// <summary>How long a replica that an agent is not connected to must stay so before the alert <c>replica-unreachable</c> fires.</summary>
     public TimeSpan ReplicaUnreachableWait { get; set; } = TimeSpan.FromMinutes(2);
 
+    /// <summary>The window in which the calls to a dependency are looked at for failures.</summary>
+    public TimeSpan EdgeErrorWindow { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>The share of calls to a dependency that must fail within the window to raise <c>edge-error-rate</c>, from 0 to 1.</summary>
+    public double EdgeErrorShare { get; set; } = 0.5;
+
+    /// <summary>The fewest calls within the window that can raise <c>edge-error-rate</c>.</summary>
+    public int EdgeErrorMinCalls { get; set; } = 20;
+
+    /// <summary>How long an agent may use another configuration than expected before <c>configuration-drift</c> fires.</summary>
+    public TimeSpan ConfigurationDriftWait { get; set; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>The window in which spans thrown away by a client are counted.</summary>
+    public TimeSpan DroppedDataWindow { get; set; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>How many spans a client may throw away within the window before <c>dropped-data</c> fires.</summary>
+    public int DroppedDataSpans { get; set; } = 100;
+
     /// <summary>How many restarts of an instance within <see cref="RestartLoopWindow"/> raise the restart-loop alert.</summary>
     public int RestartLoopCount { get; set; } = 3;
 
