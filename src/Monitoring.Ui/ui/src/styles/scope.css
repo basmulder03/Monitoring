@@ -14,3 +14,4 @@ table.instances th, table.instances td, table.containers th, table.containers td
 
 details.instance > summary { cursor: pointer; }
 ul.checks { list-style: none; padding: 0; margin: 0.25rem 0; }
+.sparkline { color: var(--fg); vertical-align: middle; }

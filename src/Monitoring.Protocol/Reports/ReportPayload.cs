@@ -23,6 +23,12 @@ public static class ReportPayload
     public static string Write(MetricsReport report) =>
         JsonSerializer.Serialize(report, ReportJsonContext.Default.MetricsReport);
 
+    /// <summary>Writes the metric history of an instance.</summary>
+    /// <param name="history">The history.</param>
+    /// <returns>The JSON text.</returns>
+    public static string Write(MetricHistory history) =>
+        JsonSerializer.Serialize(history, ReportJsonContext.Default.MetricHistory);
+
     /// <summary>Writes the dependency edges of an application.</summary>
     /// <param name="report">The report.</param>
     /// <returns>The JSON text.</returns>
@@ -58,6 +64,12 @@ public static class ReportPayload
     /// <returns>The report, or <see langword="null"/> when the text is not one.</returns>
     public static MetricsReport? ReadMetrics(string? json) =>
         Read(json, ReportJsonContext.Default.MetricsReport);
+
+    /// <summary>Reads the metric history of an instance.</summary>
+    /// <param name="json">The JSON text of a history result.</param>
+    /// <returns>The history, or <see langword="null"/> when the text is not one.</returns>
+    public static MetricHistory? ReadHistory(string? json) =>
+        Read(json, ReportJsonContext.Default.MetricHistory);
 
     /// <summary>Reads the dependency edges of an application.</summary>
     /// <param name="json">The JSON text of a pull result.</param>

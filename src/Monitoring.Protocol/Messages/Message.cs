@@ -15,4 +15,6 @@ namespace Monitoring.Protocol.Messages;
 [JsonDerivedType(typeof(Goodbye), "goodbye")]
 [JsonDerivedType(typeof(Config), "config")]
 [JsonDerivedType(typeof(Ack), "ack")]
+[JsonDerivedType(typeof(HistoryRequest), "historyRequest")]
+[JsonDerivedType(typeof(HistoryResult), "historyResult")]
 public abstract record Message;

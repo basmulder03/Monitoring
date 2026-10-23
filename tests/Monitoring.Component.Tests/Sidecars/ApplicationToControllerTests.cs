@@ -3,8 +3,10 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
 using Monitoring.Agent.Features.Configuration;
 using Monitoring.Component.Tests.Support;
+using Monitoring.Controller.Features.AgentLink;
 using Monitoring.Controller.Features.Topology;
 using Monitoring.Protocol.Health;
+using Monitoring.Protocol.Reports;
 using Shouldly;
 using Xunit;
 
@@ -54,6 +56,26 @@ public class ApplicationToControllerTests
         // Assert
         await Eventually.AssertAsync(() =>
             controller.Registry.GetInstances("shop").Single().Metrics!.ShouldContain(s => s.Name == "dotnet.process.memory.working_set"));
+    }
+
+    [Fact]
+    public async Task The_controller_can_ask_the_agent_for_the_recent_values_of_the_metrics_of_an_instance()
+    {
+        // Arrange
+        await using var cluster = new FakeKubernetesApiServer().WithPod("orders-1").Start();
+        await using var controller = new ControllerHost().AcceptingEnrollment(Token).WithCentralConfiguration(FastPulls).Start();
+        await using var agent = new AgentHost("shop", Token).ConnectingTo(controller).DiscoveringIn(cluster)
+            .With("Agent:Sidecars:HeartbeatInterval", "00:00:01").Start();
+        await using var application = new ApplicationHost("orders-1").Start(agent);
+        await Eventually.AssertAsync(() =>
+            controller.Registry.GetInstances("shop").Single().Metrics!.ShouldContain(s => s.Name == "dotnet.process.memory.working_set"));
+
+        // Act
+        var json = await controller.Services.GetRequiredService<IAgentRequests>().GetMetricHistoryAsync("shop", "orders-1", TestContext.Current.CancellationToken);
+
+        // Assert
+        var history = ReportPayload.ReadHistory(json)!;
+        history.Series.Single(s => s.Name == "dotnet.process.memory.working_set").Values.ShouldNotBeEmpty();
     }
 
     [Fact]

@@ -15,6 +15,9 @@ public sealed class AgentLinkOptions
     /// <summary>How long a new connection may stay silent before it must have sent its <c>Hello</c>.</summary>
     public TimeSpan HelloTimeout { get; set; } = TimeSpan.FromSeconds(10);
 
+    /// <summary>How long a request to an agent, such as for the history of a metric, waits for the answer.</summary>
+    public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(3);
+
     /// <summary>Largest frame accepted from an agent, which bounds the memory one connection can claim.</summary>
     public int MaxFrameBytes { get; set; } = FrameCodec.DefaultMaxFrameBytes;
 

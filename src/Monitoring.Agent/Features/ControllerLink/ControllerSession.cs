@@ -1,10 +1,13 @@
 using Monitoring.Agent.Features.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Threading.Channels;
+using Monitoring.Agent.Features.MetricsHistory;
 using Monitoring.Agent.Features.ScopeState;
 using Monitoring.Agent.Features.SelfMonitoring;
 using Monitoring.Protocol.Framing;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Messages;
+using Monitoring.Protocol.Reports;
 using Monitoring.Protocol.Versioning;
 
 namespace Monitoring.Agent.Features.ControllerLink;
@@ -23,13 +26,15 @@ namespace Monitoring.Agent.Features.ControllerLink;
 /// <param name="time">Clock for the timeouts and timers.</param>
 /// <param name="logger">Receives the reasons a session ended.</param>
 /// <param name="telemetry">Told about connections and frames sent; optional.</param>
+/// <param name="history">Answers the replica's requests for the recent values of an instance's metrics; optional.</param>
 internal sealed class ControllerSession(
     IScopeStateStore store,
     IAgentConfiguration configuration,
     ControllerLinkOptions options,
     TimeProvider time,
     ILogger<ControllerSession> logger,
-    IAgentTelemetry? telemetry = null)
+    IAgentTelemetry? telemetry = null,
+    IMetricsHistory? history = null)
 {
     private static readonly TimeSpan GoodbyeTimeout = TimeSpan.FromSeconds(1);
 
@@ -131,11 +136,14 @@ internal sealed class ControllerSession(
 
         using var pumpCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var resyncRequested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var reader = ReadRepliesAsync(stream, heartbeatTimer, resyncRequested, onConfig, pumpCts.Token);
+        // Answers to the replica's requests are written by the pump loop too, so only one place ever writes.
+        var answers = Channel.CreateBounded<Message>(new BoundedChannelOptions(64) { FullMode = BoundedChannelFullMode.DropWrite });
+        var reader = ReadRepliesAsync(stream, heartbeatTimer, resyncRequested, onConfig, answers.Writer, pumpCts.Token);
 
         Task<bool>? nextDelta = null;
         Task<bool>? nextHeartbeat = null;
         Task<bool>? nextSnapshot = null;
+        Task<bool>? nextAnswer = null;
         long heartbeats = 0;
 
         try
@@ -145,9 +153,10 @@ internal sealed class ControllerSession(
                 nextDelta ??= subscription.Deltas.WaitToReadAsync(pumpCts.Token).AsTask();
                 nextHeartbeat ??= heartbeatTimer.WaitForNextTickAsync(pumpCts.Token).AsTask();
                 nextSnapshot ??= snapshotTimer.WaitForNextTickAsync(pumpCts.Token).AsTask();
+                nextAnswer ??= answers.Reader.WaitToReadAsync(pumpCts.Token).AsTask();
 
                 // The order doubles as priority when several are ready: ending conditions first.
-                var ready = await Task.WhenAny(reader, resyncRequested.Task, nextDelta, nextHeartbeat, nextSnapshot).ConfigureAwait(false);
+                var ready = await Task.WhenAny(reader, resyncRequested.Task, nextDelta, nextHeartbeat, nextSnapshot, nextAnswer).ConfigureAwait(false);
 
                 if (ready == reader)
                 {
@@ -167,6 +176,15 @@ internal sealed class ControllerSession(
                     if (!await SendDeltasAsync(stream, subscription, available, ct).ConfigureAwait(false))
                     {
                         return SessionEnd.ResyncRequested;
+                    }
+                }
+                else if (ready == nextAnswer)
+                {
+                    nextAnswer = null;
+                    while (answers.Reader.TryRead(out var answer))
+                    {
+                        await FrameCodec.WriteAsync(stream, answer, options.MaxFrameBytes, ct).ConfigureAwait(false);
+                        telemetry?.Add("monitoring.agent.frames_sent");
                     }
                 }
                 else if (ready == nextHeartbeat)
@@ -222,7 +240,7 @@ internal sealed class ControllerSession(
 
     /// <summary>Reads the replica's messages until the connection ends.</summary>
     private async Task ReadRepliesAsync(
-        Stream stream, PeriodicTimer heartbeatTimer, TaskCompletionSource resyncRequested, Action<Config> onConfig, CancellationToken ct)
+        Stream stream, PeriodicTimer heartbeatTimer, TaskCompletionSource resyncRequested, Action<Config> onConfig, ChannelWriter<Message> answers, CancellationToken ct)
     {
         while (await FrameCodec.ReadAsync(stream, options.MaxFrameBytes, ct).ConfigureAwait(false) is { } message)
         {
@@ -235,6 +253,11 @@ internal sealed class ControllerSession(
                 case Config config:
                     heartbeatTimer.Period = TimeSpan.FromSeconds(config.HeartbeatSeconds);
                     onConfig(config);
+                    break;
+
+                case HistoryRequest request:
+                    var recent = history?.Get(request.InstanceId, configuration.Current.PullSeconds);
+                    answers.TryWrite(new HistoryResult(request.RequestId, recent is null ? null : ReportPayload.Write(recent)));
                     break;
 
                 default:

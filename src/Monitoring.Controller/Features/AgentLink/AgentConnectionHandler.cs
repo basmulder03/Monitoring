@@ -27,6 +27,7 @@ namespace Monitoring.Controller.Features.AgentLink;
 /// <param name="options">Timeouts, limits and the configuration handed to agents.</param>
 /// <param name="time">Clock for the hello timeout.</param>
 /// <param name="logger">Receives the reasons a connection was refused or ended.</param>
+/// <param name="connections">Keeps the live connections so requests can reach them; optional.</param>
 internal sealed class AgentConnectionHandler(
     IAgentAuthenticator authenticator,
     IScopeRegistry registry,
@@ -36,7 +37,8 @@ internal sealed class AgentConnectionHandler(
     IAppliedConfigurations applied,
     AgentLinkOptions options,
     TimeProvider time,
-    ILogger<AgentConnectionHandler> logger)
+    ILogger<AgentConnectionHandler> logger,
+    AgentConnections? connections = null)
 {
     /// <summary>Serves the connection until the agent leaves, misbehaves or the controller shuts down.</summary>
     /// <param name="stream">The connection to the agent.</param>
@@ -46,6 +48,7 @@ internal sealed class AgentConnectionHandler(
     {
         var connection = Guid.NewGuid();
         AgentIdentity? registered = null;
+        AgentConnection? link = null;
         try
         {
             var authenticated = await AuthenticateAsync(stream, ct).ConfigureAwait(false);
@@ -58,6 +61,7 @@ internal sealed class AgentConnectionHandler(
 
             // Registered before the reply, so the agent never holds its configuration while the controller does not count it as connected.
             registered = identity;
+            link = connections?.Add(identity.ScopeName, hello.ProtocolVersion);
             liveness.Connected(identity.ScopeName, connection);
             logger.LogInformation("Agent for scope '{Scope}' connected", identity.ScopeName);
 
@@ -68,7 +72,7 @@ internal sealed class AgentConnectionHandler(
 
             await FrameCodec.WriteAsync(stream, ConfigFor(), options.MaxFrameBytes, ct).ConfigureAwait(false);
 
-            await ReceiveAsync(stream, identity, connection, changes.Reader, ConfigFor, ct).ConfigureAwait(false);
+            await ReceiveAsync(stream, identity, connection, changes.Reader, link, ConfigFor, ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -85,6 +89,11 @@ internal sealed class AgentConnectionHandler(
         finally
         {
             // However the connection ended, the scope no longer has this agent.
+            if (link is not null)
+            {
+                connections!.Remove(link);
+            }
+
             if (registered is not null)
             {
                 liveness.Disconnected(registered.ScopeName, connection);
@@ -146,11 +155,12 @@ internal sealed class AgentConnectionHandler(
     /// <c>Config</c> whenever the central configuration changes. This loop is the only writer, so writes never overlap.
     /// </summary>
     private async Task ReceiveAsync(
-        Stream stream, AgentIdentity identity, Guid connection, ChannelReader<bool> changes, Func<Config> configFor, CancellationToken ct)
+        Stream stream, AgentIdentity identity, Guid connection, ChannelReader<bool> changes, AgentConnection? link, Func<Config> configFor, CancellationToken ct)
     {
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
         Task<Message?>? reading = null;
         Task<bool>? changed = null;
+        Task<bool>? requested = null;
         try
         {
             while (true)
@@ -158,7 +168,19 @@ internal sealed class AgentConnectionHandler(
                 // A read that is not finished is waited for again, never started twice and never cancelled halfway through a frame.
                 reading ??= ReadAsync(stream, stop.Token);
                 changed ??= changes.WaitToReadAsync(stop.Token).AsTask();
-                var ready = await Task.WhenAny(reading, changed).ConfigureAwait(false);
+                requested ??= link?.Outgoing.Reader.WaitToReadAsync(stop.Token).AsTask();
+                var ready = await Task.WhenAny(requested is null ? [reading, changed] : [reading, changed, requested]).ConfigureAwait(false);
+
+                if (ready == requested)
+                {
+                    requested = null;
+                    while (link!.Outgoing.Reader.TryRead(out var request))
+                    {
+                        await FrameCodec.WriteAsync(stream, request, options.MaxFrameBytes, ct).ConfigureAwait(false);
+                    }
+
+                    continue;
+                }
 
                 if (ready == changed)
                 {
@@ -174,7 +196,7 @@ internal sealed class AgentConnectionHandler(
 
                 var message = await reading.ConfigureAwait(false);
                 reading = null;
-                if (message is null || !await ApplyAsync(stream, identity, connection, message, ct).ConfigureAwait(false))
+                if (message is null || !await ApplyAsync(stream, identity, connection, link, message, ct).ConfigureAwait(false))
                 {
                     return;
                 }
@@ -183,7 +205,7 @@ internal sealed class AgentConnectionHandler(
         finally
         {
             await stop.CancelAsync().ConfigureAwait(false);
-            foreach (var pending in new Task?[] { reading, changed })
+            foreach (var pending in new Task?[] { reading, changed, requested })
             {
                 try
                 {
@@ -201,7 +223,7 @@ internal sealed class AgentConnectionHandler(
     }
 
     /// <summary>Applies one message from the agent; false when the connection must end.</summary>
-    private async Task<bool> ApplyAsync(Stream stream, AgentIdentity identity, Guid connection, Message message, CancellationToken ct)
+    private async Task<bool> ApplyAsync(Stream stream, AgentIdentity identity, Guid connection, AgentConnection? link, Message message, CancellationToken ct)
     {
         liveness.Seen(identity.ScopeName, connection);
 
@@ -230,6 +252,10 @@ internal sealed class AgentConnectionHandler(
                     applied.Report(identity.ScopeName, connection, version);
                 }
 
+                return true;
+
+            case HistoryResult result:
+                link?.Complete(result);
                 return true;
 
             case Goodbye:

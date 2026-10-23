@@ -3,11 +3,13 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Monitoring.Agent.Features.Configuration;
 using Monitoring.Agent.Features.ControllerLink;
+using Monitoring.Agent.Features.MetricsHistory;
 using Monitoring.Agent.Features.ScopeState;
 using Monitoring.Protocol.Framing;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Instances;
 using Monitoring.Protocol.Messages;
+using Monitoring.Protocol.Reports;
 using Monitoring.Protocol.Versioning;
 using Monitoring.Tests.Shared;
 using Shouldly;
@@ -120,6 +122,43 @@ public class ControllerSessionTests
         // Assert
         first.ShouldBe(new Heartbeat(1, HealthState.Healthy, "built-in"));
         second.ShouldBe(new Heartbeat(2, HealthState.Healthy, "built-in"));
+    }
+
+    [Fact]
+    public async Task RunAsync_answers_a_request_for_the_history_of_an_instance_from_what_it_kept()
+    {
+        // Arrange
+        var fixture = new SessionFixture();
+        fixture.History.Record("orders-1", [new MetricSeries("orders.placed", new Dictionary<string, string>(), 4)]);
+        fixture.History.Record("orders-1", [new MetricSeries("orders.placed", new Dictionary<string, string>(), 6)]);
+        var controller = fixture.Start();
+        await controller.AcceptAsync(new Config("v", [], HeartbeatSeconds: 3600));
+
+        // Act
+        await controller.SendAsync(new HistoryRequest(9, "orders-1"));
+        var reply = await controller.ReceiveAsync();
+
+        // Assert
+        var result = reply.ShouldBeOfType<HistoryResult>();
+        result.RequestId.ShouldBe(9);
+        var series = ReportPayload.ReadHistory(result.PayloadJson)!.Series.Single();
+        series.Values.ShouldBe([4, 6]);
+    }
+
+    [Fact]
+    public async Task RunAsync_answers_a_request_for_an_instance_it_keeps_nothing_for_with_nothing()
+    {
+        // Arrange
+        var fixture = new SessionFixture();
+        var controller = fixture.Start();
+        await controller.AcceptAsync(new Config("v", [], HeartbeatSeconds: 3600));
+
+        // Act
+        await controller.SendAsync(new HistoryRequest(10, "unknown"));
+        var reply = await controller.ReceiveAsync();
+
+        // Assert
+        reply.ShouldBe(new HistoryResult(10, null));
     }
 
     [Fact]
@@ -357,6 +396,8 @@ public class ControllerSessionTests
 
         public IScopeStateStore Store => _store!;
 
+        public IMetricsHistory History { get; } = new RingMetricsHistory(new MetricsHistoryOptions());
+
         public Task<SessionResult> Result { get; private set; } = Task.FromException<SessionResult>(new InvalidOperationException("Not started."));
 
         public SessionFixture WithAgent(string id, string? version, string token)
@@ -404,7 +445,7 @@ public class ControllerSessionTests
         public FakeController Start()
         {
             _store ??= new StoreBuilder().WithInstances(_instanceIds).Build();
-            var session = new ControllerSession(_store, Configuration, _options, Clock, NullLogger<ControllerSession>.Instance);
+            var session = new ControllerSession(_store, Configuration, _options, Clock, NullLogger<ControllerSession>.Instance, history: History);
             var (server, client) = DuplexStream.CreatePair();
             Result = RunAsync(session, server);
             return new FakeController(client);

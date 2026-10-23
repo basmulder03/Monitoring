@@ -52,6 +52,11 @@ export interface InstanceDetail {
 
 export type InstanceLifecycle = "Starting" | "Running" | "Terminating" | "Gone";
 
+export interface MetricHistory {
+  intervalSeconds: number;
+  series: SeriesHistory[];
+}
+
 export interface MetricSeries {
   name: string;
   labels: Record<string, string>;
@@ -116,6 +121,12 @@ export interface ScopeSummary {
   agentConnected: boolean;
   lastSeen: string | null;
   configurationInSync: boolean;
+}
+
+export interface SeriesHistory {
+  name: string;
+  labels: Record<string, string>;
+  values: number[];
 }
 
 export interface ServiceDetail {

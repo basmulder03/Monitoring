@@ -1,5 +1,5 @@
 import { act } from "preact/test-utils";
-import type { AlertSummary, Overview, PackageCatalog, ScopeDetail, ScopeSummary, TopologyGraph, VulnerabilityReport } from "../src/api/contracts";
+import type { AlertSummary, MetricHistory, Overview, PackageCatalog, ScopeDetail, ScopeSummary, TopologyGraph, VulnerabilityReport } from "../src/api/contracts";
 import type { Services } from "../src/services/Services";
 import { start } from "../src/start";
 
@@ -11,6 +11,8 @@ export class FakeServices implements Services {
   packages: PackageCatalog = { packages: [], services: 0, servicesWithoutList: 0 };
   vulnerabilities: VulnerabilityReport = { findings: [], advisories: 0, loadedAt: null };
   streams = 0;
+  histories: Record<string, MetricHistory> = {};
+  historyRequests: string[] = [];
   private handlers: { onOverview(overview: Overview): void; onKeepAlive(): void } | null = null;
   private readonly timers: { period: number; due: number; callback: () => void }[] = [];
   private readonly settings = new Map<string, string>();
@@ -19,6 +21,12 @@ export class FakeServices implements Services {
     if (path === "/api/topology") return { status: 200, body: this.topology as T };
     if (path === "/api/packages") return { status: 200, body: this.packages as T };
     if (path === "/api/vulnerabilities") return { status: 200, body: this.vulnerabilities as T };
+    if (path.endsWith("/history")) {
+      this.historyRequests.push(path);
+      const history = this.histories[path];
+      return history ? { status: 200, body: history as T } : { status: 204, body: null };
+    }
+
     const scope = this.scopes[decodeURIComponent(path.replace("/api/scopes/", ""))];
     return scope ? { status: 200, body: scope as T } : { status: 404, body: null };
   }

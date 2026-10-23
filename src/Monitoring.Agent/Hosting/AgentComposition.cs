@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Monitoring.Agent.Features.Configuration;
 using Monitoring.Agent.Features.ControllerLink;
 using Monitoring.Agent.Features.Discovery;
+using Monitoring.Agent.Features.MetricsHistory;
 using Monitoring.Agent.Features.ScopeState;
 using Monitoring.Agent.Features.SelfMonitoring;
 using Monitoring.Agent.Features.SidecarConnections;
@@ -44,6 +45,12 @@ internal static class AgentComposition
             })
             .AddAgentConfiguration()
             .AddSelfMonitoring()
+            .AddMetricsHistory(options =>
+            {
+                var history = agent.Section("MetricsHistory");
+                options.Samples = history.Int("Samples", options.Samples);
+                options.MaxSeriesPerInstance = history.Int("MaxSeriesPerInstance", options.MaxSeriesPerInstance);
+            })
             .AddPrometheus(
                 options => PrometheusSettings.Read(agent.Section("Prometheus"), options),
                 provider =>

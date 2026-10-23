@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Monitoring.Agent.Features.Configuration;
+using Monitoring.Agent.Features.MetricsHistory;
 using Monitoring.Agent.Features.ScopeState;
 using Monitoring.Agent.Features.SelfMonitoring;
 using Monitoring.Protocol.Framing;
@@ -25,13 +26,15 @@ namespace Monitoring.Agent.Features.SidecarConnections;
 /// <param name="time">Clock for the timeouts and the pull interval.</param>
 /// <param name="logger">Receives the reasons a connection was refused or ended.</param>
 /// <param name="telemetry">Told about connected sidecars and how long pulls take; optional.</param>
+/// <param name="history">Keeps the recent values of each application's metrics; optional.</param>
 internal sealed class SidecarConnectionHandler(
     IScopeStateStore store,
     IAgentConfiguration configuration,
     SidecarConnectionsOptions options,
     TimeProvider time,
     ILogger<SidecarConnectionHandler> logger,
-    IAgentTelemetry? telemetry = null)
+    IAgentTelemetry? telemetry = null,
+    IMetricsHistory? history = null)
 {
     private readonly ConcurrentDictionary<string, Guid> _current = new();
 
@@ -263,6 +266,7 @@ internal sealed class SidecarConnectionHandler(
         }
 
         pulls.Report = pulls.Report with { Metrics = metrics.Series };
+        history?.Record(hello.InstanceId, metrics.Series);
         Publish(hello, pulls);
     }
 
@@ -322,6 +326,8 @@ internal sealed class SidecarConnectionHandler(
         {
             return;
         }
+
+        history?.Forget(instanceId);
 
         if (leftOnPurpose)
         {

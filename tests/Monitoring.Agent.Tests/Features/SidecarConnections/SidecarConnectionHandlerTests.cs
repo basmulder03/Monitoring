@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Monitoring.Agent.Features.Configuration;
+using Monitoring.Agent.Features.MetricsHistory;
 using Monitoring.Agent.Features.ScopeState;
 using Monitoring.Agent.Features.SidecarConnections;
 using Monitoring.Protocol.Framing;
@@ -219,6 +220,29 @@ public class SidecarConnectionHandlerTests
 
         // Assert
         rest.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task HandleAsync_keeps_the_values_of_the_metrics_for_the_history_and_drops_them_when_the_sidecar_leaves()
+    {
+        // Arrange
+        var fixture = new HandlerFixture().WithInstance("pod-1");
+        var session = await fixture.Build().RegisterAsync("pod-1");
+        await session.AnswerHealthAsync(HealthState.Healthy);
+        await session.SendAsync(new Heartbeat(1, HealthState.Healthy));
+        var metricsPull = (await session.ReceiveAsync()).ShouldBeOfType<Pull>();
+        var metrics = new MetricsReport([new MetricSeries("orders.placed", new Dictionary<string, string>(), 7)]);
+
+        // Act
+        await session.SendAsync(new PullResult(metricsPull.RequestId, PullKind.Metrics, 0, ReportPayload.Write(metrics)));
+        await session.SyncAsync(HealthState.Healthy);
+        var kept = fixture.History.Get("pod-1", 15)!.Series.Single().Values;
+        await session.SendAsync(new Goodbye("pod-1"));
+        await session.Handling;
+
+        // Assert
+        kept.ShouldBe([7]);
+        fixture.History.Get("pod-1", 15).ShouldBeNull();
     }
 
     [Fact]
@@ -524,10 +548,12 @@ public class SidecarConnectionHandlerTests
             new(version, instance, service, appVersion, new Dictionary<string, string>());
 
         /// <summary>Starts the handler on the server end of a new connection and returns the sidecar's end. May be called again for another connection.</summary>
+        public IMetricsHistory History { get; } = new RingMetricsHistory(new MetricsHistoryOptions());
+
         public Session Build()
         {
             // One handler for all connections, as in the agent, so a reconnect can be told from the old connection.
-            _handler ??= new SidecarConnectionHandler(Store, Configuration, _options, Clock, NullLogger<SidecarConnectionHandler>.Instance);
+            _handler ??= new SidecarConnectionHandler(Store, Configuration, _options, Clock, NullLogger<SidecarConnectionHandler>.Instance, history: History);
             var (server, client) = DuplexStream.CreatePair();
             var shutdown = new CancellationTokenSource();
             var handling = ServeAsync(_handler, server, shutdown.Token);

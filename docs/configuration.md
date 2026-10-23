@@ -399,3 +399,14 @@ Each of the controller, the agent and the sidecar can serve its own values in th
 | `Controller:Prometheus:Address`, `Agent:Prometheus:Address`, `Sidecar:Prometheus:Address` | `127.0.0.1` | The IP address to listen on. Local only until you change it; there is no authentication, so put it on a network you trust |
 
 The values are the ones described under "What the agent and the sidecar report about themselves", and for the controller the System view (`monitoring_controller_uptime_seconds`, `scopes`, `agents_connected`, `event_clients`, `memory_bytes`, `healthy` and `alert_evaluation_ms`). Dots in names become underscores, and every value is exposed as a gauge. The controller serves it from its own listener, not the dashboard's port.
+
+## Metric history
+
+The agent keeps the last values of the metrics of each instance, so the dashboard can draw them as a sparkline when someone opens the instance. The controller keeps no history: it asks the agent of the scope over the connection that is already there, only while a page shows the instance (`GET /api/scopes/{scope}/instances/{id}/history`, which answers 204 when the agent keeps nothing or does not answer within a few seconds).
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Agent:MetricsHistory:Samples` | `60` | Values kept per series; one value arrives per metric pull, so at the default interval of 15 seconds this is 15 minutes |
+| `Agent:MetricsHistory:MaxSeriesPerInstance` | `200` | Series kept per instance; further ones are not recorded, which bounds the memory of an application that makes up new series without end |
+
+The history of an instance is dropped when its sidecar disconnects. The request is part of protocol version 2; a controller never sends it to an agent that announced version 1.

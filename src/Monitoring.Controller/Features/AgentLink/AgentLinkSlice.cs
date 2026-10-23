@@ -30,11 +30,14 @@ public static class AgentLinkSlice
         ArgumentOutOfRangeException.ThrowIfGreaterThan(options.Port, IPEndPoint.MaxPort);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.HelloTimeout, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.MaxFrameBytes, 0);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.RequestTimeout, TimeSpan.Zero);
 
         services.AddLogging();
         services.AddTransportSecurity(options.Transport, server: true);
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton(options);
+        services.AddSingleton<AgentConnections>();
+        services.AddSingleton<IAgentRequests>(provider => provider.GetRequiredService<AgentConnections>());
         services.AddSingleton<AgentConnectionHandler>();
         services.AddSingleton<IAgentListener, AgentListener>();
         services.AddHostedService<AgentListenerService>();

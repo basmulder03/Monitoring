@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Monitoring.Controller.Features.AgentLink;
 using Monitoring.Controller.Features.Alerting;
 using Monitoring.Controller.Features.Configuration;
 using Monitoring.Controller.Features.Dashboard;
@@ -197,6 +198,29 @@ public class DashboardEndpointsTests
     }
 
     /// <summary>Starts the dashboard endpoints in memory over a fake registry.</summary>
+    /// <summary>Knows the history of one instance only.</summary>
+    private sealed class FixedHistory : IAgentRequests
+    {
+        public Task<string?> GetMetricHistoryAsync(string scopeName, string instanceId, CancellationToken ct) =>
+            Task.FromResult<string?>(scopeName == "shop" && instanceId == "orders-1" ? "{\"intervalSeconds\":15,\"series\":[]}" : null);
+    }
+
+    [Fact]
+    public async Task History_passes_on_what_the_agent_kept_and_is_empty_when_it_kept_nothing()
+    {
+        // Arrange
+        await using var server = await new ApiFixture().StartAsync();
+
+        // Act
+        using var kept = await server.Client.GetAsync("/api/scopes/shop/instances/orders-1/history", Ct);
+        using var none = await server.Client.GetAsync("/api/scopes/shop/instances/other/history", Ct);
+
+        // Assert
+        (await kept.Content.ReadAsStringAsync(Ct)).ShouldBe("{\"intervalSeconds\":15,\"series\":[]}");
+        kept.Content.Headers.ContentType!.MediaType.ShouldBe("application/json");
+        none.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+    }
+
     private sealed class ApiFixture
     {
         private readonly FakeScopeRegistry _registry = new();
@@ -222,6 +246,7 @@ public class DashboardEndpointsTests
             builder.Services.AddSingleton<IHealthRollup, HealthRollup>();
             builder.Services.AddSingleton<IAlertState>(new NoAlerts());
             builder.Services.AddSingleton<ITopology>(new FixedTopology());
+            builder.Services.AddSingleton<IAgentRequests>(new FixedHistory());
             builder.Services.AddSingleton<IAppliedConfigurations>(new AppliedConfigurations(new EffectiveConfiguration(Microsoft.Extensions.Logging.Abstractions.NullLogger<EffectiveConfiguration>.Instance)));
             builder.Services.AddDashboard();
 

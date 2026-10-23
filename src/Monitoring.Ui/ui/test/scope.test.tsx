@@ -137,4 +137,24 @@ describe("what an instance says about itself", () => {
     await page.settle();
     expect((all(page.main, "details.instance")[0] as HTMLDetailsElement).open).toBe(true);
   });
+
+  it("asks for the history of the metrics only once the instance is opened, and draws it", async () => {
+    const withMetrics = withService(instance({ metrics: [{ name: "orders.placed", labels: {}, value: 6 }] }));
+    const page = await openScope(withMetrics);
+    page.services.histories["/api/scopes/shop/instances/orders-1/history"] = {
+      intervalSeconds: 15,
+      series: [{ name: "orders.placed", labels: {}, values: [1, 4, 6] }],
+    };
+    expect(page.services.historyRequests).toEqual([]);
+
+    const details = page.main.querySelector("details.instance") as HTMLDetailsElement;
+    act(() => {
+      details.open = true;
+      details.dispatchEvent(new Event("toggle"));
+    });
+    await page.settle();
+
+    expect(page.services.historyRequests).toEqual(["/api/scopes/shop/instances/orders-1/history"]);
+    expect(page.main.querySelector("svg.sparkline")?.getAttribute("aria-label")).toBe("orders.placed: from 1 to 6, now 6");
+  });
 });

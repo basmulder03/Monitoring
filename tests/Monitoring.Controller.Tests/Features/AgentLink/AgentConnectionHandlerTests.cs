@@ -24,6 +24,65 @@ public class AgentConnectionHandlerTests
     private const string Scope = "shop";
 
     [Fact]
+    public async Task A_request_for_history_reaches_the_agent_and_is_answered_with_what_it_sends_back()
+    {
+        // Arrange
+        var session = await new HandlerFixture().WithToken(Token, Scope).Build().HandshakeAsync(Token);
+
+        // Act
+        var asking = session.Connections.GetMetricHistoryAsync(Scope, "orders-1", TestContext.Current.CancellationToken);
+        var request = (await session.ReceiveAsync()).ShouldBeOfType<HistoryRequest>();
+        await session.SendAsync(new HistoryResult(request.RequestId, "{\"intervalSeconds\":15,\"series\":[]}"));
+
+        // Assert
+        request.InstanceId.ShouldBe("orders-1");
+        (await asking).ShouldBe("{\"intervalSeconds\":15,\"series\":[]}");
+    }
+
+    [Fact]
+    public async Task A_request_for_history_is_not_sent_to_an_agent_that_does_not_understand_it()
+    {
+        // Arrange
+        var session = new HandlerFixture().WithToken(Token, Scope).Build();
+        await session.SendAsync(HandlerFixture.Hello(Token, version: ProtocolVersion.HistoryRequests - 1));
+        (await session.ReceiveAsync()).ShouldBeOfType<Config>();
+
+        // Act
+        var answer = await session.Connections.GetMetricHistoryAsync(Scope, "orders-1", TestContext.Current.CancellationToken);
+
+        // Assert
+        answer.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_request_for_history_gives_up_when_the_agent_goes_away()
+    {
+        // Arrange
+        var session = await new HandlerFixture().WithToken(Token, Scope).Build().HandshakeAsync(Token);
+        var asking = session.Connections.GetMetricHistoryAsync(Scope, "orders-1", TestContext.Current.CancellationToken);
+        (await session.ReceiveAsync()).ShouldBeOfType<HistoryRequest>();
+
+        // Act
+        session.Disconnect();
+
+        // Assert
+        (await asking).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_request_for_history_of_a_scope_without_an_agent_is_answered_with_nothing()
+    {
+        // Arrange
+        var connections = new AgentConnections(new AgentLinkOptions());
+
+        // Act
+        var answer = await connections.GetMetricHistoryAsync("nowhere", "orders-1", TestContext.Current.CancellationToken);
+
+        // Assert
+        answer.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task HandleAsync_answers_a_valid_hello_with_the_configuration()
     {
         // Arrange
@@ -531,8 +590,11 @@ public class AgentConnectionHandlerTests
         private readonly AgentLinkOptions _options = new();
         private readonly LivenessOptions _livenessOptions = new();
         private AppliedConfigurations? _applied;
+        private AgentConnections? _connections;
 
         public FakeTimeProvider Clock { get; } = new();
+
+        public AgentConnections Connections => _connections ??= new AgentConnections(_options);
 
         public FakeAgentLiveness Liveness { get; } = new();
 
@@ -570,13 +632,13 @@ public class AgentConnectionHandlerTests
         {
             var registry = new ScopeRegistry(new RegistryOptions(), Clock);
             var handler = new AgentConnectionHandler(
-                new FakeAuthenticator(_scopeByToken), registry, Liveness, _livenessOptions, Configuration, Applied, _options, Clock, NullLogger<AgentConnectionHandler>.Instance);
+                new FakeAuthenticator(_scopeByToken), registry, Liveness, _livenessOptions, Configuration, Applied, _options, Clock, NullLogger<AgentConnectionHandler>.Instance, Connections);
             var (server, client) = DuplexStream.CreatePair();
             var shutdown = new CancellationTokenSource();
 
             // Starts running on this thread up to its first await, so its hello timer exists when this returns.
             var handling = ServeAsync(handler, server, shutdown.Token);
-            return new Session(client, registry, handling, shutdown, Liveness, Clock, Configuration, Applied);
+            return new Session(client, registry, handling, shutdown, Liveness, Clock, Configuration, Applied, Connections);
         }
 
         public static Hello Hello(string? token, int version = ProtocolVersion.Current) =>
@@ -611,8 +673,10 @@ public class AgentConnectionHandlerTests
 
     /// <summary>The agent's end of a connection being served by the handler under test.</summary>
     private sealed class Session(
-        DuplexStream client, ScopeRegistry registry, Task handling, CancellationTokenSource shutdown, FakeAgentLiveness liveness, FakeTimeProvider clock, EffectiveConfiguration configuration, AppliedConfigurations applied)
+        DuplexStream client, ScopeRegistry registry, Task handling, CancellationTokenSource shutdown, FakeAgentLiveness liveness, FakeTimeProvider clock, EffectiveConfiguration configuration, AppliedConfigurations applied, AgentConnections connections)
     {
+        public AgentConnections Connections { get; } = connections;
+
         public EffectiveConfiguration Configuration { get; } = configuration;
 
         public AppliedConfigurations Applied { get; } = applied;
