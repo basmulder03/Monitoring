@@ -108,6 +108,17 @@ The controller checks every package version in use against advisories in the [OS
 
 A finding is raised for each advisory, package and version in use. Versions match through the ranges of the advisory (`introduced`, `fixed`, `last_affected`) or its list of versions; only the NuGet ecosystem is used. Advisories with severity HIGH or CRITICAL raise the critical alert `vulnerable-package-critical`; the rest, including advisories that do not give a severity, raise the warning `vulnerable-package`. Silences work as for any other alert.
 
+### Dead-man's switch
+
+Each controller replica can ping an external watchdog, which alerts when all pings stop. That covers the one failure the system cannot report itself: all replicas being down.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Controller:DeadMansSwitch:Url` | none | The address that is requested with GET at startup and then every interval. Without it nothing is pinged |
+| `Controller:DeadMansSwitch:Interval` | `00:01:00` | How often to ping |
+
+A ping that fails, or is answered with an error, is logged as a warning and tried again at the next interval.
+
 ### Silences
 
 A silence keeps alerts out of the dashboard until it ends, for example during planned maintenance. The conditions are still checked, so an alert that is still true when the silence ends appears at once. A silence has to end: `Until` is required, and an expired silence does nothing.

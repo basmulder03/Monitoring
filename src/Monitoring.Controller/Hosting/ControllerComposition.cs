@@ -8,6 +8,7 @@ using Monitoring.Controller.Features.AgentLink;
 using Monitoring.Controller.Features.Alerting;
 using Monitoring.Controller.Features.Configuration;
 using Monitoring.Controller.Features.Dashboard;
+using Monitoring.Controller.Features.DeadMansSwitch;
 using Monitoring.Controller.Features.Liveness;
 using Monitoring.Controller.Features.Health;
 using Monitoring.Controller.Features.Packages;
@@ -59,6 +60,12 @@ internal static class ControllerComposition
             })
             .AddHealth()
             .AddSelfMonitoring()
+            .AddDeadMansSwitch(options =>
+            {
+                var watchdog = controller.Section("DeadMansSwitch");
+                options.Url = watchdog.Optional("Url") is { } url ? new Uri(url, UriKind.RelativeOrAbsolute) : null;
+                options.Interval = watchdog.Duration("Interval", options.Interval);
+            })
             .AddVulnerabilities(options =>
             {
                 var vulnerabilities = controller.Section("Vulnerabilities");
