@@ -52,6 +52,8 @@ jobs:
           done
       - name: Smoke test the published binaries
         run: scripts/aot-smoke.sh published
+      - name: Check the start time and memory budgets
+        run: scripts/budgets.sh published
       - name: Sizes
         run: ls -l published/*/Monitoring.Controller published/*/Monitoring.Agent published/*/Monitoring.Sidecar | awk '{ print $5, $9 }'
 
