@@ -49,7 +49,8 @@ internal static class Wording
 /// <param name="http">Sends the request.</param>
 /// <param name="target">Where, and with which secret.</param>
 /// <param name="source">Which controller sends it.</param>
-internal sealed class WebhookSink(HttpClient http, WebhookTarget target, string source) : IAlertSink
+/// <param name="time">Clock for the timestamp that is signed with the body; the system clock unless a test sets one.</param>
+internal sealed class WebhookSink(HttpClient http, WebhookTarget target, string source, TimeProvider? time = null) : IAlertSink
 {
     /// <inheritdoc />
     public string Name => $"webhook:{target.Url.Host}";
@@ -64,7 +65,11 @@ internal sealed class WebhookSink(HttpClient http, WebhookTarget target, string 
         request.Content.Headers.ContentType = new("application/json");
         if (!string.IsNullOrEmpty(target.Secret))
         {
-            request.Headers.Add("X-Monitoring-Signature", "sha256=" + Convert.ToHexStringLower(HMACSHA256.HashData(Encoding.UTF8.GetBytes(target.Secret), bytes)));
+            // The time is part of what is signed, so a receiver that refuses old timestamps cannot be fed a captured request again.
+            var timestamp = (time ?? TimeProvider.System).GetUtcNow().ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var signed = Encoding.UTF8.GetBytes(timestamp + ".").Concat(bytes).ToArray();
+            request.Headers.Add("X-Monitoring-Timestamp", timestamp);
+            request.Headers.Add("X-Monitoring-Signature", "sha256=" + Convert.ToHexStringLower(HMACSHA256.HashData(Encoding.UTF8.GetBytes(target.Secret), signed)));
         }
 
         using var response = await http.SendAsync(request, ct).ConfigureAwait(false);

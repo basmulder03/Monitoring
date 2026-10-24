@@ -33,7 +33,8 @@ public class SinksTests
     public async Task A_webhook_gets_the_alert_as_json_with_the_stable_key_and_a_signature_when_there_is_a_secret()
     {
         var capture = new Capture();
-        var sink = new WebhookSink(new HttpClient(capture), new WebhookTarget(new Uri("https://hooks.example/alerts"), "s3cret"), "prod-a");
+        var clock = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 24, 12, 0, 0, TimeSpan.Zero));
+        var sink = new WebhookSink(new HttpClient(capture), new WebhookTarget(new Uri("https://hooks.example/alerts"), "s3cret"), "prod-a", clock);
 
         await sink.SendAsync(new AlertNotification(true, Sample), Ct);
 
@@ -41,8 +42,10 @@ public class SinksTests
         capture.Body.ShouldContain("\"key\":\"instance-unhealthy:shop/orders\"");
         capture.Body.ShouldContain("\"severity\":\"critical\"");
         capture.Body.ShouldContain("\"source\":\"prod-a\"");
-        var expected = "sha256=" + Convert.ToHexStringLower(HMACSHA256.HashData(Encoding.UTF8.GetBytes("s3cret"), Encoding.UTF8.GetBytes(capture.Body)));
-        capture.Request!.Headers.GetValues("X-Monitoring-Signature").Single().ShouldBe(expected);
+        var timestamp = capture.Request!.Headers.GetValues("X-Monitoring-Timestamp").Single();
+        timestamp.ShouldBe(clock.GetUtcNow().ToUnixTimeSeconds().ToString());
+        var expected = "sha256=" + Convert.ToHexStringLower(HMACSHA256.HashData(Encoding.UTF8.GetBytes("s3cret"), Encoding.UTF8.GetBytes(timestamp + "." + capture.Body)));
+        capture.Request.Headers.GetValues("X-Monitoring-Signature").Single().ShouldBe(expected);
     }
 
     [Fact]
@@ -55,6 +58,7 @@ public class SinksTests
 
         capture.Body.ShouldContain("\"status\":\"resolved\"");
         capture.Request!.Headers.Contains("X-Monitoring-Signature").ShouldBeFalse();
+        capture.Request.Headers.Contains("X-Monitoring-Timestamp").ShouldBeFalse();
     }
 
     [Fact]
