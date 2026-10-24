@@ -14,6 +14,8 @@ namespace Monitoring.Controller.Tests.Budgets;
 /// The scale the design is sized for (docs/design.md, "Memory and storage"): what a controller holds for thousands of instances with dozens of series each,
 /// and how big a frame is. The limits are set well above what was measured, to catch a change that multiplies the cost and not to track every byte.
 /// </summary>
+// Runs alone: the memory test reads the whole process's heap, so a test running beside it inflates the number (186 MB in CI against 90 MB alone).
+[Collection("Scale budgets")]
 public class ScaleBudgetTests(ITestOutputHelper output)
 {
     private const int SeriesPerInstance = 50;
@@ -68,3 +70,6 @@ public class ScaleBudgetTests(ITestOutputHelper output)
         stream.Length.ShouldBeLessThan(FrameCodec.DefaultMaxFrameBytes / 2, "a namespace of a thousand instances must fit with room to spare");
     }
 }
+
+[CollectionDefinition("Scale budgets", DisableParallelization = true)]
+public sealed class ScaleBudgetsCollection;
