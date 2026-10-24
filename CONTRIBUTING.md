@@ -4,9 +4,9 @@ Thank you for helping. The design in [docs/design.md](docs/design.md) is the ref
 
 ## How the code is organized
 
-- **Vertical slices.** Each feature owns everything it needs under `Features/<Name>` of its executable, with a `Add<Name>` registration method. Slices use each other only through public types. `tests/Monitoring.Architecture.Tests` fails the build otherwise.
-- **Native AOT.** No reflection, no assembly scanning, source-generated JSON. Trim and AOT warnings are errors.
-- **One type per file**, `internal sealed` by default, XML documentation on public members and on internal ones whose purpose is not clear from the name.
+- Vertical slices. Each feature owns everything it needs under `Features/<Name>` of its executable, with a `Add<Name>` registration method. Slices use each other only through public types. `tests/Monitoring.Architecture.Tests` fails the build otherwise.
+- Native AOT. No reflection, no assembly scanning, source-generated JSON. Trim and AOT warnings are errors.
+- One type per file, `internal sealed` by default, XML documentation on public members and on internal ones whose purpose is not clear from the name.
 
 ## Tests
 

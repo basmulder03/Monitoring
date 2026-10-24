@@ -6,7 +6,7 @@ Oct 20, 2026 · @Bas Mulder
 
 This is a small, stateless, Native AOT monitoring system for .NET 10 workloads on Kubernetes and Windows. It gives one live dashboard of health, metrics and service dependencies across environments and data centers, with alerting, and without a service mesh or a database. It is generic and centrally configured, so it can be published as open source.
 
-**Goals**
+### Goals
 
 - Show per namespace (Kubernetes) or per server (Windows) whether its services are healthy, down to service and pod level.
 - Add monitoring to a workload with a Helm change and a one-line NuGet reference, nothing else.
@@ -14,7 +14,7 @@ This is a small, stateless, Native AOT monitoring system for .NET 10 workloads o
 - Recover from any component restart without manual action.
 - Stay small: low memory and fast start for every part that runs next to an application.
 
-**Constraints**
+### Constraints
 
 | Constraint | Consequence |
 | --- | --- |
@@ -24,7 +24,7 @@ This is a small, stateless, Native AOT monitoring system for .NET 10 workloads o
 | Highly available controller | Two or more identical active replicas, each fed by every agent; no database and no leader for state |
 | Multiple environments and data centers | Free-form labels on every scope (for example `env` and `site`); the UI groups and filters by them |
 
-**Non-goals**
+### Non-goals
 
 - Long-term metric or trace storage, log aggregation, automatic remediation.
 - Replacing application-level observability tools; this is a live status and topology view.
@@ -59,7 +59,7 @@ The Kubernetes and Windows scopes look the same to the controller: each has an a
 | Controller | Deployment with 2 or more active replicas | Registry of all agents, health roll-up, dependency graph, alert rules, web UI with live push | Everything, all environments |
 |  |  |  |  |
 
-**Key principles**
+### Key principles
 
 1. Connections only go upward: sidecars dial the agent, agents dial the controllers. No tier needs the address of the tier below, which works across data centers and firewalls.
 2. The agent is the source of truth for which instances exist (Kubernetes pod watch or Windows Service Control Manager). Registration adds detail but never decides existence.
@@ -118,7 +118,7 @@ stateDiagram-v2
 
 A pod delete event moves any state straight to Gone; only then is the instance removed from the live view.
 
-**Pod lifecycle**
+### Pod lifecycle
 
 1. A pod appears in the watch: the agent creates the instance as Starting, with Kubernetes metadata (node, image, restarts, start time).
 2. The sidecar registers: the agent attaches service name, version and health checks, and the instance becomes Healthy or not.
@@ -165,7 +165,7 @@ The controller resolves where each call went using its registry; an unknown addr
 
 Each hop finds its parent through one bootstrap value, and the controller hands out the rest. Two independent signals decide whether an instance is alive, so a missing sidecar can never make a pod disappear silently.
 
-**Who finds whom**
+### Who finds whom
 
 | Who | Finds | How |
 | --- | --- | --- |
@@ -179,7 +179,7 @@ Each hop finds its parent through one bootstrap value, and the controller hands 
 - The replica list is re-sent whenever it changes, so adding or removing a replica needs no agent change.
 - Each namespace runs one agent replica. After a restart it rebuilds from the pod list and the sidecars reconnect; a second replica with Lease-based election is possible later.
 
-**Liveness signals**
+### Liveness signals
 
 | Question | Answered by |
 | --- | --- |
@@ -202,7 +202,7 @@ One message set is used on every hop, serialized as JSON with System.Text.Json s
 | Library to Windows agent | Named pipe or localhost TCP | Library |
 | Agent to controller | Long-lived TCP connection, both directions; TLS configurable | Agent |
 
-**Messages**
+### Messages
 
 | Message | Direction | Purpose |
 | --- | --- | --- |
@@ -215,20 +215,20 @@ One message set is used on every hop, serialized as JSON with System.Text.Json s
 | `Config` | Controller to agent | Effective configuration and the list of controller replica addresses; on connect and on every change |
 | `Ack` | Controller to agent | The last sequence number this replica applied, per agent; also asks for a new snapshot when the replica cannot use deltas yet |
 
-**Defaults (to be tuned)**
+### Defaults (still to be tuned)
 
 - Heartbeat every 5 s; unhealthy after 3 missed heartbeats.
 - Protocol versions: `Hello` carries the version, and a peer at most one version away is served, so adjacent versions work together during rollouts.
 - Metrics pulled every 15 s; trace edges flushed every 10 s.
 - All pulls carry a cursor, so a reconnect never replays data and never loses more than one interval.
 
-**Security**
+### Security
 
 - Agent to controller: transport security and authentication are separate, pluggable settings (see below).
 - In-cluster local hops are plain; they never leave the pod or namespace.
 - The web UI can be put behind authentication: a reverse proxy that signs people in (its headers are believed only from configured proxy addresses), and long-lived tokens for scripts and wall displays, with the roles viewer and operator. With authentication off, the UI is meant for an internal network only. The settings are under `Controller:Web:Auth` in the [configuration](configuration).
 
-**Transport security and authentication**
+### Transport security and authentication
 
 Two independent settings, each behind its own interface (`ITransportSecurity`, `IAgentAuthenticator`) and chosen in the central configuration. Authentication is always on; encryption depends on the network.
 
@@ -250,7 +250,7 @@ Two independent settings, each behind its own interface (`ITransportSecurity`, `
 - Data protection does not depend on the transport: the library removes query strings and SQL literals from span details by default, and span details travel only when someone opens a drill-down.
 - Everything uses .NET's own `SslStream` and certificate APIs, which work with Native AOT; other modes can be added by implementing the interfaces.
 
-**Recommended settings**
+### Recommended settings
 
 | Situation | Transport | Authentication |
 | --- | --- | --- |
@@ -272,12 +272,12 @@ Each controller replica holds one in-memory tree: label groups (for example envi
 | Edge | Caller service, callee service or resource, type (HTTP, MQ, DB), calls, errors, latency histogram | Library edge counters |
 | Alert state | Rule, subject, since, acknowledged | Controller |
 
-**Health states**
+### Health states
 
 - Healthy, Degraded (a non-critical check fails) and Unhealthy (a critical check fails or heartbeats are missed).
 - Unknown means the agent for that scope is disconnected. It is shown grey, not red, because the controller cannot tell whether the workload or only the link is down. Alerting escalates Unknown after a configurable time.
 
-**Container level**
+### Container level
 
 Every pod is shown down to its containers, so it is clear whether the application, the monitoring sidecar or another sidecar is the problem.
 
@@ -288,12 +288,12 @@ Every pod is shown down to its containers, so it is clear whether the applicatio
 - Usage against requests and limits per container (opt-in, needs read access to the pod metrics API) shows throttling and out-of-memory risk.
 - On Windows the level below the instance is the process (threads, handles, memory), shown in the same place.
 
-**Scope names**
+### Scope names
 
 - The agent chart has values `scope.displayName` (for example "Orders platform") and an optional `scope.group`. A namespace-scoped Role cannot read namespace objects, so the name is configured, not discovered.
 - A tile shows the display name, with the namespace or server name underneath.
 
-**Memory and storage**
+### Memory and storage
 
 - The controller keeps the registry, health, edges and the latest value per metric series. Metric history for sparklines lives in a small ring buffer in each agent, fetched through the controller only while a view is open.
 - Spans never reach the controller. Each library keeps the last 2,048 spans, which the agent reads on demand.
@@ -315,7 +315,7 @@ Tracing is done in the application process with W3C Trace Context, and only aggr
 
 AOT rules out patching third-party code at runtime, so ActiveMQ needs one registration line (for example `AddMonitoring(o => o.UseActiveMq())`). HTTP and database capture need no code.
 
-**How edges are built**
+### How edges are built
 
 1. The library updates edge counters (calls, errors, latency histogram) on every completed client span. Counters are never sampled; only span detail is.
 2. The agent pulls the counters with the other metrics and sends them as edges, not as spans.
@@ -323,12 +323,12 @@ AOT rules out patching third-party code at runtime, so ActiveMQ needs one regist
 4. A message queue is modeled as service, queue, service, so producer and consumer are both visible.
 5. An edge with no calls for 5 minutes fades out, and then disappears.
 
-**Drill-down**
+### Drill-down
 
 - Each library keeps the last 2,048 spans in memory. The agent can fetch recent slow or failed spans for one instance when someone opens it in the UI.
 - Nothing is stored centrally, so a trace that has already scrolled out of the buffer is gone by design.
 
-**Provider extensibility**
+### Provider extensibility
 
 - The library has one extension interface (for example `IClientInstrumentation`) that turns a client's activities or events into edges.
 - Built in: HttpClient, ASP.NET Core, and the official database and ActiveMQ packages that publish activity sources or diagnostics. No fixed provider list and no reflection.
@@ -351,13 +351,13 @@ On Windows, one Windows service per server replaces both the sidecar and the nam
 | Process memory, threads, handles | Process APIs, by the registered process id |
 | Health, metrics, spans | Library, over the pipe |
 
-**Liveness**
+### Liveness
 
 - A registered application is alive while its pipe connection and its Windows service are both up.
 - A service that is Stopped is Unhealthy with the cause shown (stopped by Service Control Manager), instead of only a missing heartbeat.
 - Services on an allowlist in the agent config appear even without the library, as "status only" entries with Service Control Manager state and process data.
 
-**Installation**
+### Installation
 
 - Native AOT single executable, installed as an auto-start service with recovery set to restart.
 - Needs only the bootstrap controller address and a client certificate; installed and configured with Ansible playbooks.
@@ -372,7 +372,7 @@ Two or more identical controller replicas run active at the same time, all fed b
 - Place replicas in separate data centers. Two are enough to start; agent traffic grows with the number of replicas, memory per replica does not.
 - A dead-man's switch: each replica pings an external watchdog every minute, which alerts when all pings stop. This covers the one failure the system cannot report itself.
 
-**What happens when something restarts**
+### What happens when something restarts
 
 | Component restarts | Result |
 | --- | --- |
@@ -382,7 +382,7 @@ Two or more identical controller replicas run active at the same time, all fed b
 | Controller | That replica loses everything while the others keep serving; agents reconnect to it with backoff and jitter and send a snapshot, so it is complete again within one snapshot interval |
 | Pod deleted | Pod watch emits a delete event; the agent removes the instance immediately |
 
-**Why replicas do not sync with each other**
+### Why replicas do not sync with each other
 
 - Agents are the single source of truth, so a replica never merges or trusts another replica's data: no ordering problems, no message loops, no split brain.
 - Controller-to-controller sync would need peer discovery, merge rules, loop prevention and gap repair: a second distributed protocol to build and test, for no extra capability.
@@ -398,7 +398,7 @@ All behavior is configured centrally in the controller. Agents, sidecars and lib
 | Defaults and policy | Controller config file (ConfigMap), hot-reloaded | Intervals, timeouts, health thresholds, trace sampling, enabled collectors, metric allow and deny lists, alert rules, UI settings |
 | Local override (optional) | Agent or library environment | Only the keys the central policy marks as overridable |
 
-**Layers, most specific wins**
+### Layers, most specific wins
 
 1. Built-in defaults, compiled in, so everything works with no controller.
 2. Controller defaults.
@@ -407,7 +407,7 @@ All behavior is configured centrally in the controller. Agents, sidecars and lib
 5. Service.
 6. Local override, if allowed.
 
-**Behavior**
+### Behavior
 
 - The controller computes the effective configuration per agent and sends it in `Config` on connect and on every change. The agent narrows it per service and instance for the sidecars and libraries.
 - Every configuration has a version hash. Agents report the version they applied, so the UI shows drift, and also differences between controller replicas during a rollout.
@@ -444,13 +444,13 @@ The controller evaluates alert rules against its in-memory state and shows activ
 
 These are the first rules. The controller has more (certificate expiry, connection pool, queue without consumers, replica lag, configuration drift, dropped data, vulnerable packages and package drift); the full list with what each one alerts on is generated from the code in [Code structure](https://basmulder03.github.io/Monitoring/reference/structure#alert-rules).
 
-**Stateless consequences**
+### Stateless consequences
 
 - After a replica restarts, its rules are not evaluated until agents have sent their snapshots (startup grace, about twice the snapshot interval). This prevents a flood of false alerts.
 - Alert keys are derived from rule and subject, so a repeated notification after a restart can be recognised by the receiving system.
 - Rules and silences are part of the central configuration; a silence therefore has a required expiry and survives restarts.
 
-**Channels**
+### Channels
 
 Alerts are shown in the UI (an alert panel with active alerts, severity, subject and how long they have been firing) and can be sent to webhooks (signed with an HMAC when a secret is set), to chat channels (Slack-compatible and Discord) and by email. With several replicas either every replica sends and the receiver de-duplicates by the stable alert key, or one replica sends, chosen through a Kubernetes Lease. See the notification settings in the [configuration](configuration).
 
@@ -465,20 +465,20 @@ The sidecars, agents and controllers report their own health, metrics and traces
 | Agent | Pods watched, Kubernetes API watch lag and errors, pull duration, frames sent, queue size, connection state per replica, applied configuration version | Sent in its own snapshots and deltas, so every replica has it |
 | Controller replica | Agents connected, frames per second, apply lag, memory per entity type, event stream clients, alert evaluation time | Kept locally and shared with the other replicas through the agents' acknowledgement data (see below) |
 
-**How it is modeled**
+### How it is modeled
 
 - The monitoring system is a reserved scope (for example "Monitoring system") with the controller replicas and agents as its services. Sidecars stay on their own pods, as the monitoring sidecar container.
 - The components use the same library internally, so their internal steps (pull, apply, push) are traced with the same `ActivityListener` model. Their edges (sidecar to agent to controller) form the system's own dependency graph.
 - Each agent reports which replicas acknowledge it and how far behind they are. Because every replica receives this from every agent, each replica can show the state of all replicas, without replicas talking to each other.
 - Self-telemetry uses the same memory bounds and pull intervals, configurable centrally, so monitoring the monitor does not become the biggest consumer.
 
-**System view in the UI**
+### System view in the UI
 
 - A System tile in the Overview: green when all agents are connected to all replicas, configuration versions match, and nothing is dropping data.
 - Detail: replicas with connected agents and lag; agents with watch health, pull duration and configuration version; sidecars that are failing or missing ("unmonitored" pods).
 - The same alert rules apply, with defaults for agent disconnected, replica behind, configuration drift and dropped data.
 
-**Export (optional)**
+### Export (optional)
 
 Every component can also expose its own metrics in Prometheus text format on a local port, off by default. This costs little and lets an observability stack scrape the monitoring system without any change to it.
 
@@ -488,7 +488,7 @@ The UI is a static single-page app embedded in the controller. It is built to be
 
 Recordings of the real dashboard while it plays an incident are on [the dashboard in motion](dashboard.md).
 
-**Views**
+### Views
 
 | View | Shows | Interaction |
 | --- | --- | --- |
@@ -499,7 +499,9 @@ Recordings of the real dashboard while it plays an incident are on [the dashboar
 
 An environment switcher selects one environment or all of them (development, test, acceptance, production).
 
-**TV mode** (`/tv?env=prod&rotate=60&views=overview,dependencies&theme=dark`)
+### TV mode
+
+The address looks like `/tv?env=prod&rotate=60&views=overview,dependencies&theme=dark`.
 
 - No input needed: the page rotates through the chosen views on a timer and hides the cursor.
 - Focus mode: when a scope turns Unhealthy, the rotation stops and the page opens that scope with the failing service expanded. It returns to the rotation once the problem has cleared, or after a configurable time.
@@ -507,20 +509,20 @@ An environment switcher selects one environment or all of them (development, tes
 - A visible "data is N seconds old" banner appears when no update arrived for 15 s, so a frozen screen never shows stale green.
 - Optional slow layout drift to avoid screen burn-in.
 
-**Live updates**
+### Live updates
 
 - The controller pushes changes over Server-Sent Events, coalesced to about one batch per second. SignalR is avoided because it is not AOT-friendly.
 - Every controller replica serves the same UI behind one shared URL. On connect and on reconnect the page fetches the full state first, then applies events, so it does not matter which replica it lands on and no sticky sessions or manual refresh are needed. Wall displays can list fallback URLs per data center.
 - The graph layout is recomputed only when the topology changes, so nodes do not jump on a wall display.
 
-**Accessibility (WCAG 2.0 AA minimum)**
+### Accessibility (WCAG 2.0 AA minimum)
 
 - Text contrast at least 4.5:1 (3:1 for large text and icons), in both themes; checked automatically in the tests.
 - Status is never color alone: every state has its own icon and a text label.
 - Light and dark themes through CSS design tokens; the default follows the system setting, and the TV URL can force one.
 - Full keyboard use with a visible focus ring; status changes announced through a polite live region.
 
-**Icons**
+### Icons
 
 One consistent outline icon set as an inlined SVG sprite (no font or network dependency), for example Tabler or Lucide, both MIT licensed.
 
@@ -566,7 +568,7 @@ Every runtime component is a Native AOT executable on .NET 10, and one shared pr
 | `Monitoring.Ui` | Static assets embedded in the controller |
 | `Monitoring.AppHost`, `Monitoring.Tests.*`, `TestApi`, `TestWorker`, `TestData` | Aspire host, tests and test applications |
 
-**AOT rules**
+### AOT rules
 
 - Every project sets the AOT-compatibility analyzer; trim and AOT warnings fail the build.
 - Serialization is source-generated System.Text.Json only; no reflection-based libraries.
@@ -574,7 +576,7 @@ Every runtime component is a Native AOT executable on .NET 10, and one shared pr
 - Live updates use Server-Sent Events, not SignalR.
 - No gRPC: every hop uses length-prefixed JSON frames over TCP.
 
-**Helm**
+### Helm
 
 - A named template (for example `monitoring.sidecar`) that application charts include once. It adds the sidecar as a native sidecar container, a shared `emptyDir` for the socket, and the Downward API variables (pod name, pod IP, node, namespace).
 - Values: `monitoring.enabled` and free-form `monitoring.labels`; nothing else per application.
@@ -582,7 +584,7 @@ Every runtime component is a Native AOT executable on .NET 10, and one shared pr
 - A controller chart with the certificate secret, the central configuration ConfigMap, one Route per replica, and a shared Route for the UI.
 - Small resource requests and limits by default, tightened once the budgets from the testing section are known.
 
-**Sidecar injection**
+### Sidecar injection
 
 Two ways are supported: the Helm template, and a label-based admission webhook (the way service meshes inject), which is a separate small injector. Both build the pod change from one shared definition, so they cannot drift apart.
 
@@ -598,7 +600,7 @@ Two ways are supported: the Helm template, and a label-based admission webhook (
 - Injection only changes the pod; the application still needs the NuGet reference for in-process data. The agent marks pods without a sidecar as "unmonitored".
 - On OpenShift the webhook's serving certificate can come from the OpenShift service CA.
 
-**OpenShift**
+### OpenShift
 
 - Pods run under the restricted security context with an arbitrary non-root user. Sidecar and agent images run as non-root, write only to the `emptyDir`, and make the socket group-writable (OpenShift runs arbitrary users in group 0).
 - Native sidecars need Kubernetes 1.29 or newer, which is OpenShift 4.16 or newer. On older versions the Helm template falls back to a normal second container, and the sidecar retries until the library is up.
@@ -610,7 +612,7 @@ Two ways are supported: the Helm template, and a label-based admission webhook (
 
 Nothing in the design is specific to one organization: everything is named by labels, configured centrally and extended through interfaces, so the project can be published as open source.
 
-**Making it generic**
+### Making it generic
 
 - A scope is any group of services that report through one agent: a namespace, a server, later a Docker host or a systemd machine.
 - Labels are free key-value pairs on scopes, services and instances. `environment` and `datacenter` become recommended labels, not fixed fields, and the UI groups by configured label keys (for example `env`, then `site`).
@@ -625,7 +627,7 @@ Nothing in the design is specific to one organization: everything is named by la
 | Alert sink | UI alert panel, webhook, email, chat | Other sinks |
 | State store | In memory, SQLite | Other stores |
 
-**Publishing**
+### Publishing
 
 - License: Apache-2.0 (patent grant, widely accepted in industry).
 - Packages: NuGet for the library and extensions; container images for sidecar, agent, controller and injector; Helm charts as OCI artifacts; the Windows agent as a zip or MSI.
@@ -637,7 +639,7 @@ Nothing in the design is specific to one organization: everything is named by la
 
 The code is organized in vertical (functional) slices: each feature owns everything it needs, from message handling and endpoints to state and tests, instead of shared technical layers such as `Services`, `Repositories` or `Controllers` folders. A change to one feature then touches one folder.
 
-**Slices per executable**
+### Slices per executable
 
 | Executable | Slices |
 | --- | --- |
@@ -668,7 +670,7 @@ Monitoring.Controller.Tests/
     Alerting/                   // mirrors the slice
 ```
 
-**Rules**
+### Rules
 
 - Each slice exposes one registration method (`AddAlerting`) and, when it has endpoints, one mapping method (`MapAlerting`). `Program.cs` only composes slices.
 - Slices do not reach into each other's internals. They talk through small public contracts or in-process domain events (for example `InstanceHealthChanged`, raised by Health and consumed by Alerting and Dashboard).
@@ -679,7 +681,7 @@ Monitoring.Controller.Tests/
 - Architecture tests (in the test projects, which do not need AOT) fail the build when a slice references another slice's internals or when shared code depends on a slice.
 - Tests mirror the slices: unit tests next to the slice's folder in the test project, and Gherkin feature files grouped by the same functional areas, so requirements, code and tests line up one to one.
 
-**Documentation and comments**
+### Documentation and comments
 
 Code is documented in two layers: C# XML documentation (csdoc) for what a member is and promises, and inline comments for why the code does something non-obvious.
 
@@ -696,7 +698,7 @@ Code is documented in two layers: C# XML documentation (csdoc) for what a member
 - Comments are kept in step with the code: a change that makes a comment wrong updates or removes it in the same commit.
 - The build enforces the baseline: XML documentation generation is on and missing-documentation warnings for public members (CS1591) are errors in the library and protocol projects. Review checks the quality of the text.
 
-**Commits**
+### Commits
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/), so the history is readable and the changelog and semantic version can be generated from it.
 
@@ -718,7 +720,7 @@ Behavior is specified in Gherkin and verified end to end against a real multi-pl
 | UI | Playwright for .NET, axe-core | Live updates, TV mode, themes, WCAG checks |
 | AOT | CI publishes every component with Native AOT, trim and AOT warnings as errors, then smoke-tests the binaries | Failures that only appear in the published binary |
 
-**Unit test rules**
+### Unit test rules
 
 - A unit test tests one unit (a class or a small cohesive set of functions) in isolation and checks one behavior. Collaborators outside the unit are replaced by simple fakes; time comes from `FakeTimeProvider`.
 - Every test follows Arrange-Act-Assert, in that order, marked with `// Arrange`, `// Act` and `// Assert` comments. Arrange builds the inputs and the unit, Act is a single call on the unit, and Assert checks the outcome. A test never acts twice, and an assertion never sits in Arrange or Act. A trivial Arrange may say so in its comment instead of being left out.
@@ -729,7 +731,7 @@ Behavior is specified in Gherkin and verified end to end against a real multi-pl
 
 Time is always injected through `TimeProvider`, so heartbeat timeouts, grace periods and rotation timers are tested instantly and deterministically.
 
-**End-to-end environment**
+### End-to-end environment
 
 The Aspire app host starts the controller, one or more agents, test applications and their dependencies (an ActiveMQ broker, a database, a fault-injection proxy). Tests drive it through the same ports a real deployment uses.
 
@@ -739,7 +741,7 @@ The Aspire app host starts the controller, one or more agents, test applications
 | Full Kubernetes | A throwaway cluster (kind or k3d) deployed with the real Helm chart | Nightly |
 | Windows | A Windows runner with the agent and a test app installed as real Windows services; scenarios tagged `@windows` | Nightly, and on changes to the Windows agent |
 
-**Test applications (also AOT)**
+### Test applications (also AOT)
 
 - `TestApi`: HTTP service with endpoints to set health, add latency and return errors on demand.
 - `TestWorker`: ActiveMQ producer and consumer.
@@ -747,7 +749,7 @@ The Aspire app host starts the controller, one or more agents, test applications
 - A call chain of `TestApi` to `TestWorker` to `TestData` through the queue, so the expected dependency graph is known exactly.
 - A control API to kill a process, break a health check or cut the network, so scenarios can cause real failures.
 
-**Example scenarios**
+### Example scenarios
 
 ```gherkin
 Feature: Pod lifecycle
@@ -770,7 +772,7 @@ Feature: Pod lifecycle
     Then the graph contains the edges TestApi to queue to TestWorker to database
 ```
 
-**Feature areas to cover**
+### Feature areas to cover
 
 - Registration and heartbeats; unhealthy detection; pod replacement; graceful shutdown during a rollout.
 - Namespace loss (agent down) shown as Unknown, then escalated; container-level states (crash loop, out of memory, failing sidecar); System view and self-monitoring alerts.
@@ -794,7 +796,7 @@ The biggest risk is that automatic capture is limited by Native AOT, so spikes o
 | Controller memory grows with many series | Only latest values in the controller, history in the agents; memory budget tested in CI |
 | Alert flood after controller restart | Startup grace period and stable alert keys |
 
-**Open questions**
+### Open questions
 
 - [ ] Agent scope (confirmed, no action needed): The design assumes per namespace.
 - [x] Authentication for the UI and alert channels beyond the UI: both are built (see above).

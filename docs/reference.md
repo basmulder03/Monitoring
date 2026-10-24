@@ -1,6 +1,6 @@
 # About the reference
 
-The pages in this section are **generated from the source code every time the site is built**, so they cannot drift from what the code does. The explanation in [Design](design) says why; these pages say exactly what.
+The pages in this section are generated from the source code every time the site is built, so they match what the code does. [Design](design) explains the reasons behind it.
 
 | Page | Built from | Use it to |
 | --- | --- | --- |
@@ -9,4 +9,4 @@ The pages in this section are **generated from the source code every time the si
 | [HTTP API](reference/api) | Every `MapGet`, `MapPost` and the like in the services | Find a route and the feature that serves it |
 | [Dashboard components and icons](reference/ui) | The Preact components and the SVG icon sprite | See which components and icons exist before adding another |
 
-To read the pages in your editor or change what they say, edit the XML documentation or the JSDoc comment in the code; `docs/scripts/generate.mjs` is the only other part. `npm run generate` in `docs` writes them to `docs/reference` (not committed).
+To change what a page says, edit the XML documentation or the JSDoc comment in the code. `npm run generate` in `docs` writes the pages to `docs/reference`, which is not committed.

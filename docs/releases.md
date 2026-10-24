@@ -1,6 +1,6 @@
 # Releases
 
-**Nothing has been published yet.** There are no packages on NuGet, no images in a registry and no charts in an OCI registry; what exists is the source, and the pipelines that prove it builds, publishes with Native AOT and passes its tests (see [Testing](testing)). Publishing is a deliberate step the owner takes, tracked in [issue 56](https://github.com/basmulder03/Monitoring/issues/56).
+Nothing has been published yet. There are no packages on NuGet, no images in a registry and no charts in an OCI registry; what exists is the source, and the pipelines that prove it builds, publishes with Native AOT and passes its tests (see [Testing](testing)). Publishing is a deliberate step the owner takes, tracked in [issue 56](https://github.com/basmulder03/Monitoring/issues/56).
 
 ## What a release will contain
 

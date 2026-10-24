@@ -23,6 +23,7 @@ export default withMermaid(defineConfig({
       {
         text: 'Understand',
         items: [
+          { text: 'Start here', link: '/start' },
           { text: 'Overview', link: '/' },
           {
             text: 'Design',
@@ -48,6 +49,7 @@ export default withMermaid(defineConfig({
             ],
           },
           { text: 'The dashboard in motion', link: '/dashboard' },
+          { text: 'Glossary', link: '/glossary' },
         ],
       },
       {

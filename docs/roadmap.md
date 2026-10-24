@@ -4,7 +4,11 @@ The work is tracked as GitHub issues, with [issue 61](https://github.com/basmuld
 
 ## Built
 
-Everything in the [design](design) is built and tested: the protocol and its transports (none, TLS, mutual TLS), the controller (registry, health roll-up, central configuration with layers, dependency graph, alerting with silences, change markers, notifications with webhook, chat and email, authentication of agents and of the web UI, the optional SQLite state store, self-monitoring), the agent (Kubernetes and Windows discovery, sidecar connections, metric history), the sidecar, the client library (health, metrics, spans, dependency edges, instrumentation of HTTP, databases, ActiveMQ and TCP), the dashboard (overview, scope, dependencies, packages, system, TV mode), the Helm charts and the injector, and the tests that go with them: unit, component, browser, specifications, architecture, Native AOT smoke, Kubernetes and Windows nightly runs, and speed and size budgets with a nightly trend.
+Everything in the [design](design) is built and tested. That covers the protocol with its transports (none, TLS and mutual TLS), the controller, the agent, the sidecar, the client library, the dashboard, the Helm charts and the injector.
+
+The controller has a registry, a health roll-up, central configuration with layers, a dependency graph, alerting with silences, change markers, notifications by webhook, chat and email, authentication for agents and for the web UI, an optional SQLite state store and self-monitoring. The agent discovers Kubernetes pods and Windows services. The client library reports health, metrics, spans and dependency edges, and instruments HTTP, databases, ActiveMQ and TCP. The dashboard has the overview, scope, dependencies, packages and system views and a TV mode.
+
+The tests are unit, component, browser, specifications and architecture tests, a Native AOT smoke test, nightly runs on Kubernetes and Windows, and speed and size budgets with a nightly trend.
 
 ## Open
 

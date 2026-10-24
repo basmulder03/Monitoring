@@ -8,6 +8,6 @@ Please do not open a public issue for a security problem. Use GitHub's private v
 
 ## Known limits
 
-- The dashboard has no login yet; keep it on a network you trust.
+- The dashboard has no login unless you turn authentication on (a trusted reverse proxy, or tokens; see `Controller:Web:Auth` in the configuration). Without it, keep the dashboard on a network you trust.
 - Without TLS (`Transport:Mode` `none`) agent tokens travel in clear text. Use `tls` or `mtls` outside a closed network.
 - Revocation is not checked for certificates from a private authority; use short-lived certificates.
