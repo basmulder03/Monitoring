@@ -138,7 +138,7 @@ Besides the dashboard, alerts can be sent to a webhook, a chat or an email addre
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `Controller:Notifications:Webhooks:<n>:Url` | none | A webhook that receives each notification as JSON: `status` (`firing` or `resolved`), `key` (stable, so a receiver can de-duplicate), `rule`, `subject`, `severity`, `since`, `source` |
-| `Controller:Notifications:Webhooks:<n>:Secret` | none | When set, each request carries `X-Monitoring-Signature: sha256=<hex>`, the HMAC-SHA256 of the body with this secret, so the receiver knows the controller sent it |
+| `Controller:Notifications:Webhooks:<n>:Secret` | none | When set, each request carries `X-Monitoring-Timestamp` (Unix seconds) and `X-Monitoring-Signature: sha256=<hex>`, the HMAC-SHA256 with this secret of the timestamp, a dot and the body. The receiver recomputes it and refuses a timestamp that is more than a few minutes old, so a captured request cannot be sent again |
 | `Controller:Notifications:Chats:<n>:Url`, `:Format` | none, `slack` | An incoming webhook of a chat. `slack` posts `{"text": …}` (Slack, Mattermost, Google Chat), `discord` posts `{"content": …}`. The message is one line such as `[CRITICAL] service-down: shop/payments (prod-a, since …)` |
 | `Controller:Notifications:Email:Host`, `:Port`, `:Ssl`, `:User`, `:Password`, `:From`, `:To:<n>` | none, `587`, `true` | An SMTP server, the sender and the receivers; used when a host is set, and then the sender and at least one receiver are required |
 | `Controller:Notifications:MinSeverity` | `warning` | Only alerts of this severity and above are sent: `warning` or `critical` |
@@ -332,6 +332,8 @@ Agents known by their certificate. With `mtls` the certificate can stand in for 
 
 The controller serves the dashboard itself, so there is nothing else to install. Open `http://<controller>:8080/` in a browser.
 
+It speaks plain HTTP unless you give it a certificate, and an ingress or route usually ends TLS in front of it. To serve https from the pod itself set `Controller:Web:Tls:Certificate` and `Controller:Web:Tls:Key` (PEM files). A renewed certificate is read when the files change, without a restart. The chart does this with `webTls.existingSecret` (a secret with `tls.crt` and `tls.key`). The replicas then ask each other for the operator actions over https too, by the names of their pods, so the certificate has to be valid for `monitoring-controller-N.monitoring-controller-headless.<namespace>.svc`; with `webTls.ca: true` and a `ca.crt` in the secret they trust that authority for it (`Controller:PeerCaFile`).
+
 | Path | Shows |
 | --- | --- |
 | `/` | A tile per scope with its status as an icon and a word, unhealthiest first, and the alerts that are firing. Select a tile for its services and pods |
@@ -472,13 +474,13 @@ with the token in the environment: `MONITORING_Agent__Token=...`.
 
 ### More than one agent
 
-One agent per namespace is the default. When a rollout or a lost node must not leave the scope Unknown, run two. They compete for a Kubernetes Lease in the namespace: the holder opens the port for the sidecars and connects to the controllers, and the other waits without doing either. The waiting one is not ready, so the Service sends the sidecars to the holder alone. When the holder stops it gives the lease up and the other takes it at once. When the holder is lost without a word, the other takes over after the lease duration, 15 seconds by default. A holder that cannot renew the lease for that long stops itself, and Kubernetes starts it again as a waiting agent.
+One agent per namespace is the default. When a rollout or a lost node must not leave the scope Unknown, run two. They compete for a Kubernetes Lease in the namespace: the holder takes the sidecars and connects to the controllers, and the other waits without doing either. A sidecar that the Service sends to the waiting agent is turned away and tries again, and so ends up at the holder. When the holder stops it gives the lease up and the other takes it at once. When the holder is lost without a word, the other takes over after the lease duration, 15 seconds by default. A holder that cannot renew the lease for that long stops itself, and Kubernetes starts it again as a waiting agent.
 
 The sidecars reconnect to the new holder, so the scope shows what the sidecars have reported again within a few heartbeats. It does not carry over metric history, which each agent keeps in memory.
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `Agent:Discovery:Kubernetes:LeaderElection:Enabled` | `false` | Competes for the lease. The chart sets it with `highAvailability.enabled`, which also runs two replicas, adds the readiness probe and lets the role read and change that one lease |
+| `Agent:Discovery:Kubernetes:LeaderElection:Enabled` | `false` | Competes for the lease. The chart sets it with `highAvailability.enabled`, which also runs two replicas, and lets the role read and change that one lease |
 | `Agent:Discovery:Kubernetes:LeaderElection:LeaseName` | `monitoring-agent` | Name of the Lease |
 | `Agent:Discovery:Kubernetes:LeaderElection:LeaseDuration` | `15s` | How long after its last renewal the lease can be taken over |
 | `Agent:Discovery:Kubernetes:LeaderElection:RenewInterval` | `5s` | How often the holder renews and the others look |

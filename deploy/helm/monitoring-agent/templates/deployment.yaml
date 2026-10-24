@@ -110,12 +110,6 @@ spec:
               readOnly: true
             {{- end }}
           {{- end }}
-          {{- if .Values.highAvailability.enabled }}
-          # Only the leader listens, so the Service sends the sidecars to the leader alone.
-          readinessProbe:
-            tcpSocket: { port: sidecars }
-            periodSeconds: 3
-          {{- end }}
           resources: {{- toYaml .Values.resources | nindent 12 }}
       {{- if or (ne .Values.transport.mode "none") (eq .Values.auth.mode "serviceAccount") }}
       volumes:

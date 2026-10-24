@@ -28,6 +28,7 @@ namespace Monitoring.Agent.Features.SidecarConnections;
 /// <param name="logger">Receives the reasons a connection was refused or ended.</param>
 /// <param name="telemetry">Told about connected sidecars and how long pulls take; optional.</param>
 /// <param name="history">Keeps the recent values of each application's metrics; optional.</param>
+/// <param name="leadership">When several agents serve one scope, only the leader takes sidecars; the others close the connection, and the sidecar tries again.</param>
 internal sealed class SidecarConnectionHandler(
     IScopeStateStore store,
     IAgentConfiguration configuration,
@@ -35,7 +36,8 @@ internal sealed class SidecarConnectionHandler(
     TimeProvider time,
     ILogger<SidecarConnectionHandler> logger,
     IAgentTelemetry? telemetry = null,
-    IMetricsHistory? history = null)
+    IMetricsHistory? history = null,
+    ILeadership? leadership = null)
 {
     private readonly ConcurrentDictionary<string, Guid> _current = new();
 
@@ -87,6 +89,12 @@ internal sealed class SidecarConnectionHandler(
     /// <returns>A task that completes when the connection has ended; it does not throw for connection problems.</returns>
     public async Task HandleAsync(Stream stream, Func<Hello, Hello?>? admit, CancellationToken ct)
     {
+        if (leadership is { IsLeader: false })
+        {
+            logger.LogDebug("Closing a sidecar connection: this agent waits for the lease and does not serve the scope.");
+            return;
+        }
+
         var connection = Guid.NewGuid();
         Hello? registered = null;
         var leftOnPurpose = false;
@@ -161,6 +169,12 @@ internal sealed class SidecarConnectionHandler(
         catch (OperationCanceledException) when (timeout.IsCancellationRequested && !ct.IsCancellationRequested)
         {
             logger.LogWarning("Closing sidecar connection: no hello within {Timeout}", options.HelloTimeout);
+            return null;
+        }
+
+        // A connection that closes without a word is a health probe of the platform (the readiness probe of a highly available agent), not a fault.
+        if (first is null)
+        {
             return null;
         }
 

@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
+using Monitoring.Agent;
 using Monitoring.Agent.Features.Configuration;
 using Monitoring.Agent.Features.MetricsHistory;
 using Monitoring.Agent.Features.ScopeState;
@@ -19,6 +20,29 @@ namespace Monitoring.Agent.Tests.Features.SidecarConnections;
 
 public class SidecarConnectionHandlerTests
 {
+    [Fact]
+    public async Task An_agent_that_waits_for_the_lease_turns_a_sidecar_away_without_registering_it()
+    {
+        // Arrange
+        var fixture = new HandlerFixture();
+        var handler = new SidecarConnectionHandler(fixture.Store, fixture.Configuration, new SidecarConnectionsOptions(), fixture.Clock,
+            NullLogger<SidecarConnectionHandler>.Instance, leadership: new Waiting());
+        var (server, client) = DuplexStream.CreatePair();
+
+        // Act
+        await handler.HandleAsync(server, null, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // Assert: the fake clock never fires the hello timeout, so a handler that waited for a hello would not have returned
+        client.ShouldNotBeNull();
+    }
+
+    private sealed class Waiting : ILeadership
+    {
+        public bool IsLeader => false;
+
+        public Task WaitUntilLeaderAsync(CancellationToken ct) => Task.Delay(Timeout.Infinite, ct);
+    }
+
     [Fact]
     public async Task HandleAsync_answers_a_hello_with_the_heartbeat_interval()
     {

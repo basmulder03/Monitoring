@@ -59,8 +59,10 @@ internal sealed class SidecarService(
                     }
                     else
                     {
+                        // An agent that answers and turns the sidecar away is up, for example one that waits for the lease while another serves; the next try may reach the
+                        // right one (or it takes over any moment), so the wait stays short instead of growing as it does for an agent that cannot be reached.
                         wait = NextWait(failures);
-                        failures++;
+                        failures = Math.Min(failures + 1, 2);
                     }
                 }
                 catch (Exception ex) when (ex is IOException or SocketException)

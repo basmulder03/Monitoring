@@ -1,5 +1,4 @@
 using System.Net;
-using Monitoring.Agent;
 using Monitoring.Agent.Features.SidecarConnections;
 using Shouldly;
 using Xunit;
@@ -52,26 +51,6 @@ public class SidecarListenerServiceTests
         listener.Stopped.ShouldBeTrue();
     }
 
-    [Fact]
-    public async Task A_waiting_agent_opens_no_port_until_it_leads()
-    {
-        // Arrange
-        var listener = new RecordingListener();
-        var leadership = new ManualLeadership();
-        var service = new SidecarListenerService(listener, leadership);
-
-        // Act
-        await service.StartAsync(TestContext.Current.CancellationToken);
-        var before = listener.Started;
-        leadership.Elect();
-        await listener.Running.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        // Assert
-        before.ShouldBeFalse();
-        listener.Started.ShouldBeTrue();
-        await service.StopAsync(TestContext.Current.CancellationToken);
-    }
-
     /// <summary>Listener that records how the service drives it.</summary>
     private sealed class RecordingListener : ISidecarListener
     {
@@ -111,16 +90,5 @@ public class SidecarListenerServiceTests
                 Stopped = true;
             }
         }
-    }
-
-    private sealed class ManualLeadership : ILeadership
-    {
-        private readonly TaskCompletionSource _elected = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public bool IsLeader => _elected.Task.IsCompleted;
-
-        public Task WaitUntilLeaderAsync(CancellationToken ct) => _elected.Task.WaitAsync(ct);
-
-        public void Elect() => _elected.SetResult();
     }
 }

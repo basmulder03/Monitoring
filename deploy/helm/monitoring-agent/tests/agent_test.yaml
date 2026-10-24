@@ -133,15 +133,13 @@ tests:
           path: spec.template.spec.containers[0].env
           content: { name: MONITORING_Agent__Discovery__Kubernetes__LeaderElection__Enabled, value: "true" }
         template: templates/deployment.yaml
-      - notExists: { path: "spec.template.spec.containers[0].readinessProbe" }
-        template: templates/deployment.yaml
       - notContains:
           path: rules
           content: { apiGroups: [coordination.k8s.io], resources: [leases], verbs: [create] }
         template: templates/serviceaccount.yaml
         documentSelector: { path: kind, value: Role }
 
-  - it: with high availability runs several agents that compete for a lease, and only the leader is ready
+  - it: with high availability runs several agents that compete for a lease
     set: { highAvailability.enabled: true }
     asserts:
       - equal: { path: spec.replicas, value: 2 }
@@ -151,8 +149,6 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].env
           content: { name: MONITORING_Agent__Discovery__Kubernetes__LeaderElection__Enabled, value: "true" }
-        template: templates/deployment.yaml
-      - equal: { path: "spec.template.spec.containers[0].readinessProbe.tcpSocket.port", value: sidecars }
         template: templates/deployment.yaml
       - contains:
           path: rules
