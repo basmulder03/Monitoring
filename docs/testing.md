@@ -87,6 +87,10 @@ The same numbers sit well inside the limits of the Helm charts (controller 512 M
 
 **Scale** (`tests/Monitoring.Controller.Tests/Budgets`). Five thousand instances with fifty series each, the size `docs/design.md` plans for, take about 90 MB in a controller, roughly 360 bytes per series, and the test fails above 150 MB. A snapshot of one hundred such instances is 457 KB as a frame, so a thousand take about 4.5 MB. A frame may be up to 16 MB (`FrameCodec.DefaultMaxFrameBytes`), which holds a scope of several thousand instances, and the test requires a thousand to use less than half of that. The first frame of a connection, which arrives before the peer has proved who it is, may only be 64 KB (`FrameCodec.HandshakeMaxFrameBytes`), so a stranger cannot make the controller or an agent allocate more than that. The size is checked before any memory is allocated for the frame.
 
+## Helm charts
+
+Every chart has unit tests next to it (`tests/*_test.yaml`, [helm-unittest](https://github.com/helm-unittest/helm-unittest)): required values must fail with a clear message, each mode of authentication, transport and TLS must render the right environment, volumes and rights, optional features must be off by default, and the default render of each chart is a reviewed snapshot (`tests/__snapshot__`; after an intended change run `helm unittest -u <chart>` and read the diff). The sidecar library chart is tested through `deploy/helm/test/sample-app`. `deploy/helm/test.sh` lints the charts, runs all of it and checks that the injector adds the same sidecar as the template; install the plugin once with `helm plugin install https://github.com/helm-unittest/helm-unittest --verify=false`. The injector's snapshot uses the cert-manager mode, because the generated certificate of the default mode differs on every render.
+
 ## Kubernetes nightly
 
 `deploy/k8s-test/run.sh` builds the images, installs the three charts and a sample application on a throwaway kind cluster and checks the dashboard API of the controller. It needs docker, kind, kubectl and helm; `KEEP=1` leaves the cluster. The `Kubernetes nightly` workflow runs it every night.

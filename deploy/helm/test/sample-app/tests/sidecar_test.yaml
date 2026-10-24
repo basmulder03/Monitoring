@@ -1,0 +1,28 @@
+suite: the sidecar template, in a chart that uses it
+templates: [templates/deployment.yaml]
+tests:
+  - it: adds a native sidecar and tells the application where its socket is
+    asserts:
+      - equal: { path: 'spec.template.spec.initContainers[0].name', value: monitoring-sidecar }
+      - equal: { path: 'spec.template.spec.initContainers[0].restartPolicy', value: Always }
+      - exists: { path: 'spec.template.spec.containers[0].env[?(@.name=="MONITORING_SOCKET")]' }
+      - lengthEqual: { path: spec.template.spec.containers, count: 1 }
+
+  - it: falls back to a normal container before Kubernetes 1.29
+    set: { monitoring.nativeSidecar: false }
+    asserts:
+      - notExists: { path: spec.template.spec.initContainers }
+      - equal: { path: 'spec.template.spec.containers[1].name', value: monitoring-sidecar }
+      - notExists: { path: 'spec.template.spec.containers[1].restartPolicy' }
+
+  - it: leaves no trace when disabled
+    set: { monitoring.enabled: false }
+    asserts:
+      - notExists: { path: spec.template.spec.initContainers }
+      - notExists: { path: spec.template.spec.volumes }
+      - notExists: { path: 'spec.template.spec.containers[0].env' }
+      - lengthEqual: { path: spec.template.spec.containers, count: 1 }
+
+  - it: matches the snapshot of the default render
+    asserts:
+      - matchSnapshot: {}

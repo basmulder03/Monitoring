@@ -1,0 +1,171 @@
+suite: the controller
+templates: [templates/statefulset.yaml, templates/configmap.yaml, templates/serviceaccount.yaml, templates/services.yaml]
+set:
+  agentTokens: [{ scope: "*", tokenHash: abc }]
+tests:
+  - it: refuses to render without tokens or service account authentication
+    template: templates/statefulset.yaml
+    set: { agentTokens: [] }
+    asserts:
+      - failedTemplate: { errorPattern: "agentTokens needs at least one entry" }
+
+  - it: is a stateful set with an address for every replica
+    template: templates/statefulset.yaml
+    asserts:
+      - isKind: { of: StatefulSet }
+      - equal: { path: spec.replicas, value: 2 }
+      - equal: { path: spec.serviceName, value: monitoring-controller-headless }
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Controller__Replicas__1, value: "monitoring-controller-1.monitoring-controller-headless.NAMESPACE.svc:9440" } }
+
+  - it: uses given replica addresses instead of the generated ones
+    template: templates/statefulset.yaml
+    set: { replicaAddresses: ["a.example:443", "b.example:443"] }
+    asserts:
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Controller__Replicas__1, value: "b.example:443" } }
+      - notExists: { path: "spec.template.spec.containers[0].env[?(@.name=='MONITORING_Controller__Replicas__2')]" }
+
+  - it: has a headless service that also serves pods that are not ready, next to the shared one
+    template: templates/services.yaml
+    asserts:
+      - hasDocuments: { count: 2 }
+      - equal: { path: spec.clusterIP, value: None }
+        documentIndex: 0
+      - equal: { path: spec.publishNotReadyAddresses, value: true }
+        documentIndex: 0
+      - equal: { path: "spec.ports[1].port", value: 8080 }
+        documentIndex: 1
+
+  - it: runs as an ordinary account without extra rights by default
+    asserts:
+      - hasDocuments: { count: 0 }
+        template: templates/serviceaccount.yaml
+      - notExists: { path: spec.template.spec.serviceAccountName }
+        template: templates/statefulset.yaml
+      - equal: { path: spec.template.spec.securityContext.runAsNonRoot, value: true }
+        template: templates/statefulset.yaml
+      - equal: { path: "spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem", value: true }
+        template: templates/statefulset.yaml
+
+  - it: has probes on the health endpoint
+    template: templates/statefulset.yaml
+    asserts:
+      - equal: { path: "spec.template.spec.containers[0].readinessProbe.httpGet.path", value: /healthz }
+      - equal: { path: "spec.template.spec.containers[0].livenessProbe.httpGet.path", value: /healthz }
+
+  - it: lets the controller review tokens with service account authentication, and holds no agent tokens
+    set:
+      agentTokens: []
+      serviceAccountAuth: { enabled: true, audience: mon, scopes: { shop-prod: shop } }
+    asserts:
+      - equal: { path: roleRef.name, value: "system:auth-delegator" }
+        template: templates/serviceaccount.yaml
+        documentIndex: 1
+      - equal: { path: spec.template.spec.serviceAccountName, value: monitoring-controller }
+        template: templates/statefulset.yaml
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Controller__ServiceAccounts__Enabled, value: "true" } }
+        template: templates/statefulset.yaml
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Controller__ServiceAccounts__Scopes__shop-prod, value: shop } }
+        template: templates/statefulset.yaml
+      - notExists: { path: "spec.template.spec.containers[0].env[?(@.name=='MONITORING_Controller__AgentTokens__0__Scope')]" }
+        template: templates/statefulset.yaml
+
+  - it: gets no right to review tokens when it is not used
+    template: templates/serviceaccount.yaml
+    asserts:
+      - hasDocuments: { count: 0 }
+
+  - it: sends alerts from one replica through a lease that is the only object it may touch
+    template: templates/serviceaccount.yaml
+    set: { notifications: { oneSender: true } }
+    asserts:
+      - isKind: { of: Role }
+        documentIndex: 1
+      - equal: { path: "rules[1].resourceNames", value: [monitoring-controller-alerts] }
+        documentIndex: 1
+      - equal: { path: "rules[1].verbs", value: [get, update] }
+        documentIndex: 1
+
+  - it: renders the notification channels and takes secrets from secrets
+    template: templates/statefulset.yaml
+    set:
+      notifications:
+        minSeverity: critical
+        webhooks: [{ url: "https://hooks.example/a", secretSecret: { name: hook, key: secret } }]
+        email: { host: smtp.example, from: m@example, to: [oncall@example] }
+    asserts:
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Controller__Notifications__MinSeverity, value: critical } }
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Controller__Notifications__Webhooks__0__Url, value: "https://hooks.example/a" } }
+      - contains:
+          path: "spec.template.spec.containers[0].env"
+          content: { name: MONITORING_Controller__Notifications__Webhooks__0__Secret, valueFrom: { secretKeyRef: { name: hook, key: secret } } }
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Controller__Notifications__Email__Port, value: "587" } }
+
+  - it: refuses an email host without a sender
+    template: templates/statefulset.yaml
+    set: { notifications: { email: { host: smtp.example } } }
+    asserts:
+      - failedTemplate: { errorPattern: "notifications.email.from is needed" }
+
+  - it: leaves the dashboard open by default
+    template: templates/statefulset.yaml
+    asserts:
+      - notExists: { path: "spec.template.spec.containers[0].env[?(@.name=~/Web__Auth/)]" }
+
+  - it: asks for a trusted proxy, an operator group and tokens with a role of viewer by default
+    template: templates/statefulset.yaml
+    set:
+      webAuth:
+        trustedProxies: ["10.0.0.0/8"]
+        operatorGroup: ops
+        tokens: [{ name: wall, hash: abc }]
+    asserts:
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Controller__Web__Auth__TrustedProxies__0, value: "10.0.0.0/8" } }
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Controller__Web__Auth__OperatorGroup, value: ops } }
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Controller__Web__Auth__Tokens__0__Role, value: viewer } }
+
+  - it: refuses a dashboard token without a hash
+    template: templates/statefulset.yaml
+    set: { webAuth: { tokens: [{ name: wall }] } }
+    asserts:
+      - failedTemplate: { errorPattern: "needs a hash" }
+
+  - it: keeps state in a file on an empty directory only when asked
+    template: templates/statefulset.yaml
+    set: { state: { sqlite: { enabled: true } } }
+    asserts:
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Controller__State__SqlitePath, value: /var/lib/monitoring/state.db } }
+      - contains: { path: spec.template.spec.volumes, content: { name: state, emptyDir: {} } }
+
+  - it: has no transport security by default, and mounts the certificates for tls
+    template: templates/statefulset.yaml
+    asserts:
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Controller__Transport__Mode, value: none } }
+      - lengthEqual: { path: spec.template.spec.volumes, count: 1 }
+
+  - it: also asks for the authority of the agent certificates with mtls
+    template: templates/statefulset.yaml
+    set: { transport: { mode: mtls, existingSecret: certs } }
+    asserts:
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Controller__Transport__ClientCaFile, value: /etc/monitoring/transport/ca.crt } }
+      - contains: { path: spec.template.spec.volumes, content: { name: transport, secret: { secretName: certs } } }
+
+  - it: does not ask for a client authority with tls
+    template: templates/statefulset.yaml
+    set: { transport: { mode: tls, existingSecret: certs } }
+    asserts:
+      - notExists: { path: "spec.template.spec.containers[0].env[?(@.name=='MONITORING_Controller__Transport__ClientCaFile')]" }
+
+  - it: refuses tls without a secret
+    template: templates/statefulset.yaml
+    set: { transport: { mode: tls } }
+    asserts:
+      - failedTemplate: { errorPattern: "transport.existingSecret is needed" }
+
+  - it: restarts the pods when a setting that is only read at start changes
+    asserts:
+      - isNotNull: { path: "spec.template.metadata.annotations['checksum/settings']" }
+        template: templates/statefulset.yaml
+
+  - it: matches the snapshot of its default render
+    asserts:
+      - matchSnapshot: {}

@@ -1,0 +1,103 @@
+suite: the injector
+templates: [templates/webhook.yaml, templates/tls.yaml, templates/deployment.yaml, templates/service.yaml]
+release: { namespace: monitoring }
+tests:
+  - it: registers two cluster-wide webhooks that never stop a pod from starting
+    template: templates/webhook.yaml
+    documentIndex: 1
+    asserts:
+      - isKind: { of: MutatingWebhookConfiguration }
+      - equal: { path: 'webhooks[0].failurePolicy', value: Ignore }
+      - equal: { path: 'webhooks[1].failurePolicy', value: Ignore }
+      - equal: { path: 'webhooks[0].clientConfig.service.path', value: /mutate/namespace }
+      - equal: { path: 'webhooks[1].clientConfig.service.path', value: /mutate }
+      - equal: { path: 'webhooks[0].namespaceSelector.matchLabels["monitoring/inject"]', value: "true" }
+      - equal: { path: 'webhooks[1].objectSelector.matchLabels["monitoring/inject"]', value: "true" }
+
+  - it: lets a pod say no
+    template: templates/webhook.yaml
+    documentIndex: 1
+    asserts:
+      - equal: { path: 'webhooks[0].objectSelector.matchExpressions[0].values', value: ["false"] }
+
+  - it: can be told to stop pods from starting when the webhook is down
+    template: templates/webhook.yaml
+    documentIndex: 1
+    set: { failurePolicy: Fail }
+    asserts:
+      - equal: { path: 'webhooks[0].failurePolicy', value: Fail }
+      - equal: { path: 'webhooks[1].failurePolicy', value: Fail }
+
+  - it: never changes the excluded namespaces or its own
+    template: templates/webhook.yaml
+    documentIndex: 1
+    set: { excludedNamespaces: [a, b] }
+    asserts:
+      - equal: { path: 'webhooks[0].namespaceSelector.matchExpressions[0].values', value: [a, b, monitoring] }
+      - equal: { path: 'webhooks[1].namespaceSelector.matchExpressions[0].values', value: [a, b, monitoring] }
+
+  - it: makes a certificate and trusts its authority in the generate mode
+    template: templates/webhook.yaml
+    asserts:
+      - isKind: { of: Secret }
+        documentIndex: 0
+      - equal: { path: type, value: kubernetes.io/tls }
+        documentIndex: 0
+      - isNotEmpty: { path: 'webhooks[0].clientConfig.caBundle' }
+        documentIndex: 1
+      - hasDocuments: { count: 2 }
+
+  - it: asks cert-manager for a certificate and lets it inject the authority
+    set: { tls: { mode: certManager, issuerRef: { name: ca, kind: ClusterIssuer } } }
+    asserts:
+      - isKind: { of: Certificate }
+        template: templates/tls.yaml
+      - equal: { path: spec.issuerRef.name, value: ca }
+        template: templates/tls.yaml
+      - hasDocuments: { count: 1 }
+        template: templates/webhook.yaml
+      - equal: { path: 'metadata.annotations["cert-manager.io/inject-ca-from"]', value: monitoring/monitoring-injector }
+        template: templates/webhook.yaml
+      - notExists: { path: 'webhooks[0].clientConfig.caBundle' }
+        template: templates/webhook.yaml
+
+  - it: refuses cert-manager without an issuer
+    template: templates/tls.yaml
+    set: { tls: { mode: certManager } }
+    asserts:
+      - failedTemplate: { errorPattern: "tls.issuerRef.name is needed" }
+
+  - it: lets the service authority of OpenShift make and inject the certificate
+    set: { tls: { mode: openshift } }
+    asserts:
+      - equal: { path: 'metadata.annotations["service.beta.openshift.io/inject-cabundle"]', value: "true" }
+        template: templates/webhook.yaml
+      - equal: { path: 'metadata.annotations["service.beta.openshift.io/serving-cert-secret-name"]', value: monitoring-injector-tls }
+        template: templates/service.yaml
+      - hasDocuments: { count: 0 }
+        template: templates/tls.yaml
+
+  - it: needs the authority that signed your own certificate
+    template: templates/webhook.yaml
+    set: { tls: { mode: existingSecret, existingSecret: x } }
+    asserts:
+      - failedTemplate: { errorPattern: "tls.caBundle" }
+
+  - it: uses your own authority with an existing secret
+    set: { tls: { mode: existingSecret, existingSecret: x, caBundle: Zm9v } }
+    asserts:
+      - equal: { path: 'webhooks[0].clientConfig.caBundle', value: Zm9v }
+        template: templates/webhook.yaml
+      - hasDocuments: { count: 0 }
+        template: templates/tls.yaml
+
+  - it: runs two replicas and never as root
+    template: templates/deployment.yaml
+    asserts:
+      - equal: { path: spec.replicas, value: 2 }
+      - equal: { path: spec.template.spec.securityContext.runAsNonRoot, value: true }
+
+  - it: matches the snapshot of its default render with a certificate from cert-manager
+    set: { tls: { mode: certManager, issuerRef: { name: ca, kind: ClusterIssuer } } }
+    asserts:
+      - matchSnapshot: {}

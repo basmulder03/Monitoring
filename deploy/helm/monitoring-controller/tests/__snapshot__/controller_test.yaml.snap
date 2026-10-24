@@ -1,0 +1,160 @@
+matches the snapshot of its default render:
+  1: |
+    apiVersion: v1
+    data:
+      central.json: |
+        {
+          "defaults": { "pullSeconds": 15, "edgeFlushSeconds": 10 }
+        }
+    kind: ConfigMap
+    metadata:
+      labels:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: monitoring-controller
+        app.kubernetes.io/version: 0.1.0
+        helm.sh/chart: monitoring-controller-0.1.0
+      name: monitoring-controller
+  2: |
+    apiVersion: v1
+    kind: Service
+    metadata:
+      labels:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: monitoring-controller
+        app.kubernetes.io/version: 0.1.0
+        helm.sh/chart: monitoring-controller-0.1.0
+      name: monitoring-controller-headless
+    spec:
+      clusterIP: None
+      ports:
+        - name: agents
+          port: 9440
+          targetPort: agents
+      publishNotReadyAddresses: true
+      selector:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/name: monitoring-controller
+  3: |
+    apiVersion: v1
+    kind: Service
+    metadata:
+      labels:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: monitoring-controller
+        app.kubernetes.io/version: 0.1.0
+        helm.sh/chart: monitoring-controller-0.1.0
+      name: monitoring-controller
+    spec:
+      ports:
+        - name: agents
+          port: 9440
+          targetPort: agents
+        - name: web
+          port: 8080
+          targetPort: web
+      selector:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/name: monitoring-controller
+  4: |
+    apiVersion: apps/v1
+    kind: StatefulSet
+    metadata:
+      labels:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: monitoring-controller
+        app.kubernetes.io/version: 0.1.0
+        helm.sh/chart: monitoring-controller-0.1.0
+      name: monitoring-controller
+    spec:
+      podManagementPolicy: Parallel
+      replicas: 2
+      selector:
+        matchLabels:
+          app.kubernetes.io/instance: RELEASE-NAME
+          app.kubernetes.io/name: monitoring-controller
+      serviceName: monitoring-controller-headless
+      template:
+        metadata:
+          annotations:
+            checksum/settings: 61aaf7e940d022079361eacd6e5f157f6d986858d65a7552202d598b191d238d
+          labels:
+            app.kubernetes.io/instance: RELEASE-NAME
+            app.kubernetes.io/name: monitoring-controller
+        spec:
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - podAffinityTerm:
+                    labelSelector:
+                      matchLabels:
+                        app.kubernetes.io/instance: RELEASE-NAME
+                        app.kubernetes.io/name: monitoring-controller
+                    topologyKey: kubernetes.io/hostname
+                  weight: 100
+          containers:
+            - env:
+                - name: MONITORING_Controller__AgentTokens__0__Scope
+                  value: '*'
+                - name: MONITORING_Controller__AgentTokens__0__TokenHash
+                  value: abc
+                - name: MONITORING_Controller__Replicas__0
+                  value: monitoring-controller-0.monitoring-controller-headless.NAMESPACE.svc:9440
+                - name: MONITORING_Controller__Replicas__1
+                  value: monitoring-controller-1.monitoring-controller-headless.NAMESPACE.svc:9440
+                - name: MONITORING_Controller__Configuration__File
+                  value: /etc/monitoring/central/central.json
+                - name: MONITORING_Controller__Dashboard__GroupBy__0
+                  value: environment
+                - name: MONITORING_Controller__Dashboard__GroupBy__1
+                  value: datacenter
+                - name: MONITORING_Controller__Transport__Mode
+                  value: none
+                - name: MONITORING_Controller__Notifications__MinSeverity
+                  value: warning
+              image: monitoring-controller:0.1.0
+              imagePullPolicy: IfNotPresent
+              livenessProbe:
+                httpGet:
+                  path: /healthz
+                  port: web
+                initialDelaySeconds: 10
+                periodSeconds: 30
+              name: controller
+              ports:
+                - containerPort: 9440
+                  name: agents
+                - containerPort: 8080
+                  name: web
+              readinessProbe:
+                httpGet:
+                  path: /healthz
+                  port: web
+                periodSeconds: 10
+              resources:
+                limits:
+                  memory: 512Mi
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - mountPath: /etc/monitoring/central
+                  name: central
+                  readOnly: true
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          volumes:
+            - configMap:
+                name: monitoring-controller
+              name: central

@@ -1,0 +1,57 @@
+matches the snapshot of the default render:
+  1: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: orders
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: orders
+      template:
+        metadata:
+          labels:
+            app: orders
+        spec:
+          containers:
+            - env:
+                - name: MONITORING_SOCKET
+                  value: /var/run/monitoring/monitoring.sock
+              image: example/orders:1.0.0
+              name: orders
+              volumeMounts:
+                - mountPath: /var/run/monitoring
+                  name: monitoring-socket
+          initContainers:
+            - env:
+                - name: MONITORING_Sidecar__Agent
+                  value: monitoring-agent:9441
+                - name: MONITORING_Sidecar__Library__Socket
+                  value: /var/run/monitoring/monitoring.sock
+                - name: MONITORING_Sidecar__Labels__team
+                  value: orders
+              image: monitoring-sidecar:0.1.0
+              imagePullPolicy: IfNotPresent
+              name: monitoring-sidecar
+              resources:
+                limits:
+                  memory: 64Mi
+                requests:
+                  cpu: 10m
+                  memory: 16Mi
+              restartPolicy: Always
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - mountPath: /var/run/monitoring
+                  name: monitoring-socket
+          volumes:
+            - emptyDir:
+                medium: Memory
+                sizeLimit: 1Mi
+              name: monitoring-socket
