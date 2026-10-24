@@ -1,0 +1,12 @@
+{
+  "type": "hello",
+  "protocolVersion": 2,
+  "instanceId": "orders-7d9f-x1",
+  "serviceName": "orders",
+  "version": "1.2.3",
+  "labels": {
+    "environment": "prod"
+  },
+  "token": "token",
+  "scopeName": "shop"
+}

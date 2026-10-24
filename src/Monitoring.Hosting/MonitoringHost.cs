@@ -1,5 +1,6 @@
 using System.Net.Sockets;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -76,22 +77,53 @@ public static class MonitoringHost
     /// <param name="args">Command line arguments.</param>
     /// <param name="compose">Adds the executable's services, reading its settings.</param>
     /// <returns>0 after a normal stop, <see cref="ConfigurationError"/> for a configuration problem, or <see cref="StartupFailure"/> when it could not start.</returns>
-    public static Task<int> RunAsync(string[] args, Action<HostApplicationBuilder, SettingsReader> compose) =>
-        RunAsync(() =>
+    public static Task<int> RunAsync(string[] args, Action<HostApplicationBuilder, SettingsReader> compose)
+    {
+        var (rest, check) = SplitCheck(args);
+        return RunAsync(() =>
         {
-            var builder = CreateBuilder(args);
+            var builder = CreateBuilder(rest);
             compose(builder, new SettingsReader(builder.Configuration));
             return builder.Build();
-        });
+        }, check);
+    }
+
+    /// <summary>The switch that makes an executable only check its configuration and exit, so a change can be tried before it is rolled out.</summary>
+    public const string CheckSwitch = "--check";
+
+    /// <summary>Takes the check switch out of the arguments, because the command line provider cannot read a switch without a value.</summary>
+    /// <param name="args">The arguments of the executable.</param>
+    /// <returns>The arguments without the switch, and whether it was there.</returns>
+    public static (string[] Remaining, bool Check) SplitCheck(string[] args) =>
+        ([.. args.Where(arg => arg != CheckSwitch)], args.Contains(CheckSwitch));
 
     /// <summary>Builds a host and runs it until it is told to stop, turning start-up problems into exit codes.</summary>
     /// <param name="build">Creates the host; may throw <see cref="ConfigurationException"/> or <see cref="ArgumentException"/> for a bad configuration.</param>
+    /// <param name="check">Only build the host and check the configuration, then exit; see <see cref="CheckSwitch"/>.</param>
     /// <returns>0 after a normal stop, <see cref="ConfigurationError"/> for a configuration problem, or <see cref="StartupFailure"/> when it could not start.</returns>
-    public static async Task<int> RunAsync(Func<IHost> build)
+    public static async Task<int> RunAsync(Func<IHost> build, bool check = false)
     {
         try
         {
             using var host = build();
+            if (check)
+            {
+                // Built without starting: reading every setting, the tokens and the certificates has already happened. What is looked at while running is checked now.
+                var problems = host.Services.GetServices<IConfigurationCheck>().SelectMany(c => c.Problems()).ToList();
+                foreach (var problem in problems)
+                {
+                    await Console.Error.WriteLineAsync($"Configuration error: {problem}").ConfigureAwait(false);
+                }
+
+                if (problems.Count > 0)
+                {
+                    return ConfigurationError;
+                }
+
+                await Console.Out.WriteLineAsync("The configuration is valid.").ConfigureAwait(false);
+                return 0;
+            }
+
             await host.RunAsync().ConfigureAwait(false);
             return 0;
         }

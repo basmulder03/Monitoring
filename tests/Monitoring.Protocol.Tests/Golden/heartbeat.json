@@ -1,0 +1,6 @@
+{
+  "type": "heartbeat",
+  "sequence": 42,
+  "health": "Degraded",
+  "configVersion": "v3"
+}

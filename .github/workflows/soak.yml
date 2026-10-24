@@ -1,0 +1,36 @@
+name: Soak
+
+# A long run of the controller under load, to find what a test of one moment cannot: memory, threads and files that keep growing. Weekly, and by hand with a length.
+on:
+  schedule:
+    - cron: "0 4 * * 0"
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: How long to run, at most 330
+        default: "120"
+
+permissions:
+  contents: read
+
+jobs:
+  soak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run
+        run: scripts/soak.sh "${{ inputs.minutes || 120 }}" 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: soak
+          path: |
+            soak-samples.csv
+            soak-demo.log

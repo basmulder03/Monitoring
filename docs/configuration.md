@@ -15,6 +15,16 @@ Durations are written as `hh:mm:ss`, for example `00:00:30`; fractions of a seco
 
 Logging is controlled by the usual `Logging:LogLevel` settings, for example `MONITORING_Logging__LogLevel__Default=Debug`.
 
+## Checking a configuration
+
+`--check` builds the controller or the agent exactly as it would start, with the same settings, files and certificates, and exits without starting anything. It prints `The configuration is valid.` and exits with 0, or says what is wrong and exits with 78 (see below). For the controller it also reads the central configuration file (`Controller:Configuration:File`), which while running is only logged when it is bad, with the last good one staying in force. Run it in the pipeline that rolls out a change, with the same environment as the real thing:
+
+```sh
+Monitoring.Controller --check
+```
+
+The log line of the controller about a dashboard without sign-in shows in the output as well, which is what a check is for.
+
 ## Exit codes
 
 | Code | Meaning |

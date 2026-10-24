@@ -78,10 +78,11 @@ public sealed class BrowserFixture : IAsyncLifetime
     }
 
     /// <summary>Opens a new page in a fresh browser context.</summary>
+    /// <param name="width">The width of the window in pixels; a desktop by default.</param>
     /// <returns>The page, which records script errors and console errors, and closes its context when disposed.</returns>
-    public async Task<BrowserPage> NewPageAsync()
+    public async Task<BrowserPage> NewPageAsync(int width = 1280)
     {
-        var context = await _browser!.NewContextAsync(new BrowserNewContextOptions { ViewportSize = new ViewportSize { Width = 1280, Height = 800 } });
+        var context = await _browser!.NewContextAsync(new BrowserNewContextOptions { ViewportSize = new ViewportSize { Width = width, Height = 800 } });
         return new BrowserPage(context, await context.NewPageAsync());
     }
 

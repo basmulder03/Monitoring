@@ -1,0 +1,7 @@
+{
+  "type": "pullResult",
+  "requestId": 7,
+  "kind": "Health",
+  "cursor": 1001,
+  "payloadJson": "{\u0022health\u0022:\u0022Healthy\u0022}"
+}

@@ -43,3 +43,14 @@ h3, h4 { margin: 1rem 0 0.5rem; font-size: 1rem; }
 .bar nav { display: flex; gap: 1rem; margin-right: auto; margin-left: 1.5rem; }
 .bar nav a { text-decoration-thickness: 1px; text-underline-offset: 0.25em; }
 .bar nav a[aria-current="page"] { font-weight: 700; text-decoration-thickness: 3px; }
+
+/* A narrow screen, such as a phone of someone on call: the bar wraps, tables scroll sideways inside themselves and nothing makes the page wider than the screen. */
+.bar { flex-wrap: wrap; gap: 0.5rem; }
+.bar nav { flex-wrap: wrap; gap: 0.25rem 1rem; }
+@media (max-width: 40rem) {
+  .bar nav { order: 3; flex-basis: 100%; margin: 0; }
+  main { padding: 1rem 0.75rem; }
+  table.instances, table.containers { display: block; overflow-x: auto; }
+  .silence-form input { min-width: 0; width: 100%; }
+}
+body { overflow-wrap: break-word; }

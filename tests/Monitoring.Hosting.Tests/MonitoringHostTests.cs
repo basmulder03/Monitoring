@@ -142,6 +142,75 @@ public class MonitoringHostTests
     }
 
     [Fact]
+    public void SplitCheck_takes_the_switch_out_of_the_arguments()
+    {
+        // Act
+        var (remaining, check) = MonitoringHost.SplitCheck(["--Agent:Token=x", "--check"]);
+        var (untouched, none) = MonitoringHost.SplitCheck(["--Agent:Token=x"]);
+
+        // Assert
+        check.ShouldBeTrue();
+        remaining.ShouldBe(["--Agent:Token=x"]);
+        none.ShouldBeFalse();
+        untouched.ShouldBe(["--Agent:Token=x"]);
+    }
+
+    [Fact]
+    public async Task A_check_builds_the_host_and_asks_the_checks_without_starting_anything()
+    {
+        // Arrange
+        var started = false;
+        IHost Build(IConfigurationCheck? check)
+        {
+            var builder = MonitoringHost.CreateBuilder([], configFile: NoFile());
+            builder.Services.AddHostedService(_ => new Probe(() => started = true));
+            if (check is not null)
+            {
+                builder.Services.AddSingleton(check);
+            }
+
+            return builder.Build();
+        }
+
+        // Act
+        var valid = await MonitoringHost.RunAsync(() => Build(new Check([])), check: true);
+        var invalid = await MonitoringHost.RunAsync(() => Build(new Check(["The file is not valid."])), check: true);
+        var without = await MonitoringHost.RunAsync(() => Build(null), check: true);
+
+        // Assert
+        valid.ShouldBe(0);
+        invalid.ShouldBe(MonitoringHost.ConfigurationError);
+        without.ShouldBe(0);
+        started.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task A_check_of_a_host_that_cannot_be_built_reports_the_configuration_problem()
+    {
+        // Act
+        var exitCode = await MonitoringHost.RunAsync(() => throw new ConfigurationException("Setting 'X' is required."), check: true);
+
+        // Assert
+        exitCode.ShouldBe(MonitoringHost.ConfigurationError);
+    }
+
+    private sealed class Check(string[] problems) : IConfigurationCheck
+    {
+        public IEnumerable<string> Problems() => problems;
+    }
+
+    private sealed class Probe(Action started) : IHostedService
+    {
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            started();
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    [Fact]
     public async Task RunAsync_returns_zero_after_the_host_stopped_normally()
     {
         // Arrange

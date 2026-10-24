@@ -1,0 +1,5 @@
+{
+  "type": "ack",
+  "sequence": 5,
+  "snapshotRequired": true
+}

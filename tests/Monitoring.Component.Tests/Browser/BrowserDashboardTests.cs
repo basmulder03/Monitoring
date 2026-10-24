@@ -279,6 +279,32 @@ public class BrowserDashboardTests(BrowserFixture browser)
     };
 
     [Theory]
+    [InlineData("/", "a.tile")]
+    [InlineData("/#/scopes/shop", "details.service")]
+    [InlineData("/#/system", "main table.instances")]
+    [InlineData("/#/packages", "main h2")]
+    [InlineData("/#/dependencies", "main h2")]
+    public async Task On_a_phone_nothing_makes_the_page_wider_than_the_screen(string path, string readyWhenVisible)
+    {
+        // Arrange
+        Assert.SkipUnless(browser.IsAvailable, browser.Reason);
+        await using var world = await new DashboardWorld()
+            .WithScope("shop", "prod", "a", ("orders-1", true), ("orders-2", false))
+            .WithScope("billing", "test", "b", ("invoices-1", true))
+            .StartAsync();
+        await world.WaitUntilScopesAreKnownAsync(2);
+        await using var page = await browser.NewPageAsync(width: 390);
+
+        // Act
+        await page.Page.GotoAsync(world.Url + path);
+        await Assertions.Expect(page.Page.Locator(readyWhenVisible).First).ToBeVisibleAsync(Patient);
+        var (scroll, client) = await page.Page.EvaluateAsync<int[]>("[document.documentElement.scrollWidth, document.documentElement.clientWidth]") is [var a, var b] ? (a, b) : (0, 0);
+
+        // Assert
+        scroll.ShouldBeLessThanOrEqualTo(client, $"{path} is {scroll} px wide on a screen of {client} px");
+    }
+
+    [Theory]
     [MemberData(nameof(AccessibilityCases))]
     public async Task The_page_has_no_accessibility_violations_at_wcag_2_aa(string view, string path, string readyWhenVisible)
     {

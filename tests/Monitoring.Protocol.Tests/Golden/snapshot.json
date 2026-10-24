@@ -1,0 +1,72 @@
+{
+  "type": "snapshot",
+  "sequence": 1,
+  "scopeName": "shop",
+  "instances": [
+    {
+      "id": "orders-7d9f-x1",
+      "serviceName": "orders",
+      "lifecycle": "Running",
+      "health": "Degraded",
+      "labels": {
+        "app": "orders",
+        "k8s.pod-ips": "10.0.0.5"
+      },
+      "version": "1.2.3",
+      "checks": [
+        {
+          "name": "database",
+          "health": "Degraded",
+          "description": "answers in 850 ms"
+        }
+      ],
+      "metrics": [
+        {
+          "name": "http.server.request.duration",
+          "labels": {
+            "route": "/orders"
+          },
+          "value": 12.5
+        }
+      ],
+      "containers": [
+        {
+          "name": "app",
+          "role": "App",
+          "phase": "Running",
+          "health": "Healthy",
+          "ready": true,
+          "restarts": 2,
+          "image": "orders:1.2.3",
+          "lastExitCode": 137,
+          "lastReason": "OOMKilled"
+        }
+      ],
+      "edges": [
+        {
+          "type": "HTTP",
+          "target": "http://payments:8080",
+          "calls": 1200,
+          "errors": 3,
+          "durationSumMs": 16800.5,
+          "buckets": [
+            700,
+            400,
+            100
+          ]
+        }
+      ],
+      "packages": [
+        {
+          "name": "Serilog",
+          "version": "4.0.0",
+          "direct": true
+        }
+      ]
+    }
+  ],
+  "labels": {
+    "environment": "prod",
+    "datacenter": "a"
+  }
+}
