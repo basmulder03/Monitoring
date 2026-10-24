@@ -46,3 +46,21 @@ Feature: Recovery
     When the controller is restarted
     Then the dashboard shows the service "orders" in the scope "shop" as Healthy within 90 seconds
     And the dashboard shows no alerts within 30 seconds
+
+  Scenario: An application that is killed for lack of memory again and again is shown as unhealthy, with the reason
+    Given the environment is running
+    And the dashboard shows the service "payments" in the scope "shop" as Healthy within 60 seconds
+    When the application of the pod "payments-1" of "payments" is killed for lack of memory again and again
+    Then the dashboard shows the service "payments" in the scope "shop" as Unhealthy within 20 seconds
+    And the instance "payments-1" of "payments" in the scope "shop" shows that the container "app" waits with "CrashLoopBackOff" after ending with "OOMKilled" within 20 seconds
+    And the dashboard shows the service "orders" in the scope "shop" as Healthy within 20 seconds
+    When the pod "payments-1" of "payments" is ready again
+    Then the dashboard shows the service "payments" in the scope "shop" as Healthy within 30 seconds
+
+  Scenario: A monitoring sidecar that crash loops degrades the instance but does not make the application look down
+    Given the environment is running
+    And the dashboard shows the service "payments" in the scope "shop" as Healthy within 60 seconds
+    When the monitoring sidecar of the pod "payments-1" of "payments" crash loops
+    Then the dashboard shows the service "payments" in the scope "shop" as Degraded within 20 seconds
+    When the pod "payments-1" of "payments" is ready again
+    Then the dashboard shows the service "payments" in the scope "shop" as Healthy within 30 seconds

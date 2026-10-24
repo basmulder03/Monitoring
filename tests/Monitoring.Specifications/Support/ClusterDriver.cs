@@ -24,14 +24,15 @@ public sealed class ClusterDriver
     /// <param name="pod">The pod.</param>
     /// <param name="service">The service its application is.</param>
     /// <param name="ready">Whether it is ready.</param>
+    /// <param name="fault">What is wrong with it: <c>crash</c> (the application is killed for lack of memory again and again) or <c>sidecar</c> (the monitoring sidecar crash loops); none when it is well.</param>
     /// <returns>A task that completes when the cluster has done it.</returns>
-    public async Task PutAsync(string pod, string service, bool ready = true)
+    public async Task PutAsync(string pod, string service, bool ready = true, string? fault = null)
     {
         using var client = RunningEnvironment.App.CreateHttpClient(MonitoringEnvironment.Cluster, "api");
-        using var response = await client.PutAsync($"/control/pods/{pod}?service={service}&ready={ready.ToString().ToLowerInvariant()}", content: null);
+        using var response = await client.PutAsync($"/control/pods/{pod}?service={service}&ready={ready.ToString().ToLowerInvariant()}{(fault is null ? "" : $"&fault={fault}")}", content: null);
         response.EnsureSuccessStatusCode();
         _deleted.Remove(pod);
-        if (!ready)
+        if (!ready || fault is not null)
         {
             _changed.Add(pod);
         }

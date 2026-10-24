@@ -32,6 +32,12 @@ public sealed class OperationSteps(ApplicationDriver applications, ClusterDriver
     [When(@"the pod ""(.*)"" of ""(.*)"" is ready again")]
     public Task WhenThePodIsReadyAgain(string pod, string service) => cluster.PutAsync(pod, service, ready: true);
 
+    [When(@"the application of the pod ""(.*)"" of ""(.*)"" is killed for lack of memory again and again")]
+    public Task WhenTheApplicationKeepsBeingKilled(string pod, string service) => cluster.PutAsync(pod, service, ready: false, fault: "crash");
+
+    [When(@"the monitoring sidecar of the pod ""(.*)"" of ""(.*)"" crash loops")]
+    public Task WhenTheSidecarCrashLoops(string pod, string service) => cluster.PutAsync(pod, service, ready: false, fault: "sidecar");
+
     [When("the agent is stopped")]
     public Task WhenTheAgentIsStopped() => processes.StopAsync(MonitoringEnvironment.Agent);
 

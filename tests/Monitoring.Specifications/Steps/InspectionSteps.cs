@@ -22,6 +22,17 @@ public sealed class InspectionSteps(DashboardDriver dashboard)
                 .Any(c => c.GetProperty("name").GetString() == container && c.GetProperty("role").GetString() == role);
         }, $"/api/scopes/{scope}");
 
+    [Then(@"the instance ""(.*)"" of ""(.*)"" in the scope ""(.*)"" shows that the container ""(.*)"" waits with ""(.*)"" after ending with ""(.*)"" within (\d+) seconds")]
+    public Task ThenTheContainerIsStuck(string instance, string service, string scope, string container, string reason, string lastReason, int seconds) =>
+        dashboard.WaitUntilAsync($"'{container}' of '{instance}' waits with {reason} after {lastReason}", TimeSpan.FromSeconds(seconds), async () =>
+        {
+            using var document = await dashboard.ScopeAsync(scope);
+            return document!.RootElement.GetProperty("services").EnumerateArray().Where(s => s.GetProperty("name").GetString() == service)
+                .SelectMany(s => s.GetProperty("instances").EnumerateArray()).Where(i => i.GetProperty("id").GetString() == instance)
+                .SelectMany(i => i.GetProperty("containers").EnumerateArray())
+                .Any(c => c.GetProperty("name").GetString() == container && c.GetProperty("reason").GetString() == reason && c.GetProperty("lastReason").GetString() == lastReason);
+        }, $"/api/scopes/{scope}");
+
     [Then(@"the packages of the applications include ""(.*)"" within (\d+) seconds")]
     public Task ThenThePackagesInclude(string package, int seconds) =>
         dashboard.WaitUntilAsync($"the package '{package}' is known", TimeSpan.FromSeconds(seconds), async () =>
