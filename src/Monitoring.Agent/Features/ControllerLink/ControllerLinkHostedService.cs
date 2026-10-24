@@ -4,8 +4,17 @@ namespace Monitoring.Agent.Features.ControllerLink;
 
 /// <summary>Hosts the <see cref="IControllerLink"/>: connects to the controller replicas while the host runs.</summary>
 /// <param name="link">The link to run.</param>
-internal sealed class ControllerLinkHostedService(IControllerLink link) : BackgroundService
+/// <param name="leadership">When agents compete for a scope, only the leader connects, so the controllers never see the scope twice.</param>
+internal sealed class ControllerLinkHostedService(IControllerLink link, ILeadership? leadership = null) : BackgroundService
 {
     /// <inheritdoc />
-    protected override Task ExecuteAsync(CancellationToken stoppingToken) => link.RunAsync(stoppingToken);
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        if (leadership is not null)
+        {
+            await leadership.WaitUntilLeaderAsync(stoppingToken).ConfigureAwait(false);
+        }
+
+        await link.RunAsync(stoppingToken).ConfigureAwait(false);
+    }
 }

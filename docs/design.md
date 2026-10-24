@@ -177,7 +177,7 @@ Each hop finds its parent through one bootstrap value, and the controller hands 
 
 - Replicas need individual addresses (one Route per replica, or per-pod DNS names inside a cluster). A shared load-balanced address would reach only one replica, so it is used only for bootstrap and the UI.
 - The replica list is re-sent whenever it changes, so adding or removing a replica needs no agent change.
-- Each namespace runs one agent replica. After a restart it rebuilds from the pod list and the sidecars reconnect; a second replica with Lease-based election is possible later.
+- Each namespace runs one agent replica. After a restart it rebuilds from the pod list and the sidecars reconnect; a second replica takes over through a Kubernetes Lease when `highAvailability.enabled` is set (see configuration.md, "More than one agent").
 
 ### Liveness signals
 

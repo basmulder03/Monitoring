@@ -77,6 +77,20 @@ public static class DiscoverySlice
         services.AddSingleton(target);
         services.AddSingleton<IKubernetesApi>(_ => new HttpKubernetesApi(KubernetesHttpClient.Create(connection)));
         services.AddHostedService<KubernetesDiscoveryService>();
+
+        if (options.LeaderElection.Enabled)
+        {
+            var election = options.LeaderElection;
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(election.RenewInterval, TimeSpan.Zero);
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(election.LeaseDuration, election.RenewInterval);
+            ArgumentException.ThrowIfNullOrWhiteSpace(election.LeaseName);
+
+            services.AddSingleton(election);
+            services.AddSingleton<ILeaseApi>(provider => (ILeaseApi)provider.GetRequiredService<IKubernetesApi>());
+            services.AddSingleton(provider => ActivatorUtilities.CreateInstance<KubernetesLeaderElection>(provider, Environment.MachineName));
+            services.AddSingleton<ILeadership>(provider => provider.GetRequiredService<KubernetesLeaderElection>());
+            services.AddHostedService(provider => provider.GetRequiredService<KubernetesLeaderElection>());
+        }
     }
 
     private static string? ReadFileOrNull(string path)

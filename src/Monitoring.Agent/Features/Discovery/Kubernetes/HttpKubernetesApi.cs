@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Monitoring.Agent.Features.Discovery.Kubernetes.Models;
@@ -10,7 +11,7 @@ namespace Monitoring.Agent.Features.Discovery.Kubernetes;
 /// does not work in a Native AOT executable.
 /// </summary>
 /// <param name="http">Client whose base address is the API server and which adds the credentials.</param>
-internal sealed class HttpKubernetesApi(HttpClient http) : IKubernetesApi, IDisposable
+internal sealed class HttpKubernetesApi(HttpClient http) : IKubernetesApi, ILeaseApi, IDisposable
 {
     private static readonly TimeSpan ListTimeout = TimeSpan.FromSeconds(30);
 
@@ -186,6 +187,53 @@ internal sealed class HttpKubernetesApi(HttpClient http) : IKubernetesApi, IDisp
             return null;
         }
     }
+
+    /// <inheritdoc />
+    public async Task<Lease?> GetLeaseAsync(string namespaceName, string name, CancellationToken ct)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(ListTimeout);
+
+        using var response = await http.GetAsync($"{LeasesPath(namespaceName)}/{Uri.EscapeDataString(name)}", timeout.Token).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        return await ReadLeaseAsync(response, timeout.Token).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<Lease> CreateLeaseAsync(string namespaceName, Lease lease, CancellationToken ct)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(ListTimeout);
+
+        using var content = JsonContent.Create(lease, KubernetesJsonContext.Default.Lease);
+        using var response = await http.PostAsync(LeasesPath(namespaceName), content, timeout.Token).ConfigureAwait(false);
+        return await ReadLeaseAsync(response, timeout.Token).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<Lease> ReplaceLeaseAsync(string namespaceName, Lease lease, CancellationToken ct)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(ListTimeout);
+
+        using var content = JsonContent.Create(lease, KubernetesJsonContext.Default.Lease);
+        using var response = await http.PutAsync($"{LeasesPath(namespaceName)}/{Uri.EscapeDataString(lease.Metadata.Name)}", content, timeout.Token).ConfigureAwait(false);
+        return await ReadLeaseAsync(response, timeout.Token).ConfigureAwait(false);
+    }
+
+    private static async Task<Lease> ReadLeaseAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+        await using var body = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        return await ReadAsync(() => JsonSerializer.DeserializeAsync(body, KubernetesJsonContext.Default.Lease, ct).AsTask()).ConfigureAwait(false)
+            ?? throw new KubernetesApiException("The lease answer is empty.");
+    }
+
+    private static string LeasesPath(string namespaceName) => $"apis/coordination.k8s.io/v1/namespaces/{Uri.EscapeDataString(namespaceName)}/leases";
 
     private static string PodsPath(string namespaceName) => $"api/v1/namespaces/{Uri.EscapeDataString(namespaceName)}/pods";
 

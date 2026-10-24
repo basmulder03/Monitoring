@@ -40,6 +40,9 @@ public sealed class KubernetesDiscoveryOptions
     /// </summary>
     public TimeSpan ResyncInterval { get; set; } = TimeSpan.FromSeconds(60);
 
+    /// <summary>Lets several agents run for the namespace, of which one serves; see <see cref="LeaderElectionOptions"/>.</summary>
+    public LeaderElectionOptions LeaderElection { get; } = new();
+
     /// <summary>Shortest wait before retrying after a failure.</summary>
     public TimeSpan RetryMinDelay { get; set; } = TimeSpan.FromSeconds(1);
 

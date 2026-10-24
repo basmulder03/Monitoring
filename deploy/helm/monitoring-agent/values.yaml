@@ -51,6 +51,12 @@ networkPolicy:
 sidecars:
   verifyPeerAddress: true
 
+# Runs more than one agent, so a rollout or a lost node does not leave the scope Unknown. The agents compete for a Lease: the one that holds it
+# opens the port of the sidecars and connects to the controllers, the others wait and show as not ready until one takes over, which takes about 15 seconds.
+highAvailability:
+  enabled: false
+  replicas: 2
+
 resources:
   requests: { cpu: 25m, memory: 32Mi }
   limits: { memory: 128Mi }

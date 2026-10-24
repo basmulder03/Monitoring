@@ -470,6 +470,19 @@ How a pod becomes an instance:
 
 with the token in the environment: `MONITORING_Agent__Token=...`.
 
+### More than one agent
+
+One agent per namespace is the default. When a rollout or a lost node must not leave the scope Unknown, run two. They compete for a Kubernetes Lease in the namespace: the holder opens the port for the sidecars and connects to the controllers, and the other waits without doing either. The waiting one is not ready, so the Service sends the sidecars to the holder alone. When the holder stops it gives the lease up and the other takes it at once. When the holder is lost without a word, the other takes over after the lease duration, 15 seconds by default. A holder that cannot renew the lease for that long stops itself, and Kubernetes starts it again as a waiting agent.
+
+The sidecars reconnect to the new holder, so the scope shows what the sidecars have reported again within a few heartbeats. It does not carry over metric history, which each agent keeps in memory.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `Agent:Discovery:Kubernetes:LeaderElection:Enabled` | `false` | Competes for the lease. The chart sets it with `highAvailability.enabled`, which also runs two replicas, adds the readiness probe and lets the role read and change that one lease |
+| `Agent:Discovery:Kubernetes:LeaderElection:LeaseName` | `monitoring-agent` | Name of the Lease |
+| `Agent:Discovery:Kubernetes:LeaderElection:LeaseDuration` | `15s` | How long after its last renewal the lease can be taken over |
+| `Agent:Discovery:Kubernetes:LeaderElection:RenewInterval` | `5s` | How often the holder renews and the others look |
+
 ### Windows services
 
 On a Windows server the agent runs as one process per machine and the machine is the scope; its labels come from `Agent:Labels` in the local configuration file like any other agent. With `Agent:Discovery:Kind` set to `windows` it asks the Service Control Manager every few seconds and shows the services you list, even when the application behind them knows nothing of the monitoring client.

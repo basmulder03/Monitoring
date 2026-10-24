@@ -144,6 +144,11 @@ internal static class AgentComposition
         options.Kubernetes.CaFile = kubernetes.Optional("CaFile");
         options.Kubernetes.MonitoringSidecarContainer = kubernetes.Text("MonitoringSidecarContainer", options.Kubernetes.MonitoringSidecarContainer);
         options.Kubernetes.PodMetrics = kubernetes.Text("PodMetrics", "false").Equals("true", StringComparison.OrdinalIgnoreCase);
+        var election = kubernetes.Section("LeaderElection");
+        options.Kubernetes.LeaderElection.Enabled = election.Text("Enabled", "false").Equals("true", StringComparison.OrdinalIgnoreCase);
+        options.Kubernetes.LeaderElection.LeaseName = election.Text("LeaseName", options.Kubernetes.LeaderElection.LeaseName);
+        options.Kubernetes.LeaderElection.LeaseDuration = election.Duration("LeaseDuration", options.Kubernetes.LeaderElection.LeaseDuration);
+        options.Kubernetes.LeaderElection.RenewInterval = election.Duration("RenewInterval", options.Kubernetes.LeaderElection.RenewInterval);
         options.Kubernetes.ResyncInterval = kubernetes.Duration("ResyncInterval", options.Kubernetes.ResyncInterval);
         options.Kubernetes.RetryMinDelay = kubernetes.Duration("RetryMinDelay", options.Kubernetes.RetryMinDelay);
         options.Kubernetes.RetryMaxDelay = kubernetes.Duration("RetryMaxDelay", options.Kubernetes.RetryMaxDelay);

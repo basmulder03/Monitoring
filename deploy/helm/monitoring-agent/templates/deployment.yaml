@@ -6,10 +6,15 @@ metadata:
   name: {{ include "monitoring-agent.name" . }}
   labels: {{- include "monitoring-agent.labels" . | nindent 4 }}
 spec:
-  # One agent per namespace: after a restart it rebuilds from the pod list, and a second one would report the same scope twice.
+  # One agent serves a namespace: after a restart it rebuilds from the pod list, and a second one would report the same scope twice.
+  # With highAvailability the others only wait for the lease; they open no port and connect to nothing.
+  {{- if .Values.highAvailability.enabled }}
+  replicas: {{ .Values.highAvailability.replicas }}
+  {{- else }}
   replicas: 1
   strategy:
     type: Recreate
+  {{- end }}
   selector:
     matchLabels: {{- include "monitoring-agent.selector" . | nindent 6 }}
   template:
@@ -61,6 +66,12 @@ spec:
             {{- end }}
             - name: MONITORING_Agent__Discovery__Kind
               value: kubernetes
+            {{- if .Values.highAvailability.enabled }}
+            - name: MONITORING_Agent__Discovery__Kubernetes__LeaderElection__Enabled
+              value: "true"
+            - name: MONITORING_Agent__Discovery__Kubernetes__LeaderElection__LeaseName
+              value: {{ include "monitoring-agent.name" . | quote }}
+            {{- end }}
             - name: MONITORING_Agent__Discovery__Kubernetes__MonitoringSidecarContainer
               value: {{ .Values.sidecarContainer | quote }}
             {{- if .Values.podMetrics }}
@@ -98,6 +109,12 @@ spec:
               mountPath: /var/run/monitoring-auth
               readOnly: true
             {{- end }}
+          {{- end }}
+          {{- if .Values.highAvailability.enabled }}
+          # Only the leader listens, so the Service sends the sidecars to the leader alone.
+          readinessProbe:
+            tcpSocket: { port: sidecars }
+            periodSeconds: 3
           {{- end }}
           resources: {{- toYaml .Values.resources | nindent 12 }}
       {{- if or (ne .Values.transport.mode "none") (eq .Values.auth.mode "serviceAccount") }}
