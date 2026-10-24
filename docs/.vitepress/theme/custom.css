@@ -20,3 +20,6 @@
 
 /* The recordings of the dashboard. */
 .vp-doc video { width: 100%; height: auto; border: 1px solid var(--vp-c-divider); border-radius: 8px; }
+
+/* The nightly trend page, embedded. */
+.vp-doc iframe.trend { width: 100%; height: 36rem; border: 1px solid var(--vp-c-divider); border-radius: 8px; }
