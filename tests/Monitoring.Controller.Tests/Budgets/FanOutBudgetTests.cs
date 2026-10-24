@@ -24,6 +24,8 @@ namespace Monitoring.Controller.Tests.Budgets;
 /// itself, so the cost grows with the number of pages. The limits are many times above what was measured, so a shared runner's noise does not fail the build
 /// but a change that makes a page cost an order of magnitude more does. The test prints what it measured.
 /// </summary>
+// Runs alone, like the scale budgets: beside the other tests on a shared runner it took 16 s instead of 0.3 s and starved their threads.
+[Collection("Scale budgets")]
 public class FanOutBudgetTests(ITestOutputHelper output)
 {
     private const int Pages = 200;
