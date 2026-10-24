@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Monitoring.Controller.Tests.Shared;
 using Monitoring.Controller.Features.WebAuth;
 using Shouldly;
 using Xunit;
@@ -132,6 +134,30 @@ public class WebAuthTests
         app.MapGet("/api/overview", () => "data");
         await app.StartAsync(Ct);
         return app.GetTestClient();
+    }
+
+    [Theory]
+    [InlineData("0.0.0.0", false, true)]
+    [InlineData("10.1.2.3", false, true)]
+    [InlineData("127.0.0.1", false, false)]
+    [InlineData("0.0.0.0", true, false)]
+    public async Task A_dashboard_that_anyone_can_reach_without_signing_in_is_warned_about_at_startup(string address, bool authentication, bool warns)
+    {
+        // Arrange
+        var logs = new CapturedLogs();
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.UseTestServer();
+        builder.Logging.AddProvider(logs);
+        builder.Configuration["Controller:Web:Address"] = address;
+        builder.Services.AddWebAuth(o => { if (authentication) { o.Tokens.Add(new WebToken("wall", HashOf("long-secret"))); } });
+        var app = builder.Build();
+
+        // Act
+        app.UseWebAuth();
+
+        // Assert
+        logs.Warnings.Any(w => w.Contains("needs no sign-in")).ShouldBe(warns);
+        await app.DisposeAsync();
     }
 
     [Fact]

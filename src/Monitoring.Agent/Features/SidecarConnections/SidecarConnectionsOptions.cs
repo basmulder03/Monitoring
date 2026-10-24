@@ -14,6 +14,13 @@ public sealed class SidecarConnectionsOptions
     /// <summary>TCP port sidecars connect to; 0 picks a free port, which is only useful in tests.</summary>
     public int Port { get; set; } = 9441;
 
+    /// <summary>
+    /// Whether a sidecar that connects over TCP has to come from the address of the pod it says it is, as the platform reports it. Without it, anything that can reach the
+    /// port can report for any pod by name. It only applies to pods the platform knows an address for, and it needs the addresses of the pods to be what the agent sees, which they are
+    /// unless something in between (a service mesh or a proxy) changes the source address; turn it off then, and restrict who may reach the port instead.
+    /// </summary>
+    public bool VerifyPeerAddress { get; set; } = true;
+
     /// <summary>How long a new connection may stay silent before it must have sent its <c>Hello</c>.</summary>
     public TimeSpan HelloTimeout { get; set; } = TimeSpan.FromSeconds(10);
 

@@ -614,6 +614,8 @@ public class ControllerSessionTests
 
         public void LoseSidecar(string id) => throw new NotSupportedException();
 
+        public InstanceInfo? Find(string id) => null;
+
         public void ForgetReport(string id) => throw new NotSupportedException();
 
         public void Publish() => throw new NotSupportedException();

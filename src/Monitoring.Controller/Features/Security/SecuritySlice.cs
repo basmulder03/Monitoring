@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Monitoring.Controller.Features.Security;
 
@@ -23,6 +25,7 @@ public static class SecuritySlice
         }
 
         services.AddSingleton(options);
+        services.AddSingleton<IHostedService>(provider => new EnrollmentTokenWarning(options, provider.GetRequiredService<ILoggerFactory>().CreateLogger("Monitoring.Controller.Security")));
         if (options.Certificates.Enabled)
         {
             services.AddSingleton<ICertificateIdentity>(new CertificateAgentIdentity(options.Certificates));
@@ -57,5 +60,23 @@ public static class SecuritySlice
         {
             throw new ArgumentException($"The token hash for scope '{entry.ScopeName}' must be 64 hexadecimal characters.", nameof(entry));
         }
+    }
+
+    /// <summary>Warns at startup when a token lets its holder report as any scope, which is the weakest way to let agents in.</summary>
+    private sealed class EnrollmentTokenWarning(SecurityOptions options, ILogger logger) : IHostedService
+    {
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            if (options.AgentTokens.Any(entry => entry.AllowsAnyScope))
+            {
+                logger.LogWarning(
+                    "An enrollment token (scope '*') is configured: anyone who holds it can report as any scope and replace what the dashboard shows for it. " +
+                    "Use one token per scope, or service account or certificate authentication, where you can.");
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

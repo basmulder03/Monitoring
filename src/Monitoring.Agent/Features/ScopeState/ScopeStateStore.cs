@@ -54,6 +54,15 @@ internal sealed class ScopeStateStore(ScopeStateOptions options) : IScopeStateSt
     }
 
     /// <inheritdoc />
+    public InstanceInfo? Find(string id)
+    {
+        lock (_gate)
+        {
+            return _platform.GetValueOrDefault(id);
+        }
+    }
+
+    /// <inheritdoc />
     public void LoseSidecar(string id)
     {
         lock (_gate)

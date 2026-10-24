@@ -20,14 +20,17 @@ internal static partial class SpanSanitizer
         return uri.GetLeftPart(UriPartial.Path).Replace(uri.UserInfo + "@", "", StringComparison.Ordinal);
     }
 
-    /// <summary>Replaces the values in a statement by question marks, so what was asked stays visible but not about whom.</summary>
+    /// <summary>
+    /// Replaces the values in a statement by question marks, so what was asked stays visible but not about whom. String literals in every common form (single or double
+    /// quotes, doubled or backslash-escaped quotes, Postgres dollar quotes), hexadecimal and decimal numbers and comments are taken out; a quote that is never closed takes the
+    /// rest of the statement with it. Double-quoted text is taken out as well, although standard SQL makes it an identifier, because MySQL makes it a value.
+    /// </summary>
     /// <param name="sql">A statement as it was sent to the database.</param>
-    /// <returns>The statement with string and number literals replaced.</returns>
-    public static string Sql(string sql) => Number().Replace(StringLiteral().Replace(sql, "?"), "?");
+    /// <returns>The statement with the literals replaced and the comments removed.</returns>
+    public static string Sql(string sql) => Literal().Replace(sql, match => match.Value.StartsWith("--", StringComparison.Ordinal) || match.Value.StartsWith("/*", StringComparison.Ordinal) ? " " : "?");
 
-    [GeneratedRegex("'(?:[^']|'')*'")]
-    private static partial Regex StringLiteral();
-
-    [GeneratedRegex(@"\b\d+(?:\.\d+)?\b")]
-    private static partial Regex Number();
+    [GeneratedRegex(
+        @"'(?:[^'\\]|''|\\.)*'|""(?:[^""\\]|""""|\\.)*""|\$(\w*)\$.*?\$\1\$|--[^\r\n]*|/\*.*?\*/|(?<![\w$])0[xX][0-9a-fA-F]+\b|(?<![\w$])\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b|'.*|"".*",
+        RegexOptions.Singleline)]
+    private static partial Regex Literal();
 }

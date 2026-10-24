@@ -29,13 +29,13 @@ public class PipeListenerServiceTests
     {
         private readonly PipeListenerService _service;
 
-        public Fixture(IWindowsProcessMap? processes, string? pipe = null)
+        public Fixture(IWindowsProcessMap? processes, string? pipe = null, bool trustAnnounced = true)
         {
             Pipe = pipe ?? $"mon-agent-{Guid.NewGuid():N}";
             Store = new ScopeStateStore(new ScopeStateOptions { ScopeName = "server-1" });
             var options = new SidecarConnectionsOptions { PipeName = Pipe, HeartbeatInterval = TimeSpan.FromSeconds(5) };
             var handler = new SidecarConnectionHandler(Store, new AgentConfiguration(NullLogger<AgentConfiguration>.Instance), options, new FakeTimeProvider(), NullLogger<SidecarConnectionHandler>.Instance);
-            _service = new PipeListenerService(handler, options, NullLogger<PipeListenerService>.Instance, processes);
+            _service = new PipeListenerService(handler, options, NullLogger<PipeListenerService>.Instance, processes, trustAnnounced);
         }
 
         public string Pipe { get; }
@@ -156,6 +156,26 @@ public class PipeListenerServiceTests
         // Assert
         (await ReadAsync(first)).ShouldBeOfType<Config>();
         (await ReadAsync(second)).ShouldBeOfType<Config>();
+    }
+
+    [Fact]
+    public async Task On_windows_an_application_cannot_announce_the_process_id_of_another_process()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Windows says which process opened the pipe; other systems cannot.");
+
+        // Arrange: this test process is the real client, and a service "Billing" runs in another process, 4242
+        var real = Environment.ProcessId;
+        await using var fixture = await new Fixture(new FakeProcesses((real, "Mine"), (4242, "Billing")), trustAnnounced: false).StartAsync();
+        await using var honest = await fixture.ConnectAsync();
+        await using var liar = await fixture.ConnectAsync();
+
+        // Act
+        await FrameCodec.WriteAsync(honest, Hello(real), ct: Ct);
+        await FrameCodec.WriteAsync(liar, Hello(4242), ct: Ct);
+
+        // Assert
+        (await ReadAsync(honest)).ShouldBeOfType<Config>();
+        (await ReadAsync(liar)).ShouldBeNull();
     }
 
     [Fact]

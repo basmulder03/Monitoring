@@ -112,6 +112,7 @@ internal static class AgentComposition
         options.Port = listen.Int("Port", options.Port);
         options.HelloTimeout = sidecars.Duration("HelloTimeout", options.HelloTimeout);
         options.HeartbeatInterval = sidecars.Duration("HeartbeatInterval", options.HeartbeatInterval);
+        options.VerifyPeerAddress = !sidecars.Text("VerifyPeerAddress", "true").Equals("false", StringComparison.OrdinalIgnoreCase);
         options.MissedHeartbeats = sidecars.Int("MissedHeartbeats", options.MissedHeartbeats);
         options.HealthPullInterval = sidecars.Duration("HealthPullInterval", options.HealthPullInterval);
         // On a Windows server the applications connect over a pipe, so no port is opened unless asked for.

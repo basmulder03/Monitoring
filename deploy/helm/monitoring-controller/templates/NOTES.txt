@@ -1,0 +1,5 @@
+{{- if eq .Values.transport.mode "none" }}
+
+WARNING: transport.mode is "none". The token of the agents and everything they report travel in clear text between the agents and the controller.
+That is only acceptable on a network you trust and that traffic cannot leave. Anywhere else set transport.mode to tls (or mtls); see docs/configuration.md.
+{{- end }}

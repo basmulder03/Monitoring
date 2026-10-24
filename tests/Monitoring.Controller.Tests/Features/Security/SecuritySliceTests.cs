@@ -1,4 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Monitoring.Controller.Tests.Shared;
 using Monitoring.Controller.Features.Security;
 using Shouldly;
 using Xunit;
@@ -51,5 +54,27 @@ public class SecuritySliceTests
 
         // Assert
         add.ShouldThrow<ArgumentException>();
+    }
+
+    [Theory]
+    [InlineData("*", true)]
+    [InlineData("shop", false)]
+    public async Task An_enrollment_token_is_warned_about_at_startup_and_a_token_bound_to_a_scope_is_not(string scope, bool warns)
+    {
+        // Arrange
+        var logs = new CapturedLogs();
+        using var provider = new ServiceCollection()
+            .AddLogging(builder => builder.AddProvider(logs))
+            .AddSecurity(o => o.AgentTokens.Add(new AgentTokenEntry(scope, AgentTokenHash.Compute("t"))))
+            .BuildServiceProvider();
+
+        // Act
+        foreach (var service in provider.GetServices<IHostedService>())
+        {
+            await service.StartAsync(TestContext.Current.CancellationToken);
+        }
+
+        // Assert
+        logs.Warnings.Any(w => w.Contains("enrollment token")).ShouldBe(warns);
     }
 }

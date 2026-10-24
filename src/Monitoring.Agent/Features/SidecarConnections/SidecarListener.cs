@@ -15,7 +15,7 @@ internal sealed class SidecarListener : ISidecarListener
     /// <param name="logger">Receives listener and connection faults.</param>
     public SidecarListener(SidecarConnectionHandler handler, SidecarConnectionsOptions options, ILogger<SidecarListener> logger)
     {
-        _listener = new TcpConnectionListener(IPAddress.Parse(options.ListenAddress), options.Port, handler.HandleAsync, "sidecars", logger);
+        _listener = new TcpConnectionListener(IPAddress.Parse(options.ListenAddress), options.Port, (stream, peer, ct) => handler.HandlePeerAsync(stream, peer, ct), "sidecars", logger);
     }
 
     /// <inheritdoc />

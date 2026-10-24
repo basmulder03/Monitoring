@@ -1,5 +1,5 @@
 suite: the agent
-templates: [templates/deployment.yaml, templates/serviceaccount.yaml]
+templates: [templates/deployment.yaml, templates/serviceaccount.yaml, templates/networkpolicy.yaml]
 set:
   controller.addresses: ["controller:9440"]
   token.existingSecret: agent-token
@@ -95,6 +95,37 @@ tests:
     set: { transport.mode: tls }
     asserts:
       - failedTemplate: { errorPattern: "transport.existingSecret is needed" }
+
+  - it: lets only the pods of its own namespace reach the port of the sidecars
+    template: templates/networkpolicy.yaml
+    asserts:
+      - isKind: { of: NetworkPolicy }
+      - equal: { path: spec.policyTypes, value: [Ingress] }
+      - equal: { path: "spec.ingress[0].from[0]", value: { podSelector: {} } }
+      - equal: { path: "spec.ingress[0].ports[0].port", value: sidecars }
+
+  - it: adds the sources it is given, and can be left out
+    template: templates/networkpolicy.yaml
+    set: { networkPolicy: { extraFrom: [{ namespaceSelector: { matchLabels: { name: tools } } }] } }
+    asserts:
+      - equal: { path: "spec.ingress[0].from[1].namespaceSelector.matchLabels.name", value: tools }
+
+  - it: renders no network policy when it is turned off
+    template: templates/networkpolicy.yaml
+    set: { networkPolicy: { enabled: false } }
+    asserts:
+      - hasDocuments: { count: 0 }
+
+  - it: checks the address of the sidecars unless told not to
+    template: templates/deployment.yaml
+    asserts:
+      - notExists: { path: "spec.template.spec.containers[0].env[?(@.name=='MONITORING_Agent__Sidecars__VerifyPeerAddress')]" }
+
+  - it: can turn the check of the address of the sidecars off
+    template: templates/deployment.yaml
+    set: { sidecars: { verifyPeerAddress: false } }
+    asserts:
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Agent__Sidecars__VerifyPeerAddress, value: "false" } }
 
   - it: matches the snapshot of its default render
     asserts:

@@ -284,7 +284,23 @@ public class PodMapperTests
             ["team"] = "payments",
             ["k8s.node"] = "node-3",
             ["k8s.pod-ip"] = "10.1.2.3",
+            ["k8s.pod-ips"] = "10.1.2.3",
         });
+    }
+
+    [Fact]
+    public void Map_lists_every_address_of_a_dual_stack_pod_once()
+    {
+        // Arrange
+        var pod = new PodBuilder().WithIp("10.1.2.3").Build();
+        pod = pod with { Status = pod.Status! with { PodIPs = [new PodIPAddress("10.1.2.3"), new PodIPAddress("fd00::3")] } };
+
+        // Act
+        var instance = PodMapper.Map(pod);
+
+        // Assert
+        instance!.Labels["k8s.pod-ips"].ShouldBe("10.1.2.3,fd00::3");
+        instance.Labels["k8s.pod-ip"].ShouldBe("10.1.2.3");
     }
 
     [Fact]

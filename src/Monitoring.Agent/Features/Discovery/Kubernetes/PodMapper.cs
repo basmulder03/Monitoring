@@ -185,6 +185,13 @@ internal static class PodMapper
             labels["k8s.pod-ip"] = ip;
         }
 
+        // All of them, so a sidecar that connects over the other address family of a dual-stack pod is still recognised as the pod.
+        var podAddresses = (pod.Status?.PodIPs ?? []).Select(a => a.Ip).Concat([pod.Status?.PodIP]).OfType<string>().Where(a => a.Length > 0).Distinct(StringComparer.Ordinal).ToList();
+        if (podAddresses.Count > 0)
+        {
+            labels["k8s.pod-ips"] = string.Join(',', podAddresses);
+        }
+
         var selecting = (services ?? []).Where(service => Selects(service, labels) && service.Metadata?.Name is { Length: > 0 }).ToList();
         if (selecting.Count > 0)
         {

@@ -7,17 +7,28 @@ namespace Monitoring.Common;
 /// <summary>A TCP accept loop: binds an address and hands each accepted connection to a handler until stopped.</summary>
 /// <param name="address">The IP address to listen on.</param>
 /// <param name="port">The port to listen on; 0 picks a free port.</param>
-/// <param name="handle">Serves one connection; the connection is closed when it returns.</param>
+/// <param name="handle">Serves one connection and is told who connected; the connection is closed when it returns.</param>
 /// <param name="what">Names the kind of connection for log messages, such as "agents".</param>
 /// <param name="logger">Receives the address that is listened on and connection faults.</param>
 public sealed class TcpConnectionListener(
     IPAddress address,
     int port,
-    Func<Stream, CancellationToken, Task> handle,
+    Func<Stream, EndPoint?, CancellationToken, Task> handle,
     string what,
     ILogger logger)
 {
     private TcpListener? _listener;
+
+    /// <summary>Creates a listener whose handler does not need to know who connected.</summary>
+    /// <param name="address">The IP address to listen on.</param>
+    /// <param name="port">The port to listen on; 0 picks a free port.</param>
+    /// <param name="handle">Serves one connection; the connection is closed when it returns.</param>
+    /// <param name="what">Names the kind of connection for log messages, such as "agents".</param>
+    /// <param name="logger">Receives the address that is listened on and connection faults.</param>
+    public TcpConnectionListener(IPAddress address, int port, Func<Stream, CancellationToken, Task> handle, string what, ILogger logger)
+        : this(address, port, (stream, _, ct) => handle(stream, ct), what, logger)
+    {
+    }
 
     /// <summary>The address and port the listener is bound to, or <see langword="null"/> before <see cref="Start"/>.</summary>
     public IPEndPoint? LocalEndPoint => (IPEndPoint?)_listener?.LocalEndpoint;
@@ -78,7 +89,7 @@ public sealed class TcpConnectionListener(
         {
             try
             {
-                await handle(client.GetStream(), ct).ConfigureAwait(false);
+                await handle(client.GetStream(), client.Client.RemoteEndPoint, ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {

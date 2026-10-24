@@ -40,7 +40,7 @@ Put `monitoring.json` next to the program. A service starts in the system folder
 }
 ```
 
-`Pipe:Allow` lists the accounts the monitored applications run as. Without it only the system, the administrators, the agent's own account and the built-in Local Service and Network Service accounts can use the pipe, so another user on the server cannot report as one of your applications.
+`Pipe:Allow` lists the accounts the monitored applications run as. Without it only the system, the administrators, the agent's own account and the built-in Local Service and Network Service accounts can use the pipe, so a user who is not one of these cannot report as one of your applications. The accounts that are let in trust each other: the agent goes by the process id an application announces and does not check it against the process that opened the pipe, so give each monitored application an account of its own and keep the list short.
 
 ## Installing
 
@@ -50,7 +50,9 @@ By hand, from an elevated PowerShell:
 .\install-agent.ps1 -Path C:\MonitoringAgent
 ```
 
-It installs the service `MonitoringAgent`, set to start with the machine and to be restarted when it stops (after 5 seconds, again after 5, then after 30), and starts it. Running it again replaces the service, which is how an upgrade of the program or the configuration takes effect. `-Uninstall` removes it and `-Account 'DOMAIN\svc-monitoring'` runs it as another account, asking for the password.
+It installs the service `MonitoringAgent`, set to start with the machine and to be restarted when it stops (after 5 seconds, again after 5, then after 30), and starts it. Running it again replaces the service, which is how an upgrade of the program or the configuration takes effect. `-Uninstall` removes it. `-Account 'DOMAIN\svc-monitoring'` runs it as another account and asks for the password; a service account without a password, such as `-Account 'NT SERVICE\MonitoringAgent'`, needs no prompt. Without `-Account` the service runs as SYSTEM.
+
+The installation also locks the folder down: only SYSTEM and the administrators can change or read it (the `-Account` account can read and run it). The folder holds the program that runs with those rights and the token of the agent, so a folder that other users can write to would let them run code as SYSTEM and read the token. Check the same when you install by hand in a folder of your own.
 
 With Ansible, `deploy/windows/ansible/install-agent.yml` copies the program and the scripts, writes `monitoring.json` from variables and runs the installation:
 
@@ -60,6 +62,8 @@ ansible-playbook -i inventory.ini deploy/windows/ansible/install-agent.yml \
   -e '{"agent_services": ["OrdersApi", "OrdersWorker"], "agent_labels": {"environment": "prod"}}' \
   -e @secrets.yml     # holds agent_token, in a vault
 ```
+
+A controller outside a network you trust needs `agent_transport_mode: tls` (or `mtls`) and `agent_ca_src`, the authority that signed its certificate; the playbook copies it to the server and says so when the mode is `none`, because then the token and everything the agent reports travel in clear text. `agent_server_name` is the name in the certificate when it differs from the host of `controller_address`, `agent_cert_src` and `agent_key_src` are for `mtls`, and `agent_account` is passed to the installer, where only an account without a password works, because Ansible cannot answer a prompt.
 
 The playbook needs the collections `ansible.windows` and a working WinRM connection to the hosts, which is yours to set up. It has passed Ansible's syntax check, but it has not been run against a Windows host; the script it runs has been tested on Windows 11.
 

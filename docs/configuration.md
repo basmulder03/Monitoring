@@ -105,7 +105,7 @@ Layers, the most specific winning: the built-in defaults, then `defaults`, then 
 
 ### Who may see the dashboard
 
-With nothing set the dashboard and its API are open, as before: keep them on a network you trust. Two settings turn on authentication, and either one is enough; every request must then prove who it sends it, except `GET /healthz`, which the platform's probes use and which says only `ok`.
+With nothing set the dashboard and its API are open: anyone who can reach the address sees every service, package, vulnerability and dependency. The controller says so in its log at startup, unless it listens on a loopback address only. Keep it on a network you trust until you turn authentication on. Two settings turn on authentication, and either one is enough; every request must then prove who it sends it, except `GET /healthz`, which the platform's probes use and which says only `ok`.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -499,7 +499,8 @@ The sidecar next to each application connects to the agent, registers its applic
 | --- | --- | --- |
 | `Agent:Sidecars:Enabled` | `true` for Kubernetes, else `false` | Whether the agent listens for sidecars |
 | `Agent:Sidecars:Listen:Address` | `0.0.0.0` | IP address sidecars connect to |
-| `Agent:Sidecars:Listen:Port` | `9441` | TCP port sidecars connect to. Plain TCP: keep it inside the namespace, for example behind a Service no one outside can reach |
+| `Agent:Sidecars:Listen:Port` | `9441` | TCP port sidecars connect to. Plain TCP: keep it inside the namespace. The agent chart ships a network policy that only lets the pods of the namespace reach it (`networkPolicy.enabled`, needs a network plugin that enforces policies) |
+| `Agent:Sidecars:VerifyPeerAddress` | `true` | A sidecar has to connect from an address of the pod it says it is, as the Kubernetes watch reports it (both addresses of a dual-stack pod count). A pod the agent does not know, or knows no address for, cannot be checked and is let in. Turn it off (`sidecars.verifyPeerAddress=false` in the chart) only when a service mesh or proxy changes the source address, and restrict who may reach the port instead |
 | `Agent:Sidecars:HelloTimeout` | `00:00:10` | How long a new connection may stay silent before it must say hello |
 | `Agent:Sidecars:HeartbeatInterval` | `00:00:05` | How often sidecars are told to send a heartbeat |
 | `Agent:Sidecars:MissedHeartbeats` | `3` | How many heartbeats in a row may be missing before the sidecar counts as gone and its connection is closed |

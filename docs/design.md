@@ -225,7 +225,7 @@ One message set is used on every hop, serialized as JSON with System.Text.Json s
 ### Security
 
 - Agent to controller: transport security and authentication are separate, pluggable settings (see below).
-- In-cluster local hops are plain; they never leave the pod or namespace.
+- In-cluster local hops are plain; they never leave the pod or namespace. The sidecar port of the agent is protected by where it can be reached from: the agent chart ships a network policy for the namespace, and the agent checks that a sidecar connects from the address of the pod it says it is. On Windows the pipe is limited to named accounts and the agent checks the process id of the client that opened it.
 - The web UI can be put behind authentication: a reverse proxy that signs people in (its headers are believed only from configured proxy addresses), and long-lived tokens for scripts and wall displays, with the roles viewer and operator. With authentication off, the UI is meant for an internal network only. The settings are under `Controller:Web:Auth` in the [configuration](configuration).
 
 ### Transport security and authentication

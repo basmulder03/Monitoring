@@ -16,8 +16,9 @@ namespace Monitoring.Agent.Features.SidecarConnections;
 /// <param name="options">The name of the pipe and who may use it.</param>
 /// <param name="processes">Matches a process with the service that runs in it; without it an application is taken at its word.</param>
 /// <param name="logger">Receives faults.</param>
+/// <param name="trustAnnouncedProcess">For tests with made-up process ids: believe the process id in the hello even on Windows, where it is otherwise compared with the process that opened the pipe.</param>
 internal sealed class PipeListenerService(
-    SidecarConnectionHandler handler, SidecarConnectionsOptions options, ILogger<PipeListenerService> logger, IWindowsProcessMap? processes = null) : BackgroundService
+    SidecarConnectionHandler handler, SidecarConnectionsOptions options, ILogger<PipeListenerService> logger, IWindowsProcessMap? processes = null, bool trustAnnouncedProcess = false) : BackgroundService
 {
     /// <summary>The label in which an application tells its process id.</summary>
     public const string ProcessIdLabel = "process.id";
@@ -108,7 +109,9 @@ internal sealed class PipeListenerService(
         {
             try
             {
-                await handler.HandleAsync(server, Admit, ct).ConfigureAwait(false);
+                // Asked now, while the client is connected: Windows says which process opened this end of the pipe.
+                var clientProcessId = OperatingSystem.IsWindows() ? NamedPipeClient.ProcessIdOf(server) : null;
+                await handler.HandleAsync(server, hello => Admit(hello, clientProcessId), ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -121,16 +124,28 @@ internal sealed class PipeListenerService(
         }
     }
 
-    /// <summary>Goes by the instance of the service that runs in the process the application names. The process id is the one the application announces: it is not compared with the process that opened the pipe, so the accounts the pipe lets in have to trust each other.</summary>
-    private Hello? Admit(Hello hello)
+    /// <summary>
+    /// Goes by the instance of the service that runs in the process the application names. On Windows the process id in the hello has to be the one of the process that
+    /// opened the pipe, which the machine says; otherwise any account the pipe lets in could announce the id of another service and report in its place.
+    /// </summary>
+    private Hello? Admit(Hello hello, int? clientProcessId)
     {
         if (processes is null)
         {
             return hello;
         }
 
-        return hello.Labels.TryGetValue(ProcessIdLabel, out var text) && int.TryParse(text, out var processId) && processes.InstanceOfProcess(processId) is { } instance
-            ? hello with { InstanceId = instance }
-            : null;
+        if (!hello.Labels.TryGetValue(ProcessIdLabel, out var text) || !int.TryParse(text, out var announced))
+        {
+            return null;
+        }
+
+        if (OperatingSystem.IsWindows() && !trustAnnouncedProcess && clientProcessId != announced)
+        {
+            logger.LogWarning("An application on the pipe announced process {Announced}, but the pipe was opened by process {Actual}; it is turned away", announced, clientProcessId?.ToString() ?? "unknown");
+            return null;
+        }
+
+        return processes.InstanceOfProcess(announced) is { } instance ? hello with { InstanceId = instance } : null;
     }
 }

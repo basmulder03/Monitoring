@@ -46,6 +46,14 @@ public static class WebAuthSlice
         var authenticator = app.Services.GetRequiredService<WebAuthenticator>();
         var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Monitoring.Controller.WebAuth");
 
+        // The dashboard shows every service, package, vulnerability and dependency, so say so when anyone who can reach it can see that.
+        if (!authenticator.Enabled && !(System.Net.IPAddress.TryParse(app.Configuration["Controller:Web:Address"], out var listening) && System.Net.IPAddress.IsLoopback(listening)))
+        {
+            logger.LogWarning(
+                "The dashboard needs no sign-in: anyone who can reach it sees every service, package, vulnerability and dependency. " +
+                "Turn on Controller:Web:Auth (a trusted proxy or tokens), and keep it on a network you trust until then.");
+        }
+
         app.Use(async (context, next) =>
         {
             if (!authenticator.Enabled || context.Request.Path == "/healthz")

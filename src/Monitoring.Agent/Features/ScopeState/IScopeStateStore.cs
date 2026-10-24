@@ -43,6 +43,11 @@ public interface IScopeStateStore
     /// <param name="id">Id of the instance.</param>
     void LoseSidecar(string id);
 
+    /// <summary>Looks up an instance as the platform (the Kubernetes watch or the Service Control Manager) reports it, without what applications say about themselves.</summary>
+    /// <param name="id">The instance id.</param>
+    /// <returns>The instance, or <see langword="null"/> when the platform does not know it (yet).</returns>
+    InstanceInfo? Find(string id);
+
     /// <summary>Forgets what the application of an instance reported, for example when its sidecar said goodbye on purpose.</summary>
     /// <param name="id">Id of the instance.</param>
     void ForgetReport(string id);

@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Monitoring.Agent.Features.Configuration;
@@ -533,6 +534,76 @@ public class SidecarConnectionHandlerTests
         fixture.Store.CreateSnapshot().Instances.Single().Health.ShouldBe(HealthState.Degraded);
     }
 
+
+    private static IPEndPoint From(string address) => new(IPAddress.Parse(address), 40000);
+
+    [Theory]
+    [InlineData("10.0.0.5")]
+    [InlineData("fd00::5")]
+    [InlineData("::ffff:10.0.0.5")]
+    public async Task A_sidecar_that_connects_from_an_address_of_its_pod_is_let_in(string peer)
+    {
+        // Arrange: a pod with both an IPv4 and an IPv6 address; an IPv4 peer may also arrive as an IPv4-mapped IPv6 address
+        var session = new HandlerFixture().WithPod("pod-1", "10.0.0.5,fd00::5").Build(From(peer));
+
+        // Act
+        await session.SendAsync(HandlerFixture.Hello("pod-1"));
+        var reply = await session.ReceiveAsync();
+
+        // Assert
+        reply.ShouldBeOfType<Config>();
+    }
+
+    [Fact]
+    public async Task A_sidecar_that_connects_from_another_address_than_the_pod_it_names_is_turned_away()
+    {
+        // Arrange
+        var session = new HandlerFixture().WithPod("pod-1", "10.0.0.5").Build(From("10.0.0.99"));
+
+        // Act
+        await session.SendAsync(HandlerFixture.Hello("pod-1"));
+        var reply = await session.ReceiveAsync();
+
+        // Assert
+        reply.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData(false, "10.0.0.99")]
+    [InlineData(true, "10.0.0.99")]
+    public async Task A_pod_that_is_unknown_or_has_no_address_cannot_be_checked_and_is_let_in(bool known, string peer)
+    {
+        // Arrange
+        var fixture = new HandlerFixture();
+        if (known)
+        {
+            fixture.WithPod("pod-1", null);
+        }
+
+        var session = fixture.Build(From(peer));
+
+        // Act
+        await session.SendAsync(HandlerFixture.Hello("pod-1"));
+        var reply = await session.ReceiveAsync();
+
+        // Assert
+        reply.ShouldBeOfType<Config>();
+    }
+
+    [Fact]
+    public async Task The_check_of_the_address_can_be_turned_off()
+    {
+        // Arrange
+        var session = new HandlerFixture().WithoutPeerCheck().WithPod("pod-1", "10.0.0.5").Build(From("10.0.0.99"));
+
+        // Act
+        await session.SendAsync(HandlerFixture.Hello("pod-1"));
+        var reply = await session.ReceiveAsync();
+
+        // Assert
+        reply.ShouldBeOfType<Config>();
+    }
+
     private sealed class HandlerFixture
     {
         private readonly SidecarConnectionsOptions _options = new();
@@ -564,6 +635,20 @@ public class SidecarConnectionHandlerTests
             return this;
         }
 
+        public HandlerFixture WithoutPeerCheck()
+        {
+            _options.VerifyPeerAddress = false;
+            return this;
+        }
+
+        /// <summary>A pod the platform knows about, with the addresses it has.</summary>
+        public HandlerFixture WithPod(string id, string? addresses)
+        {
+            Store.Upsert(new InstanceInfo(id, "orders", InstanceLifecycle.Running, HealthState.Healthy,
+                addresses is null ? new Dictionary<string, string>() : new Dictionary<string, string> { ["k8s.pod-ips"] = addresses }));
+            return this;
+        }
+
         /// <summary>An instance the platform knows about, so reports about it have something to add to.</summary>
         public HandlerFixture WithInstance(string id)
         {
@@ -577,22 +662,22 @@ public class SidecarConnectionHandlerTests
         /// <summary>Starts the handler on the server end of a new connection and returns the sidecar's end. May be called again for another connection.</summary>
         public IMetricsHistory History { get; } = new RingMetricsHistory(new MetricsHistoryOptions());
 
-        public Session Build()
+        public Session Build(EndPoint? peer = null)
         {
             // One handler for all connections, as in the agent, so a reconnect can be told from the old connection.
             _handler ??= new SidecarConnectionHandler(Store, Configuration, _options, Clock, NullLogger<SidecarConnectionHandler>.Instance, history: History);
             var (server, client) = DuplexStream.CreatePair();
             var shutdown = new CancellationTokenSource();
-            var handling = ServeAsync(_handler, server, shutdown.Token);
+            var handling = ServeAsync(_handler, server, peer, shutdown.Token);
             return new Session(client, handling, shutdown);
         }
 
         /// <summary>Closes the server end when handling ends, as the listener does when it disposes the socket.</summary>
-        private static async Task ServeAsync(SidecarConnectionHandler handler, DuplexStream server, CancellationToken ct)
+        private static async Task ServeAsync(SidecarConnectionHandler handler, DuplexStream server, EndPoint? peer, CancellationToken ct)
         {
             try
             {
-                await handler.HandleAsync(server, ct);
+                await (peer is null ? handler.HandleAsync(server, ct) : handler.HandlePeerAsync(server, peer, ct));
             }
             finally
             {

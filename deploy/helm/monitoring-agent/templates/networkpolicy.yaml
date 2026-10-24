@@ -1,0 +1,21 @@
+{{- if .Values.networkPolicy.enabled }}
+# Only the pods of this namespace may connect to the agent. The sidecars are in this namespace and the agent only listens for them.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "monitoring-agent.name" . }}
+  labels: {{- include "monitoring-agent.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "monitoring-agent.selector" . | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: sidecars
+      from:
+        - podSelector: {}
+        {{- with .Values.networkPolicy.extraFrom }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+{{- end }}

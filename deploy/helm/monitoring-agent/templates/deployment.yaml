@@ -55,6 +55,10 @@ spec:
             - name: MONITORING_Agent__Labels__{{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+            {{- if not .Values.sidecars.verifyPeerAddress }}
+            - name: MONITORING_Agent__Sidecars__VerifyPeerAddress
+              value: "false"
+            {{- end }}
             - name: MONITORING_Agent__Discovery__Kind
               value: kubernetes
             - name: MONITORING_Agent__Discovery__Kubernetes__MonitoringSidecarContainer

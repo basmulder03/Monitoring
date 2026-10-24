@@ -40,6 +40,17 @@ podMetrics: false
 service:
   port: 9441         # where the sidecars connect
 
+# Who may reach the port of the sidecars. The sidecars of the namespace dial it in plain text and the agent believes which pod they say they are,
+# so only the pods of the namespace may reach it. This needs a network plugin that enforces network policies, and does nothing without one.
+networkPolicy:
+  enabled: true
+  extraFrom: []      # more sources, as in the "from" of a network policy, for example [{ namespaceSelector: { matchLabels: { name: tools } } }]
+
+# The agent checks that a sidecar connects from the address of the pod it says it is. Turn it off only when something in between (a service mesh,
+# a proxy) changes the source address of the connection, and restrict who may reach the port with networkPolicy instead.
+sidecars:
+  verifyPeerAddress: true
+
 resources:
   requests: { cpu: 25m, memory: 32Mi }
   limits: { memory: 128Mi }

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Monitoring.Agent.Features.Configuration;
@@ -43,6 +44,41 @@ internal sealed class SidecarConnectionHandler(
     /// <param name="ct">Ends the connection when the agent shuts down.</param>
     /// <returns>A task that completes when the connection has ended; it does not throw for connection problems.</returns>
     public Task HandleAsync(Stream stream, CancellationToken ct) => HandleAsync(stream, null, ct);
+
+    /// <summary>Serves a connection from a sidecar over TCP, once it has been checked that it comes from the pod it says it is.</summary>
+    /// <param name="stream">The connection to the sidecar.</param>
+    /// <param name="peer">The address the connection comes from.</param>
+    /// <param name="ct">Ends the connection when the agent shuts down.</param>
+    /// <returns>A task that completes when the connection has ended; it does not throw for connection problems.</returns>
+    public Task HandlePeerAsync(Stream stream, EndPoint? peer, CancellationToken ct) => HandleAsync(stream, hello => AdmitPeer(hello, peer), ct);
+
+    /// <summary>
+    /// Lets a hello through when its sender connects from an address of the pod it names. The platform view holds the addresses of the pods it watches; a pod it does not know,
+    /// or knows no address for, cannot be checked and is let through, because what it reports only attaches to instances the platform reports anyway.
+    /// </summary>
+    private Hello? AdmitPeer(Hello hello, EndPoint? peer)
+    {
+        if (!options.VerifyPeerAddress || peer is not IPEndPoint remote || store.Find(hello.InstanceId) is not { } pod)
+        {
+            return hello;
+        }
+
+        var known = (pod.Labels.GetValueOrDefault("k8s.pod-ips") ?? pod.Labels.GetValueOrDefault("k8s.pod-ip") ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(text => IPAddress.TryParse(text, out var address) ? address : null)
+            .OfType<IPAddress>()
+            .ToList();
+        var from = remote.Address.IsIPv4MappedToIPv6 ? remote.Address.MapToIPv4() : remote.Address;
+        if (known.Count == 0 || known.Contains(from))
+        {
+            return hello;
+        }
+
+        logger.LogWarning(
+            "Refusing the sidecar of instance '{Instance}': it connects from {From}, which is not an address of that pod. If a proxy or service mesh changes the source address, set Agent:Sidecars:VerifyPeerAddress to false.",
+            hello.InstanceId, from);
+        return null;
+    }
 
     /// <summary>Serves the connection like <see cref="HandleAsync(Stream, CancellationToken)"/>, but lets the caller decide who the sender is once it has introduced itself.</summary>
     /// <param name="stream">The connection to the sidecar.</param>

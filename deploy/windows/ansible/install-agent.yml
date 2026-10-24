@@ -4,6 +4,8 @@
 #     -e agent_build=published/Agent -e controller_address=monitoring.example.com:443 -e @secrets.yml
 #
 # secrets.yml (keep it in a vault) holds agent_token. Variables you will want to set per environment are in vars below.
+# A controller that is not on a network you trust needs agent_transport_mode: tls (or mtls) with the authority that signed its certificate, as agent_ca_src.
+# Without it the token and everything the agent reports travel in clear text, and the playbook says so.
 - name: Install the monitoring agent
   hosts: windows_servers
   gather_facts: false
@@ -15,13 +17,30 @@
     agent_labels: {}                        # for example { environment: prod, datacenter: a }
     agent_services: []                      # the Windows services to report, exact names or a prefix ending in *
     agent_pipe_allow: []                    # the accounts the monitored applications run as, for example ['NT SERVICE\billing']
+    agent_transport_mode: none              # none, tls or mtls; use tls or mtls for any controller outside a network you trust
+    agent_ca_src: ""                        # tls and mtls: the authority (PEM) that signed the certificate of the controller, a file on the machine that runs Ansible
+    agent_server_name: ""                   # the name in the certificate of the controller when it is not the host of controller_address
+    agent_cert_src: ""                      # mtls: the certificate of this agent (PEM) and its key, files on the machine that runs Ansible
+    agent_key_src: ""
+    agent_account: ""                       # the account the service runs as; empty is SYSTEM; 'NT SERVICE\MonitoringAgent' needs no password
   tasks:
     - name: Check what is needed
       ansible.builtin.assert:
         that:
           - controller_address | length > 0
           - agent_token is defined
-        fail_msg: Give controller_address and agent_token.
+          - agent_transport_mode in ['none', 'tls', 'mtls']
+          - agent_transport_mode == 'none' or agent_ca_src | length > 0
+          - agent_transport_mode != 'mtls' or (agent_cert_src | length > 0 and agent_key_src | length > 0)
+        fail_msg: >-
+          Give controller_address and agent_token. With agent_transport_mode tls or mtls also give agent_ca_src, and with mtls agent_cert_src and agent_key_src.
+
+    - name: Warn about clear text
+      ansible.builtin.debug:
+        msg: >-
+          agent_transport_mode is none, so the token and everything this agent reports travel in clear text. That is only acceptable on a network you trust;
+          otherwise set agent_transport_mode to tls.
+      when: agent_transport_mode == 'none'
 
     - name: Create the folder
       ansible.windows.win_file:
@@ -36,18 +55,43 @@
         - { src: "{{ agent_build }}/", dest: "" }
         - { src: "{{ playbook_dir }}/../install-agent.ps1", dest: "install-agent.ps1" }
 
+    # Only the system and the administrators may read this folder, which install-agent.ps1 sees to; the files are copied before it runs.
+    - name: Create the folder for the certificates
+      ansible.windows.win_file:
+        path: "{{ agent_dir }}\\tls"
+        state: directory
+      when: agent_transport_mode != 'none'
+
+    - name: Copy the certificates
+      ansible.windows.win_copy:
+        src: "{{ item.src }}"
+        dest: "{{ agent_dir }}\\tls\\{{ item.dest }}"
+      loop:
+        - { src: "{{ agent_ca_src }}", dest: ca.pem }
+        - { src: "{{ agent_cert_src }}", dest: agent.pem }
+        - { src: "{{ agent_key_src }}", dest: agent.key }
+      when: agent_transport_mode != 'none' and item.src | length > 0
+      loop_control:
+        label: "{{ item.dest }}"
+
     # The agent reads this file from the folder of the program, because a service starts in the system folder.
     - name: Write the configuration
       ansible.windows.win_copy:
         dest: "{{ agent_dir }}\\monitoring.json"
         content: "{{ config | to_nice_json }}"
       vars:
+        transport: >-
+          {{ {'Mode': agent_transport_mode}
+             | combine({'CaFile': agent_dir ~ '\\tls\\ca.pem'} if agent_transport_mode != 'none' else {})
+             | combine({'ServerName': agent_server_name} if agent_server_name | length > 0 else {})
+             | combine({'Certificate': agent_dir ~ '\\tls\\agent.pem', 'Key': agent_dir ~ '\\tls\\agent.key'} if agent_transport_mode == 'mtls' else {}) }}
         config:
           Agent:
             ScopeName: "{{ agent_scope_name }}"
             Token: "{{ agent_token }}"
             Controllers: ["{{ controller_address }}"]
             Labels: "{{ agent_labels }}"
+            Transport: "{{ transport }}"
             Discovery:
               Kind: windows
               Windows:
@@ -62,5 +106,5 @@
     - name: Install and start the service
       ansible.windows.win_powershell:
         script: |
-          & '{{ agent_dir }}\install-agent.ps1' -Path '{{ agent_dir }}'
+          & '{{ agent_dir }}\install-agent.ps1' -Path '{{ agent_dir }}' {{ ("-Account '" ~ agent_account ~ "'") if agent_account | length > 0 else "" }}
       changed_when: true
