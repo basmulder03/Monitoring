@@ -2,7 +2,7 @@
 
 A small, stateless, Native AOT monitoring system for .NET 10 workloads on Kubernetes and Windows. One live dashboard shows the health, metrics and (soon) service dependencies of every namespace or server, across environments and data centers, with alerting, and without a service mesh, a Prometheus stack or a database.
 
-> **Status: early development.** The pieces below work end to end and are tested, but the project is not released yet. See the [roadmap](https://github.com/basmulder03/MonitoringAgent/issues/61) for what is built and what is next.
+> **Status: early development.** The pieces below work end to end and are tested, but the project is not released yet. See the [roadmap](https://github.com/basmulder03/Monitoring/issues/61) for what is built and what is next.
 
 ## How it fits together
 

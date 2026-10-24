@@ -21,7 +21,7 @@ Every change comes with tests, and `dotnet test` must pass at every commit.
 
 ## Work items
 
-Planned work is tracked as issues, one per slice, listed in the [roadmap](https://github.com/basmulder03/MonitoringAgent/issues/61). Say on the issue when you pick one up.
+Planned work is tracked as issues, one per slice, listed in the [roadmap](https://github.com/basmulder03/Monitoring/issues/61). Say on the issue when you pick one up.
 
 ## License
 
