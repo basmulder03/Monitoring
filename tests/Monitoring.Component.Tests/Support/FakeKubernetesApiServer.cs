@@ -57,10 +57,11 @@ internal sealed class FakeKubernetesApiServer : IAsyncDisposable
     /// <param name="name">Pod name.</param>
     /// <param name="ready">Whether the pod is running and ready.</param>
     /// <returns>This server, for chaining.</returns>
-    public FakeKubernetesApiServer WithPod(string name, bool ready = true)
+    public FakeKubernetesApiServer WithPod(string name, bool ready = true, string ip = LoopbackIp)
     {
         lock (_gate)
         {
+            _ips[name] = ip;
             _pods.Add(PodJson(name, ready));
         }
 
@@ -91,7 +92,12 @@ internal sealed class FakeKubernetesApiServer : IAsyncDisposable
         }
     }
 
-    private static string PodJson(string name, bool ready) =>
+    /// <summary>The sidecars of the tests connect from the loopback address, so that is the address the pods have unless a test says another.</summary>
+    private const string LoopbackIp = "127.0.0.1";
+
+    private readonly Dictionary<string, string> _ips = [];
+
+    private string PodJson(string name, bool ready) =>
         JsonSerializer.Serialize(new
         {
             metadata = new
@@ -105,7 +111,7 @@ internal sealed class FakeKubernetesApiServer : IAsyncDisposable
             status = new
             {
                 phase = "Running",
-                podIP = "10.1.0.5",
+                podIP = _ips.GetValueOrDefault(name, LoopbackIp),
                 conditions = new[] { new { type = "Ready", status = ready ? "True" : "False" } },
                 containerStatuses = new[] { new { name = "app", ready, restartCount = 0, state = new { running = new { } } } },
             },

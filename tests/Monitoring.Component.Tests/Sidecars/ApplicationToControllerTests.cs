@@ -74,6 +74,35 @@ public class ApplicationToControllerTests
     }
 
     [Fact]
+    public async Task A_sidecar_that_connects_from_another_address_than_its_pod_has_is_not_believed()
+    {
+        // Arrange: the platform says the pod has another address than the one the sidecar connects from
+        await using var cluster = new FakeKubernetesApiServer().WithPod("orders-1", ip: "10.9.9.9").Start();
+        await using var controller = new ControllerHost().AcceptingEnrollment(Token).WithCentralConfiguration(FastPulls).Start();
+        await using var agent = new AgentHost("shop", Token).ConnectingTo(controller).DiscoveringIn(cluster).Start();
+
+        // Act
+        await using var application = new ApplicationHost("orders-1").WithCheck("database", HealthStatus.Unhealthy).Start(agent);
+        await Task.Delay(TimeSpan.FromSeconds(4), TestContext.Current.CancellationToken);
+
+        // Assert: the pod exists, but nothing the application said about itself was taken over
+        var instance = await WaitForInstanceAsync(controller);
+        instance.Version.ShouldBeNull();
+        (instance.Checks ?? []).ShouldBeEmpty();
+    }
+
+    private static async Task<Monitoring.Protocol.Instances.InstanceInfo> WaitForInstanceAsync(ControllerHost controller)
+    {
+        Monitoring.Protocol.Instances.InstanceInfo? found = null;
+        await Eventually.AssertAsync(() =>
+        {
+            found = controller.Registry.GetInstances("shop").SingleOrDefault();
+            found.ShouldNotBeNull();
+        });
+        return found!;
+    }
+
+    [Fact]
     public async Task A_failing_health_check_of_the_application_shows_on_the_controller()
     {
         // Arrange
@@ -168,10 +197,10 @@ public class ApplicationToControllerTests
         using var peer = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
         peer.Start();
         var address = $"127.0.0.1:{((System.Net.IPEndPoint)peer.LocalEndpoint).Port}";
-        await using var cluster = new FakeKubernetesApiServer().WithPod("orders-1").Start();
+        await using var cluster = new FakeKubernetesApiServer().WithPod("orders-1", ip: "10.1.0.5").Start();  // not the loopback address the peer has, or the peer would be taken for the pod
         await using var controller = new ControllerHost().AcceptingEnrollment(Token).WithCentralConfiguration(FastPulls).With("Controller:Topology:SampleInterval", "00:00:00.100").Start();
         await using var agent = new AgentHost("shop", Token).ConnectingTo(controller).DiscoveringIn(cluster)
-            .With("Agent:Sidecars:HeartbeatInterval", "00:00:01").Start();
+            .With("Agent:Sidecars:HeartbeatInterval", "00:00:01").With("Agent:Sidecars:VerifyPeerAddress", "false").Start();
         await using var application = new ApplicationHost("orders-1").Start(agent);
 
         // Act
