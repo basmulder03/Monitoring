@@ -38,7 +38,7 @@ jobs:
       MONITORING_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Username=postgres;Password=ci-only
       MONITORING_TEST_ARTEMIS: 127.0.0.1:5672:art:ci-only
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
@@ -57,7 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
@@ -86,7 +86,7 @@ jobs:
       matrix:
         project: [Controller, Agent, Sidecar, Injector]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build the image
         run: |
           name="monitoring-$(echo '${{ matrix.project }}' | tr '[:upper:]' '[:lower:]')"
@@ -97,7 +97,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: azure/setup-helm@v5
         with:
           version: v4.3.1
