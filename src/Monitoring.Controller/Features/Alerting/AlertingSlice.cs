@@ -44,6 +44,12 @@ public static class AlertingSlice
         ArgumentOutOfRangeException.ThrowIfLessThan(options.CertificateWarningDays, options.CertificateCriticalDays);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.RestartLoopWindow, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.EvaluationInterval, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.PeerInterval, TimeSpan.Zero);
+        foreach (var peer in options.Peers.Where(peer => !peer.IsAbsoluteUri || peer.Scheme is not ("http" or "https")))
+        {
+            throw new ArgumentException($"The address of a peer must be an absolute http or https address, not '{peer}'.", nameof(configure));
+        }
+
         foreach (var silence in options.Silences.Where(silence => string.IsNullOrWhiteSpace(silence.Rule)))
         {
             throw new ArgumentException($"A silence needs the name of a rule, or '*' for every rule (it ends {silence.Until:u}).", nameof(configure));
@@ -78,10 +84,22 @@ public static class AlertingSlice
         services.AddSingleton<IAlertRule>(provider => new DroppedDataRule(provider.GetRequiredService<IScopeRegistry>(), options, provider.GetRequiredService<TimeProvider>()));
         services.AddSingleton<IAlertRule>(provider => new ConfigurationDriftRule(
             provider.GetRequiredService<IScopeRegistry>(), provider.GetRequiredService<IAgentLiveness>(), provider.GetRequiredService<IAppliedConfigurations>(), options));
+        services.AddSingleton(provider => new AlertActions(
+            provider.GetRequiredService<TimeProvider>(), provider.GetService<StateStore.IStateStore>(), provider.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>().CreateLogger("Monitoring.Controller.AlertActions")));
+        services.AddSingleton(provider => new AlertHistory(
+            provider.GetRequiredService<TimeProvider>(), provider.GetService<StateStore.IStateStore>(), provider.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>().CreateLogger("Monitoring.Controller.AlertHistory")));
         services.AddSingleton<AlertEvaluator>();
         services.AddSingleton<IAlertEvaluator>(provider => provider.GetRequiredService<AlertEvaluator>());
         services.AddSingleton<IAlertState>(provider => provider.GetRequiredService<AlertEvaluator>());
         services.AddHostedService<AlertEvaluationService>();
+        if (options.Peers.Count > 0)
+        {
+            services.AddSingleton(provider => new AlertActionsSync(
+                new HttpClient { Timeout = TimeSpan.FromSeconds(10) }, provider.GetRequiredService<AlertActions>(), options, provider.GetRequiredService<TimeProvider>(),
+                provider.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>().CreateLogger("Monitoring.Controller.AlertActions")));
+            services.AddHostedService(provider => provider.GetRequiredService<AlertActionsSync>());
+        }
+
         return services;
     }
 }

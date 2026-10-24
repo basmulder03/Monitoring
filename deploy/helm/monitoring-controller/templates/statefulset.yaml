@@ -61,6 +61,20 @@ spec:
             - name: MONITORING_Controller__Replicas__{{ $i }}
               value: {{ $address | quote }}
             {{- end }}
+            {{- if and .Values.peers.enabled (gt (int .Values.replicas) 1) }}
+            {{- $name := include "monitoring-controller.name" . }}
+            {{- range $i := until (int .Values.replicas) }}
+            - name: MONITORING_Controller__Peers__{{ $i }}
+              value: {{ printf "http://%s-%d.%s-headless.%s.svc:%d" $name $i $name $.Release.Namespace (int $.Values.service.webPort) | quote }}
+            {{- end }}
+            {{- with .Values.peers.existingSecret }}
+            - name: MONITORING_Controller__PeerToken
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.peers.key }}
+            {{- end }}
+            {{- end }}
             - name: MONITORING_Controller__Configuration__File
               value: /etc/monitoring/central/central.json
             {{- range $i, $key := .Values.dashboard.groupBy }}

@@ -66,6 +66,19 @@ public sealed class AlertingOptions
     /// <summary>Silences that keep matching alerts out of the active list. The conditions are still evaluated, so an alert reappears when its silence ends.</summary>
     public List<AlertSilence> Silences { get; set; } = [];
 
+    /// <summary>
+    /// The addresses of the other controller replicas' web servers, such as <c>http://monitoring-controller-1.monitoring-controller-headless:8080</c>. Replicas do not talk to each other
+    /// about what agents report, but what operators did on the dashboard (silences, acknowledgements) exists nowhere else, so each replica copies it from these. Without any,
+    /// what an operator does is only known to the replica that served the request.
+    /// </summary>
+    public List<Uri> Peers { get; set; } = [];
+
+    /// <summary>A token of a viewer (or more) of the dashboard, which is how a replica that needs a sign-in asks the others; <see langword="null"/> when none is needed.</summary>
+    public string? PeerToken { get; set; }
+
+    /// <summary>How often the peers are asked.</summary>
+    public TimeSpan PeerInterval { get; set; } = TimeSpan.FromSeconds(30);
+
     /// <summary>How long a vulnerable package version must be in use before its alert fires; zero fires at once.</summary>
     public TimeSpan VulnerablePackageWait { get; set; } = TimeSpan.Zero;
 

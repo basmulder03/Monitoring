@@ -191,6 +191,19 @@ tests:
     asserts:
       - failedTemplate: { errorPattern: "needs a url" }
 
+  - it: lets the replicas copy what operators did from each other, with a token when asked
+    template: templates/statefulset.yaml
+    set: { peers: { existingSecret: peer-token } }
+    asserts:
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Controller__Peers__1, value: "http://monitoring-controller-1.monitoring-controller-headless.NAMESPACE.svc:8080" } }
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Controller__PeerToken, valueFrom: { secretKeyRef: { name: peer-token, key: token } } } }
+
+  - it: has no peers with one replica or when switched off
+    template: templates/statefulset.yaml
+    set: { replicas: 1 }
+    asserts:
+      - notExists: { path: "spec.template.spec.containers[0].env[?(@.name=='MONITORING_Controller__Peers__0')]" }
+
   - it: matches the snapshot of its default render
     asserts:
       - matchSnapshot: {}

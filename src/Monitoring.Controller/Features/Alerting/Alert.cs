@@ -9,4 +9,5 @@ namespace Monitoring.Controller.Features.Alerting;
 /// <param name="Subject">What the alert is about, for example <c>shop/orders</c> for a service in a scope.</param>
 /// <param name="Severity">How urgent the alert is.</param>
 /// <param name="Since">When the condition first became true, so the UI can show how long the problem has lasted.</param>
-public sealed record Alert(string Key, string RuleName, string Subject, AlertSeverity Severity, DateTimeOffset Since);
+/// <param name="Acknowledged">Who said they are looking at it, or <see langword="null"/> when nobody did.</param>
+public sealed record Alert(string Key, string RuleName, string Subject, AlertSeverity Severity, DateTimeOffset Since, Acknowledgement? Acknowledged = null);

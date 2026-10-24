@@ -40,6 +40,14 @@ webAuth:
   operatorGroup: ""         # people the proxy says belong to this group (header X-Forwarded-Groups) are operators, the rest viewers
   tokens: []                # - { name: wall-display, hash: "<sha-256 of the token>", role: viewer }
 
+# What operators do on the dashboard (silences, acknowledgements) exists nowhere else, so each replica copies it from the others now and then.
+# With webAuth on, the replicas need a token to ask each other: put the hash of a token with role viewer in webAuth.tokens, and the token itself
+# in a secret with one key, named here.
+peers:
+  enabled: true
+  existingSecret: ""
+  key: token
+
 # What the controller keeps across a restart, such as the history of changes. In memory by default, which loses it.
 state:
   sqlite:

@@ -130,7 +130,7 @@ describe("alerts", () => {
   it("lists the alerts that are firing", () => {
     const { services, main } = mount();
     const since = new Date(services.time - 90000).toISOString();
-    services.send(overview([scope("alpha", "Healthy")], [], [{ key: "k", rule: "service-down", subject: "shop/orders", severity: "Critical", since }]));
+    services.send(overview([scope("alpha", "Healthy")], [], [{ key: "k", rule: "service-down", subject: "shop/orders", severity: "Critical", since, acknowledged: null }]));
     const text = main.textContent!;
     for (const expected of ["shop/orders", "Critical", "service-down", "for 1 min"]) expect(text).toContain(expected);
   });

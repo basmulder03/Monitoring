@@ -8,6 +8,21 @@ export const browserServices: Services = {
     return { status: response.status, body: response.status === 200 ? ((await response.json()) as T) : null };
   },
 
+  async change(method, path, body) {
+    // The header is what tells the controller that this request comes from the dashboard and not from a page of another site.
+    const headers: Record<string, string> = { "X-Monitoring-Action": "1" };
+    const init: RequestInit = { method, headers };
+    if (body !== undefined) {
+      headers["Content-Type"] = "application/json";
+      init.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(path, init);
+    if (response.ok) return { status: response.status, error: null };
+    const problem = (await response.json().catch(() => null)) as { error?: string } | null;
+    return { status: response.status, error: problem?.error ?? `The controller answered ${response.status}.` };
+  },
+
   followOverview({ onOverview, onKeepAlive }) {
     const source = new EventSource("/api/events");
     source.addEventListener("overview", (event) => onOverview(JSON.parse((event as MessageEvent<string>).data) as Overview));

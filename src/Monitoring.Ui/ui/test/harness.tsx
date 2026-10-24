@@ -23,6 +23,8 @@ export class FakeServices implements Services {
   async getJson<T>(path: string) {
     if (path === "/api/me") return this.me ? { status: 200, body: this.me as T } : { status: 404, body: null };
     if (path === "/api/system") return this.system ? { status: 200, body: this.system as T } : { status: 404, body: null };
+    if (path.startsWith("/api/alerts/history")) return { status: 200, body: this.history as T };
+    if (path === "/api/silences") return { status: 200, body: this.silences as T };
     if (path === "/api/topology") return { status: 200, body: this.topology as T };
     if (path === "/api/packages") return { status: 200, body: this.packages as T };
     if (path === "/api/vulnerabilities") return { status: 200, body: this.vulnerabilities as T };
@@ -34,6 +36,17 @@ export class FakeServices implements Services {
 
     const scope = this.scopes[decodeURIComponent(path.replace("/api/scopes/", ""))];
     return scope ? { status: 200, body: scope as T } : { status: 404, body: null };
+  }
+
+  /** What was sent to change something, and how the controller answers. */
+  changes: { method: string; path: string; body: unknown }[] = [];
+  changeAnswer: { status: number; error: string | null } = { status: 204, error: null };
+  silences: import("../src/api/contracts").RuntimeSilence[] = [];
+  history: import("../src/api/contracts").AlertOccurrence[] = [];
+
+  async change(method: "POST" | "DELETE", path: string, body?: unknown) {
+    this.changes.push({ method, path, body });
+    return this.changeAnswer;
   }
 
   followOverview(handlers: { onOverview(overview: Overview): void; onKeepAlive(): void }) {

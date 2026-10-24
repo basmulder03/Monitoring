@@ -4,6 +4,8 @@ import type { Overview } from "../api/contracts";
 export interface Services {
   /** Reads JSON from the controller. Rejects when the request fails. */
   getJson<T>(path: string): Promise<{ status: number; body: T | null }>;
+  /** Asks the controller to change something (POST or DELETE). Resolves with the status and, when the controller refused, the reason it gave. */
+  change(method: "POST" | "DELETE", path: string, body?: unknown): Promise<{ status: number; error: string | null }>;
   /** Follows the live stream of overviews. Returns a function that stops it. */
   followOverview(handlers: { onOverview(overview: Overview): void; onKeepAlive(): void }): () => void;
   /** The current time in milliseconds, for ages and for noticing old data. */

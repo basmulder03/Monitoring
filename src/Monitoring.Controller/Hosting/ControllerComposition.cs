@@ -192,6 +192,9 @@ internal static class ControllerComposition
                 options.ScopeUnknownWait = alerting.Duration("ScopeUnknownWait", options.ScopeUnknownWait);
                 options.EvaluationInterval = alerting.Duration("EvaluationInterval", options.EvaluationInterval);
                 options.Silences = [.. alerting.Items("Silences").Select(ReadSilence)];
+                options.Peers = [.. controller.List("Peers").Select(address => new Uri(address, UriKind.RelativeOrAbsolute))];
+                options.PeerToken = controller.Optional("PeerToken");
+                options.PeerInterval = controller.Duration("PeerInterval", options.PeerInterval);
             })
             .AddDashboard(options =>
             {
@@ -252,6 +255,7 @@ internal static class ControllerComposition
         var app = builder.Build();
         app.UseWebAuth();
         app.MapDashboard();
+        app.MapAlertActions();
         app.MapSelfMonitoring();
         app.MapChangeMarkers();
         app.MapPackages();

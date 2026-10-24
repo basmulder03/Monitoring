@@ -34,7 +34,7 @@ internal sealed class DashboardModel(
 
         // GetActiveAlerts already returns the most severe first.
         var firing = alerts.GetActiveAlerts()
-            .Select(a => new AlertSummary(a.Key, a.RuleName, a.Subject, a.Severity, a.Since))
+            .Select(a => new AlertSummary(a.Key, a.RuleName, a.Subject, a.Severity, a.Since, a.Acknowledged))
             .ToList();
 
         return new Overview(scopes, firing, [.. options.GroupBy]);

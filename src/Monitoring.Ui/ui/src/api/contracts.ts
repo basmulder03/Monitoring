@@ -1,6 +1,24 @@
 // GENERATED from the C# types of the dashboard API. Do not edit.
 // Regenerate with: UPDATE_CONTRACTS=1 dotnet test --project tests/Monitoring.Ui.Tests
 
+export interface Acknowledgement {
+  key: string;
+  by: string;
+  at: string;
+  note: string | null;
+  removed: boolean;
+}
+
+export interface AlertOccurrence {
+  key: string;
+  rule: string;
+  subject: string;
+  severity: AlertSeverity;
+  started: string;
+  ended: string | null;
+  endedBy: string | null;
+}
+
 export type AlertSeverity = "Warning" | "Critical";
 
 export interface AlertSummary {
@@ -9,6 +27,7 @@ export interface AlertSummary {
   subject: string;
   severity: AlertSeverity;
   since: string;
+  acknowledged: Acknowledgement | null;
 }
 
 export interface ContainerInfo {
@@ -101,6 +120,17 @@ export interface ReplicaState {
   agentsReporting: number;
   agentsConnected: number;
   maxLag: number;
+}
+
+export interface RuntimeSilence {
+  id: string;
+  rule: string;
+  subjectPrefix: string;
+  until: string;
+  reason: string | null;
+  by: string;
+  updatedAt: string;
+  removed: boolean;
 }
 
 export interface ScopeConfiguration {

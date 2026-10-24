@@ -8,4 +8,5 @@ namespace Monitoring.Controller.Features.Dashboard;
 /// <param name="Subject">What the alert is about, for example <c>shop/orders</c>.</param>
 /// <param name="Severity">How urgent the alert is.</param>
 /// <param name="Since">When the condition began.</param>
-public sealed record AlertSummary(string Key, string Rule, string Subject, AlertSeverity Severity, DateTimeOffset Since);
+/// <param name="Acknowledged">Who said they are looking at it, or <see langword="null"/>.</param>
+public sealed record AlertSummary(string Key, string Rule, string Subject, AlertSeverity Severity, DateTimeOffset Since, Acknowledgement? Acknowledged = null);

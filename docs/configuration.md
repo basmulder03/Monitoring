@@ -213,6 +213,21 @@ A silence keeps alerts out of the dashboard until it ends, for example during pl
 | `Controller:Alerting:Silences:<n>:Subject` | all | Silences subjects starting with this text, such as `shop/` for a whole scope or `shop/orders/` for one service |
 | `Controller:Alerting:Silences:<n>:Reason` | none | Why, for whoever reads the file |
 
+#### Silences and acknowledgements on the dashboard
+
+An operator can also act on an alert on the dashboard. **Acknowledge** says someone is looking at it: the alert stays in the list, with who and when, and the acknowledgement goes when the problem does. **Silence** hides an alert and the ones like it (the same rule, subjects starting with the same text) for 1 hour, 4 hours, 1 day or 7 days, with a reason; a silence can be taken back at any time and cannot last longer than 31 days. Silences in force are listed under the alerts, so nothing is hidden in secret, and what fired lately, with how long it lasted, is listed under "Recent alerts".
+
+- Only a person who signed in with the role of operator can do this (see [Who may see the dashboard](#who-may-see-the-dashboard)). On a dashboard that needs no sign-in nobody can, so the buttons are not shown and the routes refuse. Every request has to carry the header `X-Monitoring-Action`, which the dashboard adds and a page of another site cannot, and the controller logs who did what.
+- The replicas do not talk about what agents report, but what an operator did exists nowhere else. Each replica therefore copies it from the others every 30 seconds (the latest change of each silence and acknowledgement wins), so a silence made on one replica holds on all of them within that time, and a replica that restarted learns it again. With the Helm chart this is on and needs nothing, apart from a token when the dashboard needs a sign-in (see below). A replica that cannot be reached is logged once.
+- The state store keeps it across a restart when it keeps things (`Controller:State:SqlitePath`); in memory it is also learned again from the other replicas.
+- The history of alerts is kept per replica, in the state store when there is a file, up to the last 200 occurrences. What was still firing when the controller restarted is shown as ended, unknown.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Controller:Peers:<n>` | none | The address of the web server of each other replica, such as `http://monitoring-controller-1.monitoring-controller-headless:8080`. The chart sets them from the replicas of the stateful set (`peers.enabled`) |
+| `Controller:PeerToken` | none | A token of a viewer, for when the dashboard needs a sign-in: its hash goes in `Controller:Web:Auth:Tokens` with the role `viewer` and the token itself in the secret named by `peers.existingSecret` in the chart. The token travels over plain HTTP inside the cluster, so give it no more than the viewer role |
+| `Controller:PeerInterval` | `00:00:30` | How often the other replicas are asked |
+
 ### Dependency graph
 
 Applications report the calls they make: HTTP calls and, with the right activity sources, database and broker calls. The controller connects each caller to the thing it called:
@@ -321,9 +336,14 @@ The controller serves the dashboard itself, so there is nothing else to install.
 | `/api/sbom` | The packages of the whole landscape as a CycloneDX 1.5 bill of materials (JSON), each package and version once |
 | `/api/sbom/<scope>/<service>` | The bill of materials of one service, which vulnerability scanners and licence checks can read |
 | `/api/vulnerabilities` | The package versions in use that the loaded advisories say are vulnerable, most severe first, with the fix and the services affected, and how many advisories were checked against |
+| `/api/alerts/history?limit=` | What fired lately, the latest first: `key`, `rule`, `subject`, `severity`, `started`, `ended` and `endedBy` (`cleared`, or `restart` when the controller restarted while it fired) |
+| `/api/silences` | The silences in force that operators made |
+| `POST /api/silences`, `DELETE /api/silences/<id>` | Make a silence (`rule`, `subjectPrefix`, `minutes` or `until`, `reason`) or take it back. Operator only |
+| `POST /api/alerts/acknowledge`, `DELETE /api/alerts/acknowledge?key=` | Acknowledge an alert by its key, with an optional `note`, or take it back. Operator only |
+| `/api/actions` | Everything operators did, which replicas read from each other |
 | `/api/events` | The overview as Server-Sent Events: the current one at once, then one per change, plus a keep-alive event while nothing changes |
 
-The page has no login yet; reach it only over a network you trust.
+The page needs no login unless you turn authentication on (see [Who may see the dashboard](#who-may-see-the-dashboard)); until then reach it only over a network you trust.
 
 ### Wall display
 

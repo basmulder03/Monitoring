@@ -105,6 +105,10 @@ matches the snapshot of its default render:
                   value: monitoring-controller-0.monitoring-controller-headless.NAMESPACE.svc:9440
                 - name: MONITORING_Controller__Replicas__1
                   value: monitoring-controller-1.monitoring-controller-headless.NAMESPACE.svc:9440
+                - name: MONITORING_Controller__Peers__0
+                  value: http://monitoring-controller-0.monitoring-controller-headless.NAMESPACE.svc:8080
+                - name: MONITORING_Controller__Peers__1
+                  value: http://monitoring-controller-1.monitoring-controller-headless.NAMESPACE.svc:8080
                 - name: MONITORING_Controller__Configuration__File
                   value: /etc/monitoring/central/central.json
                 - name: MONITORING_Controller__Dashboard__GroupBy__0
