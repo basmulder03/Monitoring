@@ -235,7 +235,7 @@ Two independent settings, each behind its own interface (`ITransportSecurity`, `
 | Transport mode | What it does | When to use |
 | --- | --- | --- |
 | `none` | Plain TCP | Closed internal network where the traffic cannot leave it |
-| `tls` | Controller has a server certificate; agents verify it against a configured CA certificate | Default for the open-source release; required through OpenShift passthrough Routes |
+| `tls` | Controller has a server certificate; agents verify it against a configured CA certificate | Recommended outside a closed network, and required through OpenShift passthrough Routes. The default is `none`, with a warning in the log at startup |
 | `mtls` | TLS plus a client certificate per agent | Strict environments |
 
 | Authentication | How an agent proves who it is | Notes |

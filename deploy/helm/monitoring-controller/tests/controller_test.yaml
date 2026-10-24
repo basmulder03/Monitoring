@@ -166,6 +166,31 @@ tests:
       - isNotNull: { path: "spec.template.metadata.annotations['checksum/settings']" }
         template: templates/statefulset.yaml
 
+  - it: downloads no advisories unless asked to
+    template: templates/statefulset.yaml
+    asserts:
+      - notExists: { path: "spec.template.spec.containers[0].env[?(@.name=='MONITORING_Controller__Vulnerabilities__Fetch__Enabled')]" }
+
+  - it: uses the public sources when downloading is switched on, or the ones it is given
+    template: templates/statefulset.yaml
+    set: { advisories: { fetch: { enabled: true, interval: "12:00:00" } } }
+    asserts:
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Controller__Vulnerabilities__Fetch__Enabled, value: "true" } }
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Controller__Vulnerabilities__Fetch__Interval, value: "12:00:00" } }
+      - notExists: { path: "spec.template.spec.containers[0].env[?(@.name=='MONITORING_Controller__Vulnerabilities__Fetch__Sources__0__Url')]" }
+
+  - it: passes its own sources on, and refuses a source without an address
+    template: templates/statefulset.yaml
+    set: { advisories: { fetch: { sources: [{ kind: nuget, url: "https://nuget.mirror.example/v3/vulnerabilities/index.json" }] } } }
+    asserts:
+      - contains: { path: "spec.template.spec.containers[0].env", content: { name: MONITORING_Controller__Vulnerabilities__Fetch__Sources__0__Url, value: "https://nuget.mirror.example/v3/vulnerabilities/index.json" } }
+
+  - it: refuses a download source without an address
+    template: templates/statefulset.yaml
+    set: { advisories: { fetch: { sources: [{ kind: osv }] } } }
+    asserts:
+      - failedTemplate: { errorPattern: "needs a url" }
+
   - it: matches the snapshot of its default render
     asserts:
       - matchSnapshot: {}

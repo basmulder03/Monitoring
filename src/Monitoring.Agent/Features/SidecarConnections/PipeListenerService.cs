@@ -121,7 +121,7 @@ internal sealed class PipeListenerService(
         }
     }
 
-    /// <summary>Goes by the instance of the service that runs in the process the application names, because the process id is what the machine vouches for.</summary>
+    /// <summary>Goes by the instance of the service that runs in the process the application names. The process id is the one the application announces: it is not compared with the process that opened the pipe, so the accounts the pipe lets in have to trust each other.</summary>
     private Hello? Admit(Hello hello)
     {
         if (processes is null)

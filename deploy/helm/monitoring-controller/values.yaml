@@ -72,6 +72,13 @@ alignedPackages: []
 # Advisories in the OSV format, so vulnerable package versions are found. Without it nothing is checked.
 advisories:
   existingConfigMap: ""   # a config map whose keys are advisory files
+  # Optional: let the controller download advisories itself, now and then. It sends a plain HTTPS GET to the addresses below and nothing about
+  # your packages. Off by default, so a closed network needs no exception. With enabled: true and no sources, these two public sources are used:
+  # https://osv-vulnerabilities.storage.googleapis.com/NuGet/all.zip and https://api.nuget.org/v3/vulnerabilities/index.json
+  fetch:
+    enabled: false
+    interval: "24:00:00"
+    sources: []           # - { kind: osv, url: "https://..." }   kind is osv or nuget; the address must be https
 
 service:
   agentPort: 9440

@@ -77,6 +77,20 @@ spec:
             - name: MONITORING_Controller__Vulnerabilities__Advisories
               value: /etc/monitoring/advisories
             {{- end }}
+            {{- with .Values.advisories.fetch }}
+            {{- if or .enabled .sources }}
+            - name: MONITORING_Controller__Vulnerabilities__Fetch__Enabled
+              value: "true"
+            - name: MONITORING_Controller__Vulnerabilities__Fetch__Interval
+              value: {{ .interval | quote }}
+            {{- range $i, $source := .sources }}
+            - name: MONITORING_Controller__Vulnerabilities__Fetch__Sources__{{ $i }}__Kind
+              value: {{ required "advisories.fetch.sources needs a kind (osv or nuget)" $source.kind | quote }}
+            - name: MONITORING_Controller__Vulnerabilities__Fetch__Sources__{{ $i }}__Url
+              value: {{ required "advisories.fetch.sources needs a url" $source.url | quote }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
             - name: MONITORING_Controller__Transport__Mode
               value: {{ .Values.transport.mode | quote }}
             {{- if ne .Values.transport.mode "none" }}

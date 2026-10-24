@@ -145,6 +145,19 @@ internal static class ControllerComposition
                 var vulnerabilities = controller.Section("Vulnerabilities");
                 options.Advisories = vulnerabilities.Optional("Advisories");
                 options.PollInterval = vulnerabilities.Duration("PollInterval", options.PollInterval);
+
+                // Optional: with Fetch:Enabled the public sources are used unless the sources are named.
+                var fetch = vulnerabilities.Section("Fetch");
+                options.FetchInterval = fetch.Duration("Interval", options.FetchInterval);
+                options.FetchTimeout = fetch.Duration("Timeout", options.FetchTimeout);
+                options.Sources =
+                [
+                    .. fetch.Items("Sources").Select(item => new AdvisorySource(item.Required("Kind").ToLowerInvariant(), new Uri(item.Required("Url"), UriKind.RelativeOrAbsolute))),
+                ];
+                if (options.Sources.Count == 0 && fetch.Text("Enabled", "false").Equals("true", StringComparison.OrdinalIgnoreCase))
+                {
+                    options.Sources = [VulnerabilitiesOptions.OsvNuGet, VulnerabilitiesOptions.NuGetFeed];
+                }
             })
             .AddPackages(options => options.Aligned = [.. controller.Section("Packages").Items("Aligned").Select(ReadAlignment)])
             .AddTopology(options =>

@@ -157,13 +157,28 @@ Pre-release labels do not count: `10.0.0-rc.1` and `10.0.0` are the same version
 
 ### Vulnerable packages
 
-The controller checks every package version in use against advisories in the [OSV format](https://ossf.github.io/osv-schema/), for example an export of the GitHub Advisory Database for NuGet. It does not fetch advisories itself, so it can run in a closed network and its answer does not depend on an outside service: you provide the file or folder, and a scheduled job of your own keeps it current. A change is picked up without a restart; a file that cannot be read is logged and the advisories that were loaded stay in force.
+The controller checks every package version in use against advisories in the [OSV format](https://ossf.github.io/osv-schema/), for example an export of the GitHub Advisory Database for NuGet. By default it fetches nothing, so it can run in a closed network and its answer does not depend on an outside service: you provide the file or folder, and a scheduled job of your own keeps it current. A change is picked up without a restart; a file that cannot be read is logged and the advisories that were loaded stay in force. If the controller may reach the internet, it can also download advisories itself, which is optional (see below).
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `Controller:Vulnerabilities:Advisories` | none | A JSON file (one advisory or a list) or a folder of such files, read including subfolders. Without it nothing is checked, and the page says so |
 | `Controller:Vulnerabilities:PollInterval` | `00:01:00` | How often the file or folder is looked at for a change |
+| `Controller:Vulnerabilities:Fetch:Enabled` | `false` | Download advisories from public sources now and then. Without `Sources` below, the two public sources are used |
+| `Controller:Vulnerabilities:Fetch:Interval` | `24:00:00` | How often the sources are downloaded again |
+| `Controller:Vulnerabilities:Fetch:Timeout` | `00:02:00` | How long one source may take before it is given up on until the next time |
+| `Controller:Vulnerabilities:Fetch:Sources:<n>:Kind`, `:Url` | none | Sources of your own instead of the public ones. `Kind` is `osv` (an OSV file, a list in one file, or a zip of such files) or `nuget` (the vulnerability feed of a NuGet source, given by the address of its `index.json` of vulnerabilities, for example a mirror). The address must be HTTPS |
 | `Controller:Alerting:VulnerablePackageWait` | `00:00:00` | How long a vulnerable version must be in use before its alert fires |
+
+#### Downloading advisories
+
+With `Fetch:Enabled` the controller downloads two public sources when it starts and then every 24 hours: the OSV export of the NuGet advisories (`https://osv-vulnerabilities.storage.googleapis.com/NuGet/all.zip`, about 3 MB) and the vulnerability feed of nuget.org (`https://api.nuget.org/v3/vulnerabilities/index.json`, a few hundred KB). Both come from the GitHub Advisory Database. What they send is added to the file or folder from `Advisories`, and an advisory that several of them have is kept once, from the file first.
+
+- Nothing about your packages leaves the controller. A request is a plain HTTPS GET of the address above and of the pages that feed names on the same host. There is no query, no package name and no identifier of your system; the only header besides the standard ones is `User-Agent: Monitoring-controller`. The whole advisory list is downloaded and matched locally, which is also why no per-package service is used.
+- Only HTTPS is accepted, certificates are checked as usual, and a redirect to an address that is not HTTPS is refused. The environment variables `HTTPS_PROXY` and `NO_PROXY` apply.
+- A download is limited to 64 MB before and after decompression, a zip to 100,000 files of at most 2 MB each. What is sent is only parsed, never run, and only advisories about NuGet packages are kept.
+- A source that cannot be reached or sends something unusable is logged with its host name and skipped; what it sent last time stays in force, and the other sources are not held up. The controller starts without waiting for any of it, and the page says how many advisories are loaded and when.
+- Every replica downloads for itself, so the sources see one request per replica per day. Allow egress to `osv-vulnerabilities.storage.googleapis.com` and `api.nuget.org` on port 443 if a network policy restricts it.
+- With the Helm chart, set `advisories.fetch.enabled=true`, and `advisories.fetch.sources` for sources of your own.
 
 A finding is raised for each advisory, package and version in use. Versions match through the ranges of the advisory (`introduced`, `fixed`, `last_affected`) or its list of versions; only the NuGet ecosystem is used. Advisories with severity HIGH or CRITICAL raise the critical alert `vulnerable-package-critical`; the rest, including advisories that do not give a severity, raise the warning `vulnerable-package`. Silences work as for any other alert.
 
@@ -453,12 +468,12 @@ The processes of the listed services that are running carry `windows.process.mem
 
 Clock skew is not measured: the agent has no trusted time to compare with.
 
-Applications that use the monitoring client report over a named pipe, as they do through a sidecar on Kubernetes, and the agent matches each with its service by process id. The service must be on the allowlist and running; an application in any other process is turned away. The library connects to the pipe `monitoring-agent` by default on Windows (set `MONITORING_AGENT_PIPE` or `MonitoringOptions.AgentPipe` for another name, or blank for none), introduces itself with its process id, program, name and version, sends heartbeats with its health and answers pulls for its health, metrics and calls exactly as a sidecar does. If there is no agent it retries quietly and the application is not affected.
+Applications that use the monitoring client report over a named pipe, as they do through a sidecar on Kubernetes, and the agent matches each with its service by process id. The service must be on the allowlist and running; an application in a process that is not that service's is turned away, as far as the process id it announces says: the agent goes by the process id in the application's hello and does not check it against the process that really opened the pipe. The library connects to the pipe `monitoring-agent` by default on Windows (set `MONITORING_AGENT_PIPE` or `MonitoringOptions.AgentPipe` for another name, or blank for none), introduces itself with its process id, program, name and version, sends heartbeats with its health and answers pulls for its health, metrics and calls exactly as a sidecar does. If there is no agent it retries quietly and the application is not affected.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `Agent:Sidecars:Pipe:Name` | `monitoring-agent` with Windows discovery, else none | The name of the pipe the applications connect to |
-| `Agent:Sidecars:Pipe:Allow` | none | The accounts the monitored applications run as, such as `NT SERVICE\billing` or `DOMAIN\svc-orders`. The pipe lets in only these, the system, the administrators, the agent's own account and the built-in Local Service and Network Service accounts, so another user on the machine cannot report as an application. An account that does not exist stops the agent from starting |
+| `Agent:Sidecars:Pipe:Allow` | none | The accounts the monitored applications run as, such as `NT SERVICE\billing` or `DOMAIN\svc-orders`. The pipe lets in only these, the system, the administrators, the agent's own account and the built-in Local Service and Network Service accounts, so a user that is not one of these cannot report as an application. The accounts that are let in trust each other: one of them can announce the process id of another monitored service and report in its place, so give a monitored application an account of its own and keep the list short. An account that does not exist stops the agent from starting |
 | `Agent:Sidecars:Listen:Enabled` | `false` with Windows discovery, else `true` | Whether to also listen on a TCP port for sidecars; a Windows server only needs the pipe
 
 ### Running as a Windows service
