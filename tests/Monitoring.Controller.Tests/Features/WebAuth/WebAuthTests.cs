@@ -159,6 +159,9 @@ public class WebAuthTests
         cookie.ShouldContain($"{WebAuthenticator.CookieName}=long-secret");
         cookie.ShouldContain("httponly", Case.Insensitive);
         cookie.ShouldContain("samesite=strict", Case.Insensitive);
+
+        using var wall = await client.GetAsync("/tv?token=long-secret", Ct);
+        wall.Headers.GetValues("Set-Cookie").Single().ShouldContain($"{WebAuthenticator.CookieName}=long-secret");
     }
 
     [Fact]

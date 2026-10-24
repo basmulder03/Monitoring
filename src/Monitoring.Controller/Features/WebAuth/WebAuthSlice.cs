@@ -65,7 +65,7 @@ public static class WebAuthSlice
             }
 
             // A token given in the address is kept in a cookie that script cannot read, and is not sent to other sites.
-            if (user.ViaToken && context.Request.Query["token"].ToString() is { Length: > 0 } given && !context.Request.Cookies.ContainsKey(WebAuthenticator.CookieName))
+            if (user.ViaToken && context.Request.Query["token"].ToString() is { Length: > 0 } given)
             {
                 context.Response.Cookies.Append(WebAuthenticator.CookieName, given, new CookieOptions { HttpOnly = true, SameSite = SameSiteMode.Strict, Path = "/", Secure = context.Request.IsHttps });
             }
