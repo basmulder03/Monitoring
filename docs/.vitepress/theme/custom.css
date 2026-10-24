@@ -17,3 +17,6 @@
 
 /* Animations are pictures with their own motion: keep them inside the column and off the dark background's edge. */
 .vp-doc img[src$=".svg"] { max-width: 100%; height: auto; }
+
+/* The recordings of the dashboard. */
+.vp-doc video { width: 100%; height: auto; border: 1px solid var(--vp-c-divider); border-radius: 8px; }

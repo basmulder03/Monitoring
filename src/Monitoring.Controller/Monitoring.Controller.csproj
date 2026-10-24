@@ -16,6 +16,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Monitoring.Controller.Tests" />
     <InternalsVisibleTo Include="Monitoring.Component.Tests" />
+    <InternalsVisibleTo Include="Monitoring.Demo" />
   </ItemGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

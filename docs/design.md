@@ -159,6 +159,8 @@ flowchart LR
 
 The controller resolves where each call went using its registry; an unknown address is shown as an external node.
 
+![Animation: call counters travel from the library through the sidecar and agent to the controller, which resolves each callee into an edge](./public/animations/edges.svg)
+
 ## Discovery and liveness
 
 Each hop finds its parent through one bootstrap value, and the controller hands out the rest. Two independent signals decide whether an instance is alive, so a missing sidecar can never make a pod disappear silently.
@@ -224,7 +226,7 @@ One message set is used on every hop, serialized as JSON with System.Text.Json s
 
 - Agent to controller: transport security and authentication are separate, pluggable settings (see below).
 - In-cluster local hops are plain; they never leave the pod or namespace.
-- The web UI has no login for now: it is reachable only on the internal network, and an authentication layer can be added later.
+- The web UI can be put behind authentication: a reverse proxy that signs people in (its headers are believed only from configured proxy addresses), and long-lived tokens for scripts and wall displays, with the roles viewer and operator. With authentication off, the UI is meant for an internal network only. The settings are under `Controller:Web:Auth` in the [configuration](configuration).
 
 **Transport security and authentication**
 
@@ -297,7 +299,7 @@ Every pod is shown down to its containers, so it is clear whether the applicatio
 - Spans never reach the controller. Each library keeps the last 2,048 spans, which the agent reads on demand.
 - Removed instances are kept 10 minutes as Gone, so the UI can show what disappeared, then dropped.
 - Rough example, not a measured figure: 5,000 instances with 50 series each is 250,000 series. Latest values alone take a few tens of MB; 15 minutes of history in the controller would take on the order of 100 MB.
-- All controller state goes through one interface (for example `IStateStore`). The default is in memory. SQLite on an `emptyDir` volume survives a container restart but not a reschedule, and with several replicas adds little, so it is only added if the prototype exceeds the memory budget.
+- The little that no agent can tell again (the history of changes and what each notification channel was told) goes through one interface, `IStateStore`. The default is in memory; `Controller:State:SqlitePath` keeps it in a SQLite file, which survives a restart of the container on an `emptyDir` but not a reschedule. The registry is never stored: agents rebuild it.
 - Other levers at large scale: one controller group per environment with a UI that merges them, and coarser pull intervals for large namespaces.
 
 ## Tracing and dependency graph
@@ -438,6 +440,10 @@ The controller evaluates alert rules against its in-memory state and shows activ
 | Restart loop | An instance restarted 3 times in 10 minutes | 0 s |
 | Edge error rate | Errors on one dependency edge above a threshold | 5 min |
 
+![Animation: an instance turns unhealthy, the rule waits, the alert fires in the panel and the channels, and resolves when the instance recovers](./public/animations/alert.svg)
+
+These are the first rules. The controller has more (certificate expiry, connection pool, queue without consumers, replica lag, configuration drift, dropped data, vulnerable packages and package drift); the full list with what each one alerts on is generated from the code in [Code structure](https://basmulder03.github.io/Monitoring/reference/structure#alert-rules).
+
 **Stateless consequences**
 
 - After a replica restarts, its rules are not evaluated until agents have sent their snapshots (startup grace, about twice the snapshot interval). This prevents a flood of false alerts.
@@ -446,7 +452,7 @@ The controller evaluates alert rules against its in-memory state and shows activ
 
 **Channels**
 
-For now alerts are only shown in the UI: an alert panel with active alerts, severity, subject and how long they have been firing. External channels (webhook, email) come later.
+Alerts are shown in the UI (an alert panel with active alerts, severity, subject and how long they have been firing) and can be sent to webhooks (signed with an HMAC when a secret is set), to chat channels (Slack-compatible and Discord) and by email. With several replicas either every replica sends and the receiver de-duplicates by the stable alert key, or one replica sends, chosen through a Kubernetes Lease. See the notification settings in the [configuration](configuration).
 
 ## Self-monitoring
 
@@ -479,6 +485,8 @@ Every component can also expose its own metrics in Prometheus text format on a l
 ## Dashboard UI
 
 The UI is a static single-page app embedded in the controller. It is built to be read from across a room on a large TV, rotating between dashboards, and it updates live without reloads.
+
+Recordings of the real dashboard while it plays an incident are on [the dashboard in motion](dashboard.md).
 
 **Views**
 
@@ -576,7 +584,7 @@ Every runtime component is a Native AOT executable on .NET 10, and one shared pr
 
 **Sidecar injection**
 
-Start with the Helm template; a label-based admission webhook (the way service meshes inject) can be added later as a separate small injector. Both build the pod change from one shared definition, so they cannot drift apart.
+Two ways are supported: the Helm template, and a label-based admission webhook (the way service meshes inject), which is a separate small injector. Both build the pod change from one shared definition, so they cannot drift apart.
 
 |  | Helm template | Admission webhook (label) |
 | --- | --- | --- |
@@ -614,15 +622,15 @@ Nothing in the design is specific to one organization: everything is named by la
 | Scope provider | Kubernetes, Windows Service Control Manager | Docker, systemd |
 | Client instrumentation | HTTP, ASP.NET Core, database and ActiveMQ via official packages | Other brokers and databases |
 | Collector | .NET runtime, host, pod data | Custom collectors |
-| Alert sink | UI alert panel | Webhook, email, chat |
-| State store | In memory | SQLite |
+| Alert sink | UI alert panel, webhook, email, chat | Other sinks |
+| State store | In memory, SQLite | Other stores |
 
 **Publishing**
 
-- License: Apache-2.0 is suggested (patent grant, widely accepted in industry); MIT is the simpler alternative.
+- License: Apache-2.0 (patent grant, widely accepted in industry).
 - Packages: NuGet for the library and extensions; container images for sidecar, agent, controller and injector; Helm charts as OCI artifacts; the Windows agent as a zip or MSI.
 - Repository: README with a five-minute quickstart (an Aspire sample), this design as architecture docs, contributing guide, security policy, semantic versioning, changelog, and CI that runs the AOT and end-to-end tests.
-- Pick a neutral working name and check trademarks and package-name availability before the first publish.
+- The name is plain on purpose: the code and the repository are called Monitoring. Check trademarks and package-name availability once more before the first publish.
 - Before publishing, confirm who owns the code and that open-sourcing it is allowed.
 
 ## Code structure
@@ -771,7 +779,7 @@ Feature: Pod lifecycle
 - Dependency graph for HTTP, queue and database traffic.
 - Alert firing, de-duplication, silence expiry and the startup grace period.
 - TV mode: rotation, focus mode on failure, stale-data banner, light and dark themes, contrast and keyboard checks.
-- Budgets: sidecar and library memory and start time stay under agreed limits (numbers to be set after the first prototype).
+- Budgets: start time and memory of the binaries, the size of a controller at 5,000 instances, and how fast the controller, the agent and the dashboard stream work under load stay inside limits that fail the build; a nightly run keeps the trend (see [Testing](testing#budgets)).
 
 ## Risks and open questions
 
@@ -780,7 +788,7 @@ The biggest risk is that automatic capture is limited by Native AOT, so spikes o
 | Risk | Mitigation |
 | --- | --- |
 | Sidecar cannot see application traffic without a mesh | Capture in the library; sidecar handles registration, heartbeat and probing |
-| JSON frames are larger than a binary format | Deltas instead of full state, batching, a frame size limit; measure in the prototype |
+| JSON frames are larger than a binary format | Deltas instead of full state, batching, a frame size limit (16 MB, and 64 KB before an agent has proved who it is); measured by the budget tests |
 | Database and ActiveMQ spans differ per provider | Use the official packages' own activity sources; one extension interface for the rest |
 | All controller replicas down at once blinds the dashboards | Replicas in separate data centers, fast recovery from agent snapshots, external dead-man's switch |
 | Controller memory grows with many series | Only latest values in the controller, history in the agents; memory budget tested in CI |
@@ -789,9 +797,9 @@ The biggest risk is that automatic capture is limited by Native AOT, so spikes o
 **Open questions**
 
 - [ ] Agent scope (confirmed, no action needed): The design assumes per namespace.
-- [ ] Authentication for the UI and alert channels beyond the UI: both deliberately later.
+- [x] Authentication for the UI and alert channels beyond the UI: both are built (see above).
 - [ ] Is every controller replica reachable from every cluster and Windows server through a TLS passthrough Route?
 - [ ] Windows agents: which Ansible playbook flow and package source will be used to install them?
 - [ ] Which database and ActiveMQ libraries are in use? Not blocking: the extension interface covers others.
-- [ ] Expected scale (pods per namespace, namespaces, servers): measure in the prototype, then set memory budgets and intervals.
+- [x] Expected scale: the budgets are set for 5,000 instances with 50 series each (about 90 MB in a controller), 100 agents reconnecting at once, 300 sidecars on one agent and 200 open dashboard pages; see [Testing](testing#budgets).
 - [ ] OpenShift version: native sidecars need 4.16 or newer, otherwise the fallback applies.

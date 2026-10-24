@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 270" width="760" height="270" role="img" aria-label="A controller replica restarts and is complete again from one snapshot" font-family="system-ui, sans-serif" font-size="14">
 <title>A controller replica restarts and is complete again from one snapshot</title>
-<line x1="110" y1="120" x2="600" y2="60" stroke="#8b949e" stroke-width="2" stroke-dasharray="4 4"/>
 <line x1="110" y1="120" x2="600" y2="190" stroke="#8b949e" stroke-width="2" stroke-dasharray="4 4"/>
+<line x1="110" y1="120" x2="600" y2="60" stroke="#8b949e" stroke-width="2" stroke-dasharray="4 4"/>
 <rect x="48" y="96" width="124" height="48" rx="8" fill="#e7eefc" stroke="#4c6ef5" stroke-width="2"/>
 <text x="110" y="125" text-anchor="middle" fill="#1b1f24" font-weight="600">Agent</text>
 <rect x="538" y="36" width="124" height="48" rx="8" fill="#e7eefc" stroke="#4c6ef5" stroke-width="2"/>

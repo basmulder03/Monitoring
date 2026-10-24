@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 210" width="760" height="210" role="img" aria-label="A sidecar registers, the agent collects and the controller pushes to the dashboard" font-family="system-ui, sans-serif" font-size="14">
 <title>A sidecar registers, the agent collects and the controller pushes to the dashboard</title>
-<line x1="275" y1="110" x2="90" y2="110" stroke="#8b949e" stroke-width="2" stroke-dasharray="4 4"/>
-<line x1="645" y1="110" x2="460" y2="110" stroke="#8b949e" stroke-width="2" stroke-dasharray="4 4"/>
 <line x1="275" y1="110" x2="460" y2="110" stroke="#8b949e" stroke-width="2" stroke-dasharray="4 4"/>
+<line x1="645" y1="110" x2="460" y2="110" stroke="#8b949e" stroke-width="2" stroke-dasharray="4 4"/>
+<line x1="275" y1="110" x2="90" y2="110" stroke="#8b949e" stroke-width="2" stroke-dasharray="4 4"/>
 <rect x="28" y="86" width="124" height="48" rx="8" fill="#e7eefc" stroke="#4c6ef5" stroke-width="2"/>
 <text x="90" y="115" text-anchor="middle" fill="#1b1f24" font-weight="600">Sidecar</text>
 <rect x="213" y="86" width="124" height="48" rx="8" fill="#e7eefc" stroke="#4c6ef5" stroke-width="2"/>

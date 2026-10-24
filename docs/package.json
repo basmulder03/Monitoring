@@ -8,10 +8,12 @@
     "dev": "vitepress dev",
     "prebuild": "npm run generate",
     "build": "vitepress build",
-    "preview": "vitepress preview"
+    "preview": "vitepress preview",
+    "record": "node scripts/record-dashboard.mjs"
   },
   "devDependencies": {
     "mermaid": "11.17.2",
+    "playwright-core": "1.63.0",
     "vitepress": "1.6.4",
     "vitepress-plugin-mermaid": "2.0.17"
   }

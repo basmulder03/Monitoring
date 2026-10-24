@@ -12,6 +12,7 @@
   </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/Monitoring.DatabaseSample/Monitoring.DatabaseSample.csproj" />
+    <Project Path="samples/Monitoring.Demo/Monitoring.Demo.csproj" />
     <Project Path="samples/Monitoring.SampleApp/Monitoring.SampleApp.csproj" />
   </Folder>
   <Folder Name="/tests/">
