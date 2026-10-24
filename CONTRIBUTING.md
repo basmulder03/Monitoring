@@ -23,6 +23,10 @@ Every change comes with tests, and `dotnet test` must pass at every commit.
 
 Planned work is tracked as issues, one per slice, listed in the [roadmap](https://github.com/basmulder03/Monitoring/issues/61). Say on the issue when you pick one up.
 
+## Documentation
+
+The site (<https://basmulder03.github.io/Monitoring/>) is built from `docs` with VitePress. `cd docs && npm ci && npm run dev` runs it locally. The pages under Reference (code structure, wire protocol, HTTP API, dashboard components and icons) are generated from the source by `docs/scripts/generate.mjs`, so a change to the XML documentation of a message or the JSDoc of a component shows up on its own; write those comments for the reader of the site too. Diagrams are Mermaid in the Markdown. A dead link fails the build of a pull request.
+
 ## License
 
 By contributing you agree that your contribution is licensed under the [Apache License 2.0](LICENSE), as the rest of the project.

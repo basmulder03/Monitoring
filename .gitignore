@@ -7,3 +7,9 @@ src/Monitoring.Ui/wwwroot/
 deploy/helm/test/sample-app/charts/
 deploy/helm/test/sample-app/Chart.lock
 tests/Monitoring.Specifications/Features/*.feature.cs
+
+docs/node_modules/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+docs/public/performance-trend.html
+docs/reference/

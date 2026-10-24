@@ -1,0 +1,65 @@
+name: Documentation site
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/**", "src/**", "CONTRIBUTING.md", ".github/workflows/docs.yml"]
+  pull_request:
+    paths: ["docs/**", "src/**", "CONTRIBUTING.md", ".github/workflows/docs.yml"]
+  # The speed trend on the site comes from the perf-results branch, so a night's run is published too.
+  workflow_run:
+    workflows: ["Performance nightly"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the "last updated" of a page comes from git
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+      - name: Install
+        run: npm ci
+        working-directory: docs
+      - name: Fetch the speed trend
+        run: |
+          git show origin/perf-results:index.html > docs/public/performance-trend.html 2>/dev/null \
+            || echo '<!doctype html><title>Speed budgets</title><p>No nightly run has been stored yet.</p>' > docs/public/performance-trend.html
+      # Generates the reference pages from the source, then builds; a dead link or a page that fails to render fails the build, which is the link check.
+      - name: Build
+        run: npm run build
+        working-directory: docs
+      - uses: actions/configure-pages@v5
+        if: github.event_name != 'pull_request'
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: docs/.vitepress/dist
+
+  deploy:
+    if: github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion != 'cancelled')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

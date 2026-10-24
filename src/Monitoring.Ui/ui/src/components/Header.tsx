@@ -3,6 +3,7 @@ import type { WhoAmI } from "../api/contracts";
 import { useJson } from "../state/useJson";
 import { Icon } from "./Icon";
 
+/** The top bar: where the dashboard is, the links to its views and the switch between light and dark. */
 export function Header({ route, onSwitchTheme }: { route: Route; onSwitchTheme(): void }) {
   const current = (name: Route["name"]) => (route.name === name ? "page" : undefined);
   return (

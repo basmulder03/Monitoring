@@ -33,7 +33,21 @@ This is a small, stateless, Native AOT monitoring system for .NET 10 workloads o
 
 The system has four components in three tiers: a library and an auto-injected sidecar next to every application, one agent per namespace or Windows server, and a group of controller replicas that serve the web UI. All connections are opened from the lower tier upward, so no tier needs to know addresses of the tier below.
 
-&#91;embedded content: architecture · 4 components, 2 platforms\]
+```mermaid
+flowchart BT
+    B["Browser or wall display"] -->|"HTTP + SSE"| C1
+    subgraph CTRL["Controller: 2 or more replicas, all active"]
+        C1["Replica 1"]
+        C2["Replica 2"]
+    end
+    AG["Agent per namespace"] -->|"TCP (TLS)"| CTRL
+    WAG["Agent per Windows server"] -->|"TCP (TLS)"| CTRL
+    SC["Sidecar per pod"] -->|"TCP"| AG
+    L1["Application + library"] -->|"Unix socket"| SC
+    L2["Application + library"] -->|"named pipe"| WAG
+    AG -.->|"pod watch"| K["Kubernetes API"]
+    WAG -.->|"service state"| M["Service Control Manager"]
+```
 
 The Kubernetes and Windows scopes look the same to the controller: each has an agent that dials upward, with applications reporting to it.
 
@@ -57,11 +71,50 @@ The Kubernetes and Windows scopes look the same to the controller: each has an a
 
 Four processes run continuously: registration and collection, the instance lifecycle, recovery after a controller restart, and the dependency edge pipeline. The sections after this one describe each part in detail.
 
-&#91;embedded content: registration and collection · sequence\]
+```mermaid
+sequenceDiagram
+    participant K as Kubernetes API
+    participant A as Agent
+    participant S as Sidecar
+    participant C as Controller
+    participant B as Browser
+    K->>A: pod added (watch)
+    A->>A: instance created as Starting
+    S->>A: Hello (instance, service, version)
+    A->>S: Config (heartbeat interval)
+    A->>S: Pull health
+    S->>A: PullResult (health checks)
+    A->>A: instance is Running, with its health
+    loop every heartbeat interval
+        S->>A: Heartbeat (sequence, health summary)
+    end
+    Note over A,S: a heartbeat that shows another health, or a timer, triggers a new Pull
+    A->>C: Delta (what changed)
+    C->>B: overview event (Server-Sent Events)
+```
 
 A sidecar registers once and then sends heartbeats. The agent pulls data on a timer and pushes changes to the controller, which pushes events to dashboards.
 
-&#91;embedded content: instance lifecycle · 6 states\]
+![Animation: a sidecar says hello, the agent answers and pulls its health, heartbeats follow, and a change travels to the controller and the dashboard](./public/animations/registration.svg)
+
+```mermaid
+stateDiagram-v2
+    [*] --> Starting: pod or process appears
+    Starting --> Running: sidecar or library registers
+    Running --> Terminating: shutdown begins (Goodbye or terminating pod)
+    Starting --> Gone: deleted
+    Running --> Gone: deleted
+    Terminating --> Gone: deleted
+    Gone --> [*]: dropped after 10 minutes
+    state Running {
+        [*] --> Healthy
+        Healthy --> Degraded: non-critical check fails
+        Degraded --> Healthy: check passes
+        Healthy --> Unhealthy: critical check fails or 3 heartbeats missed
+        Degraded --> Unhealthy: critical check fails or 3 heartbeats missed
+        Unhealthy --> Healthy: checks pass again
+    }
+```
 
 A pod delete event moves any state straight to Gone; only then is the instance removed from the live view.
 
@@ -72,11 +125,37 @@ A pod delete event moves any state straight to Gone; only then is the instance r
 3. The pod is replaced: a delete event removes the old instance at once and the new pod follows steps 1 and 2. No timeout guessing is needed.
 4. The pod is terminating: the instance is shown as Terminating; a graceful `Goodbye` from the sidecar avoids a false unhealthy alert during rollouts.
 
-&#91;embedded content: restart recovery · 3 participants\]
+```mermaid
+sequenceDiagram
+    participant A as Agent
+    participant R1 as Controller replica 1 (restarts)
+    participant R2 as Controller replica 2
+    A->>R1: Delta
+    A->>R2: Delta
+    Note over R1: replica restarts and loses its state
+    A->>R2: Delta (keeps being served)
+    A->>R1: reconnect (backoff with jitter)
+    A->>R1: Hello (token, scope)
+    R1->>A: Config (settings, replica addresses)
+    A->>R1: Snapshot (whole scope)
+    R1->>A: Ack (last sequence applied)
+    A->>R1: Delta (from here on)
+```
 
 Each agent feeds all controller replicas, so a restarted replica only has to reconnect and receive a snapshot.
 
-&#91;embedded content: dependency edge pipeline · 5 steps\]
+![Animation: replica 1 restarts and loses its state, the agent reconnects and sends a snapshot, and the replica is complete again](./public/animations/recovery.svg)
+
+```mermaid
+flowchart LR
+    L["1. Library counts calls, errors and latency per caller and callee on every finished client span"] --> P["2. Agent pulls the counters together with the metrics"]
+    P --> E["3. Agent sends them to the controller as edges, not as spans"]
+    E --> R{"4. Controller resolves the callee address with its registry"}
+    R -->|"known service, pod IP or host"| S["Edge to the service"]
+    R -->|"unknown address"| X["Edge to an external node"]
+    S --> F["5. No calls for 5 minutes: the edge fades, then disappears"]
+    X --> F
+```
 
 The controller resolves where each call went using its registry; an unknown address is shown as an external node.
 
