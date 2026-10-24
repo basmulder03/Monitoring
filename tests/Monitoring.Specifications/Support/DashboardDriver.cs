@@ -52,8 +52,9 @@ public sealed class DashboardDriver
     /// <returns>The status code and whether the answer sets the cookie that remembers the token.</returns>
     public async Task<(int Status, bool SetsCookie)> VisitAsync(string path, string? token)
     {
-        using var client = RunningEnvironment.App.CreateHttpClient(MonitoringEnvironment.Controller, "web");
-        client.Timeout = RequestTimeout;
+        // A visitor who has not been here before: the shared client would remember the cookie of an earlier visit.
+        using var handler = new HttpClientHandler { UseCookies = false };
+        using var client = new HttpClient(handler) { BaseAddress = RunningEnvironment.App.GetEndpoint(MonitoringEnvironment.Controller, "web"), Timeout = RequestTimeout };
         using var response = await client.GetAsync(token is null ? path : $"{path}?token={Uri.EscapeDataString(token)}");
         return ((int)response.StatusCode, response.Headers.TryGetValues("Set-Cookie", out var cookies) && cookies.Any(c => c.StartsWith("monitoring_token=", StringComparison.Ordinal)));
     }
