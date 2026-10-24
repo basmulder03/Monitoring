@@ -1,6 +1,7 @@
 using Monitoring.Client.Features.LocalServer;
 using Monitoring.Client.Features.Tracing;
 using Monitoring.Protocol.Reports;
+using Monitoring.Tests.Shared;
 using Shouldly;
 using Xunit;
 
@@ -42,6 +43,7 @@ public class LibraryBudgetTests(ITestOutputHelper output)
 
         // Assert
         output.WriteLine($"Edges and spans at their limits: {held / 1024.0 / 1024:F1} MB");
+        PerfResults.Record("client.library.memory", held / 1024.0 / 1024, "MB");
         edges.Count.ShouldBe(options.MaxEdges);
         spans.Count.ShouldBe(options.SpanBufferSize);
         held.ShouldBeLessThan(LimitBytes);

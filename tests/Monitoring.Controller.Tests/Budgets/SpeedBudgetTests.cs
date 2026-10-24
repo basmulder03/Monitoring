@@ -6,6 +6,7 @@ using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Instances;
 using Monitoring.Protocol.Messages;
 using Monitoring.Protocol.Reports;
+using Monitoring.Tests.Shared;
 using Shouldly;
 using Xunit;
 
@@ -49,6 +50,7 @@ public class SpeedBudgetTests(ITestOutputHelper output)
 
         // Assert
         output.WriteLine($"5000 instances x 50 series updated: {clock.Elapsed.TotalMilliseconds:F0} ms");
+        PerfResults.Record("controller.apply.5000x50", clock.Elapsed.TotalMilliseconds, "ms");
         clock.Elapsed.ShouldBeLessThan(TimeSpan.FromMilliseconds(250), "a round of reports from every agent must be applied well within the time agents wait between reports");
     }
 
@@ -72,6 +74,8 @@ public class SpeedBudgetTests(ITestOutputHelper output)
 
         // Assert
         output.WriteLine($"100000 subjects: first round {first.Elapsed.TotalMilliseconds:F0} ms, later round and listing {again.Elapsed.TotalMilliseconds:F0} ms");
+        PerfResults.Record("controller.alerts.first", first.Elapsed.TotalMilliseconds, "ms");
+        PerfResults.Record("controller.alerts.later", again.Elapsed.TotalMilliseconds, "ms");
         alerts.Count.ShouldBe(100_000);
         first.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(1));
         again.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(2));

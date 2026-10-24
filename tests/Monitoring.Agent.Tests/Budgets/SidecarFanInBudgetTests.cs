@@ -10,6 +10,7 @@ using Monitoring.Protocol.Instances;
 using Monitoring.Protocol.Messages;
 using Monitoring.Protocol.Reports;
 using Monitoring.Protocol.Versioning;
+using Monitoring.Tests.Shared;
 using Shouldly;
 using Xunit;
 
@@ -67,6 +68,8 @@ public class SidecarFanInBudgetTests(ITestOutputHelper output)
 
         // Assert
         output.WriteLine($"{Sidecars} sidecars: all registered after {registration.TotalMilliseconds:F0} ms, a change in every application in the agent's view after {change.TotalMilliseconds:F0} ms");
+        PerfResults.Record("agent.sidecars.register", registration.TotalMilliseconds, "ms");
+        PerfResults.Record("agent.sidecars.change", change.TotalMilliseconds, "ms");
         registration.ShouldBeLessThan(TimeSpan.FromSeconds(10), "every sidecar is greeted and asked for its health at once");
         change.ShouldBeLessThan(TimeSpan.FromSeconds(10), "a heartbeat that shows another health is followed by a pull of the health");
     }

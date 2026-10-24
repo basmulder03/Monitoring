@@ -14,6 +14,7 @@ using Monitoring.Controller.Tests.Shared;
 using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Instances;
 using Monitoring.Protocol.Messages;
+using Monitoring.Tests.Shared;
 using Shouldly;
 using Xunit;
 
@@ -79,6 +80,8 @@ public class FanOutBudgetTests(ITestOutputHelper output)
 
         // Assert
         output.WriteLine($"{Pages} pages x {Scopes * InstancesPerScope} instances: first overview on every page after {firstEvent.TotalMilliseconds:F0} ms, a change on every page after {change.TotalMilliseconds:F0} ms (push interval 250 ms)");
+        PerfResults.Record("controller.fanout.first", firstEvent.TotalMilliseconds, "ms");
+        PerfResults.Record("controller.fanout.change", change.TotalMilliseconds, "ms");
         firstEvent.ShouldBeLessThan(TimeSpan.FromSeconds(10), "every page is served its first overview at once");
         change.ShouldBeLessThan(TimeSpan.FromSeconds(10), "a change reaches every page within a few push intervals");
     }

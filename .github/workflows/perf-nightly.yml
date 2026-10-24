@@ -1,0 +1,52 @@
+name: Performance nightly
+
+on:
+  schedule:
+    - cron: "15 3 * * *"
+  workflow_dispatch:
+
+# The results live on their own branch, so they do not clutter main: results.json is the history and index.html the trend page (docs/testing.md, "Budgets").
+permissions:
+  contents: write
+
+jobs:
+  budgets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build
+        run: dotnet build --configuration Release
+      - name: Run the budget tests
+        env:
+          MONITORING_PERF_RESULTS: ${{ runner.temp }}/run.tsv
+        run: |
+          for project in Controller Agent Client; do
+            dotnet test --configuration Release --no-build --project "tests/Monitoring.$project.Tests" --filter-namespace "*.Budgets"
+          done
+      - name: Fetch the history
+        run: |
+          if git ls-remote --exit-code --heads origin perf-results >/dev/null; then
+            git worktree add perf-results origin/perf-results
+          else
+            git worktree add --orphan -b perf-results perf-results
+          fi
+      - name: Compare with the history
+        id: compare
+        continue-on-error: true
+        run: python3 scripts/perf-trend.py "$RUNNER_TEMP/run.tsv" perf-results/results.json perf-results/index.html "$GITHUB_SHA"
+      # Kept even when a value got worse, so the page shows it.
+      - name: Keep the results
+        working-directory: perf-results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add results.json index.html
+          git commit -m "perf: run of ${GITHUB_SHA::7}"
+          git push origin HEAD:perf-results
+      - name: Fail on a regression
+        if: steps.compare.outcome == 'failure'
+        run: exit 1

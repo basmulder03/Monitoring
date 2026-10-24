@@ -5,6 +5,7 @@ using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Instances;
 using Monitoring.Protocol.Messages;
 using Monitoring.Protocol.Reports;
+using Monitoring.Tests.Shared;
 using Shouldly;
 using Xunit;
 
@@ -52,6 +53,7 @@ public class ScaleBudgetTests(ITestOutputHelper output)
         // Assert
         var megabytes = held / 1_048_576.0;
         output.WriteLine($"{instances} instances x {SeriesPerInstance} series: {megabytes:F1} MB");
+        PerfResults.Record("controller.memory.5000x50", megabytes, "MB");
         megabytes.ShouldBeLessThan(150, "the design expects the latest values of 250,000 series to take a few tens of MB");
     }
 
@@ -67,6 +69,7 @@ public class ScaleBudgetTests(ITestOutputHelper output)
 
         // Assert
         output.WriteLine($"1000 instances x {SeriesPerInstance} series: {stream.Length / 1024.0:F0} KB per snapshot (limit {FrameCodec.DefaultMaxFrameBytes / 1024} KB)");
+        PerfResults.Record("protocol.snapshot.1000x50", stream.Length / 1024.0, "KB");
         stream.Length.ShouldBeLessThan(FrameCodec.DefaultMaxFrameBytes / 2, "a namespace of a thousand instances must fit with room to spare");
     }
 }

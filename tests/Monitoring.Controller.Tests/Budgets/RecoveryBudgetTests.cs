@@ -12,6 +12,7 @@ using Monitoring.Protocol.Health;
 using Monitoring.Protocol.Instances;
 using Monitoring.Protocol.Messages;
 using Monitoring.Protocol.Reports;
+using Monitoring.Tests.Shared;
 using Shouldly;
 using Xunit;
 
@@ -69,6 +70,7 @@ public class RecoveryBudgetTests(ITestOutputHelper output)
 
         // Assert
         output.WriteLine($"{Agents} agents x {InstancesPerAgent} instances x {SeriesPerInstance} series: a restarted controller has all of it again after {recovery.TotalMilliseconds:F0} ms");
+        PerfResults.Record("controller.recovery", recovery.TotalMilliseconds, "ms");
         Enumerable.Range(0, Agents).Sum(agent => second.Registry.GetInstances(Scope(agent)).Count).ShouldBe(Agents * InstancesPerAgent);
         recovery.ShouldBeLessThan(TimeSpan.FromSeconds(10), "every agent connects, authenticates and has its snapshot acknowledged");
 

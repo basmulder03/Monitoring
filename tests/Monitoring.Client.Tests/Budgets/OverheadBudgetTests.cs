@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Monitoring.Client.Features.Tracing;
+using Monitoring.Tests.Shared;
 using Shouldly;
 using Xunit;
 
@@ -39,6 +40,8 @@ public class OverheadBudgetTests(ITestOutputHelper output)
         // Assert
         var microseconds = clock.Elapsed.TotalMicroseconds / Calls;
         output.WriteLine($"{microseconds:F3} microseconds and {allocated / (double)Calls:F2} bytes per counted call");
+        PerfResults.Record("client.count.time", microseconds, "us");
+        PerfResults.Record("client.count.allocated", allocated / (double)Calls, "B");
         allocated.ShouldBeLessThan(Calls, "counting a call must not allocate more than a byte per call on average");
         microseconds.ShouldBeLessThan(5);
     }
