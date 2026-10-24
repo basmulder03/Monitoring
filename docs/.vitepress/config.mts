@@ -1,14 +1,25 @@
 import { defineConfig } from 'vitepress'
-import { withMermaid } from 'vitepress-plugin-mermaid'
 
 // Served from https://basmulder03.github.io/Monitoring/. A dead link fails the build, which is the link check of CI.
-export default withMermaid(defineConfig({
+export default defineConfig({
   title: 'Monitoring',
   description: 'A small, stateless, Native AOT monitoring system for .NET 10 workloads on Kubernetes and Windows.',
   base: '/Monitoring/',
   cleanUrls: true,
   lastUpdated: true,
   srcExclude: ['node_modules/**'],
+  // A fenced block marked mermaid becomes the Mermaid component, which draws it in the browser (see theme/Mermaid.vue).
+  markdown: {
+    config(md) {
+      const fence = md.renderer.rules.fence!
+      md.renderer.rules.fence = (tokens, index, options, env, self) => {
+        const token = tokens[index]
+        return token.info.trim() === 'mermaid'
+          ? `<Mermaid code="${encodeURIComponent(token.content)}" />`
+          : fence(tokens, index, options, env, self)
+      }
+    },
+  },
   // The trend page is fetched from the perf-results branch when the site is deployed, so it is not there while the links are checked.
   ignoreDeadLinks: [/performance-trend/],
   themeConfig: {
@@ -85,4 +96,4 @@ export default withMermaid(defineConfig({
     outline: [2, 3],
     socialLinks: [{ icon: 'github', link: 'https://github.com/basmulder03/Monitoring' }],
   },
-}))
+})
