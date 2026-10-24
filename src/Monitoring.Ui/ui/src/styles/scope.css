@@ -1,13 +1,13 @@
-details.package { background: var(--surface); border: 1px solid var(--border); border-radius: 0.5rem; margin: 0 0 0.5rem; }
+details.package { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin: 0 0 0.5rem; }
 details.package > summary { cursor: pointer; padding: 0.6rem 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
 .findings { list-style: none; margin: 0 0 1rem; padding: 0; display: grid; gap: 0.5rem; }
-.finding { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: baseline; padding: 0.5rem 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 0.5rem; }
+.finding { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: baseline; padding: 0.5rem 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
 .finding .severity { font-weight: 700; }
 .finding .severity.critical { color: var(--unhealthy); }
 .finding .severity.warning { color: var(--degraded); }
 .violation { color: var(--unhealthy); font-weight: 600; }
 .differs { color: var(--degraded); font-weight: 600; }
-details.service { background: var(--surface); border: 1px solid var(--border); border-radius: 0.5rem; margin: 0 0 0.5rem; }
+details.service { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin: 0 0 0.5rem; }
 details.service > summary { cursor: pointer; padding: 0.6rem 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
 table.instances, table.containers { width: 100%; border-collapse: collapse; }
 table.instances th, table.instances td, table.containers th, table.containers td { text-align: left; padding: 0.4rem 1rem; border-top: 1px solid var(--border); overflow-wrap: anywhere; }

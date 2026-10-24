@@ -2,42 +2,45 @@
    The tests check this, so change a colour only together with its pair. */
 :root {
   color-scheme: light dark;
-  --bg: #ffffff;
-  --surface: #f3f5f7;
-  --fg: #14181c;
-  --muted: #475059;
-  --border: #6b7680;
+  --font-text: Seravek, "Gill Sans Nova", Ubuntu, Calibri, "DejaVu Sans", system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  --radius: 0.3rem;
+  --bg: #fbf9f5;
+  --surface: #f1ede6;
+  --fg: #1d1a16;
+  --muted: #554c42;
+  --border: #766d62;
   --focus: #0b57d0;
   --healthy: #0b6e2e;
   --degraded: #7a4f00;
   --unhealthy: #b3261e;
-  --unknown: #4a5560;
+  --unknown: #4f4a43;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0e1217;
-    --surface: #171d24;
-    --fg: #eef2f6;
-    --muted: #b4bec8;
-    --border: #8996a3;
+    --bg: #14120f;
+    --surface: #1f1c18;
+    --fg: #f3efe8;
+    --muted: #c0b8ac;
+    --border: #988e80;
     --focus: #8ab4ff;
     --healthy: #62d68c;
     --degraded: #f2b84b;
     --unhealthy: #ff8f86;
-    --unknown: #b4bec8;
+    --unknown: #c0b8ac;
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #0e1217;
-  --surface: #171d24;
-  --fg: #eef2f6;
-  --muted: #b4bec8;
-  --border: #8996a3;
+  --bg: #14120f;
+  --surface: #1f1c18;
+  --fg: #f3efe8;
+  --muted: #c0b8ac;
+  --border: #988e80;
   --focus: #8ab4ff;
   --healthy: #62d68c;
   --degraded: #f2b84b;
   --unhealthy: #ff8f86;
-  --unknown: #b4bec8;
+  --unknown: #c0b8ac;
 }

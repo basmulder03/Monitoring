@@ -194,8 +194,8 @@ public class BrowserDashboardTests(BrowserFixture browser)
         var light = await page.Page.EvaluateAsync<string>("getComputedStyle(document.body).backgroundColor");
 
         // Assert
-        dark.ShouldBe("rgb(14, 18, 23)");
-        light.ShouldBe("rgb(255, 255, 255)");
+        dark.ShouldBe("rgb(20, 18, 15)");
+        light.ShouldBe("rgb(251, 249, 245)");
     }
 
     [Fact]
