@@ -15,7 +15,7 @@ spec:
       labels: {{- include "monitoring-controller.selector" . | nindent 8 }}
       annotations:
         # A new central configuration needs no restart, but a changed setting here does.
-        checksum/settings: {{ toYaml (dict "tokens" .Values.agentTokens "dashboard" .Values.dashboard "aligned" .Values.alignedPackages "replicas" .Values.replicaAddresses "transport" .Values.transport "auth" .Values.serviceAccountAuth "notifications" .Values.notifications "state" .Values.state "webAuth" .Values.webAuth) | sha256sum }}
+        checksum/settings: {{ toYaml (dict "tokens" .Values.agentTokens "dashboard" .Values.dashboard "aligned" .Values.alignedPackages "replicas" .Values.replicaAddresses "transport" .Values.transport "auth" .Values.serviceAccountAuth "notifications" .Values.notifications "state" .Values.state "webAuth" .Values.webAuth "webTls" .Values.webTls) | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -65,7 +65,11 @@ spec:
             {{- $name := include "monitoring-controller.name" . }}
             {{- range $i := until (int .Values.replicas) }}
             - name: MONITORING_Controller__Peers__{{ $i }}
-              value: {{ printf "http://%s-%d.%s-headless.%s.svc:%d" $name $i $name $.Release.Namespace (int $.Values.service.webPort) | quote }}
+              value: {{ printf "%s://%s-%d.%s-headless.%s.svc:%d" (ternary "https" "http" (not (empty $.Values.webTls.existingSecret))) $name $i $name $.Release.Namespace (int $.Values.service.webPort) | quote }}
+            {{- end }}
+            {{- if and .Values.webTls.existingSecret .Values.webTls.ca }}
+            - name: MONITORING_Controller__PeerCaFile
+              value: /etc/monitoring/web-tls/ca.crt
             {{- end }}
             {{- with .Values.peers.existingSecret }}
             - name: MONITORING_Controller__PeerToken
@@ -166,6 +170,12 @@ spec:
             - name: MONITORING_Controller__Web__Auth__Tokens__{{ $i }}__Role
               value: {{ default "viewer" $token.role | quote }}
             {{- end }}
+            {{- if .Values.webTls.existingSecret }}
+            - name: MONITORING_Controller__Web__Tls__Certificate
+              value: /etc/monitoring/web-tls/tls.crt
+            - name: MONITORING_Controller__Web__Tls__Key
+              value: /etc/monitoring/web-tls/tls.key
+            {{- end }}
             {{- if .Values.state.sqlite.enabled }}
             - name: MONITORING_Controller__State__SqlitePath
               value: /var/lib/monitoring/state.db
@@ -174,10 +184,10 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
           readinessProbe:
-            httpGet: { path: /healthz, port: web }
+            httpGet: { path: /healthz, port: web{{ if .Values.webTls.existingSecret }}, scheme: HTTPS{{ end }} }
             periodSeconds: 10
           livenessProbe:
-            httpGet: { path: /healthz, port: web }
+            httpGet: { path: /healthz, port: web{{ if .Values.webTls.existingSecret }}, scheme: HTTPS{{ end }} }
             initialDelaySeconds: 10
             periodSeconds: 30
           volumeMounts:
@@ -187,6 +197,11 @@ spec:
             {{- if ne .Values.transport.mode "none" }}
             - name: transport
               mountPath: /etc/monitoring/transport
+              readOnly: true
+            {{- end }}
+            {{- if .Values.webTls.existingSecret }}
+            - name: web-tls
+              mountPath: /etc/monitoring/web-tls
               readOnly: true
             {{- end }}
             {{- if .Values.advisories.existingConfigMap }}
@@ -207,6 +222,11 @@ spec:
         - name: transport
           secret:
             secretName: {{ required "transport.existingSecret is needed for tls and mtls" .Values.transport.existingSecret }}
+        {{- end }}
+        {{- if .Values.webTls.existingSecret }}
+        - name: web-tls
+          secret:
+            secretName: {{ .Values.webTls.existingSecret }}
         {{- end }}
         {{- if .Values.advisories.existingConfigMap }}
         - name: advisories

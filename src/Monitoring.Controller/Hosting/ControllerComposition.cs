@@ -194,6 +194,7 @@ internal static class ControllerComposition
                 options.Silences = [.. alerting.Items("Silences").Select(ReadSilence)];
                 options.Peers = [.. controller.List("Peers").Select(address => new Uri(address, UriKind.RelativeOrAbsolute))];
                 options.PeerToken = controller.Optional("PeerToken");
+                options.PeerCaFile = controller.Optional("PeerCaFile");
                 options.PeerInterval = controller.Duration("PeerInterval", options.PeerInterval);
             })
             .AddDashboard(options =>
@@ -263,7 +264,7 @@ internal static class ControllerComposition
         return app;
     }
 
-    /// <summary>Makes the web server listen where the settings say; plain HTTP, as for the agents, until transport security exists.</summary>
+    /// <summary>Makes the web server listen where the settings say: plain HTTP, or https when a certificate is given under <c>Web:Tls</c>.</summary>
     private static void ListenOn(WebApplicationBuilder builder, SettingsReader web)
     {
         var addressText = web.Text("Address", "0.0.0.0");
@@ -279,10 +280,26 @@ internal static class ControllerComposition
             throw new ConfigurationException($"Setting 'Controller:Web:Port' must be between 0 and 65535, but is {port}.");
         }
 
+        var tls = web.Section("Tls");
+        var certificate = tls.Optional("Certificate");
+        var key = tls.Optional("Key");
+        if ((certificate is null) != (key is null))
+        {
+            throw new ConfigurationException("Settings 'Controller:Web:Tls:Certificate' and 'Controller:Web:Tls:Key' go together: give both, or neither.");
+        }
+
         builder.WebHost.ConfigureKestrel(kestrel =>
         {
             kestrel.AddServerHeader = false;
-            kestrel.Listen(address, port);
+            if (certificate is null || key is null)
+            {
+                kestrel.Listen(address, port);
+                return;
+            }
+
+            // Read again when the files change, which is how a renewed certificate arrives in a pod, so a renewal needs no restart.
+            var current = new ReloadingCertificate(certificate, key);
+            kestrel.Listen(address, port, listen => listen.UseHttps(https => https.ServerCertificateSelector = (_, _) => current.Get()));
         });
     }
 

@@ -207,3 +207,26 @@ tests:
   - it: matches the snapshot of its default render
     asserts:
       - matchSnapshot: {}
+
+  - it: serves the dashboard over https from a secret, probes it that way, and has the replicas ask each other over https
+    template: templates/statefulset.yaml
+    documentSelector: { path: kind, value: StatefulSet }
+    set:
+      webTls: { existingSecret: dashboard-tls, ca: true }
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: MONITORING_Controller__Web__Tls__Certificate, value: /etc/monitoring/web-tls/tls.crt }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: MONITORING_Controller__Peers__0, value: "https://monitoring-controller-0.monitoring-controller-headless.NAMESPACE.svc:8080" }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: MONITORING_Controller__PeerCaFile, value: /etc/monitoring/web-tls/ca.crt }
+      - equal: { path: "spec.template.spec.containers[0].readinessProbe.httpGet.scheme", value: HTTPS }
+
+  - it: stays on http without a dashboard certificate
+    template: templates/statefulset.yaml
+    documentSelector: { path: kind, value: StatefulSet }
+    asserts:
+      - notExists: { path: "spec.template.spec.containers[0].readinessProbe.httpGet.scheme" }

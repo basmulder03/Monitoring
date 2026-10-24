@@ -76,6 +76,9 @@ public sealed class AlertingOptions
     /// <summary>A token of a viewer (or more) of the dashboard, which is how a replica that needs a sign-in asks the others; <see langword="null"/> when none is needed.</summary>
     public string? PeerToken { get; set; }
 
+    /// <summary>PEM file with the authority that signed the certificates of the peers, when they serve the dashboard over https with a certificate the system does not know.</summary>
+    public string? PeerCaFile { get; set; }
+
     /// <summary>How often the peers are asked.</summary>
     public TimeSpan PeerInterval { get; set; } = TimeSpan.FromSeconds(30);
 

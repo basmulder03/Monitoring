@@ -95,11 +95,43 @@ public static class AlertingSlice
         if (options.Peers.Count > 0)
         {
             services.AddSingleton(provider => new AlertActionsSync(
-                new HttpClient { Timeout = TimeSpan.FromSeconds(10) }, provider.GetRequiredService<AlertActions>(), options, provider.GetRequiredService<TimeProvider>(),
+                PeerClient(options.PeerCaFile), provider.GetRequiredService<AlertActions>(), options, provider.GetRequiredService<TimeProvider>(),
                 provider.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>().CreateLogger("Monitoring.Controller.AlertActions")));
             services.AddHostedService(provider => provider.GetRequiredService<AlertActionsSync>());
         }
 
         return services;
+    }
+
+    /// <summary>The client that asks the peers; with an authority given it trusts the peers' certificates by that authority alone.</summary>
+    private static HttpClient PeerClient(string? caFile)
+    {
+        var handler = new SocketsHttpHandler();
+        if (caFile is not null)
+        {
+            var authorities = new System.Security.Cryptography.X509Certificates.X509Certificate2Collection();
+            authorities.ImportFromPemFile(caFile);
+            handler.SslOptions.RemoteCertificateValidationCallback = (_, certificate, _, errors) =>
+            {
+                if (errors == System.Net.Security.SslPolicyErrors.None)
+                {
+                    return true;
+                }
+
+                // Only a chain the system does not know is acceptable; a wrong name never is.
+                if (certificate is null || (errors & ~System.Net.Security.SslPolicyErrors.RemoteCertificateChainErrors) != 0)
+                {
+                    return false;
+                }
+
+                using var chain = new System.Security.Cryptography.X509Certificates.X509Chain();
+                chain.ChainPolicy.TrustMode = System.Security.Cryptography.X509Certificates.X509ChainTrustMode.CustomRootTrust;
+                chain.ChainPolicy.CustomTrustStore.AddRange(authorities);
+                chain.ChainPolicy.RevocationMode = System.Security.Cryptography.X509Certificates.X509RevocationMode.NoCheck;
+                return chain.Build(new System.Security.Cryptography.X509Certificates.X509Certificate2(certificate));
+            };
+        }
+
+        return new HttpClient(handler, disposeHandler: true) { Timeout = TimeSpan.FromSeconds(10) };
     }
 }

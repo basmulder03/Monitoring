@@ -55,6 +55,73 @@ public class ControllerCompositionTests
     }
 
     [Fact]
+    public async Task CreateHost_serves_the_dashboard_over_https_when_a_certificate_is_given_and_picks_up_a_renewed_one()
+    {
+        // Arrange
+        var directory = Directory.CreateTempSubdirectory("dashboard-tls");
+        var cert = Path.Combine(directory.FullName, "tls.crt");
+        var key = Path.Combine(directory.FullName, "tls.key");
+        WriteCertificate(cert, key, "first");
+        var probe = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        probe.Start();
+        var port = ((System.Net.IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        using var host = new ControllerSettings().WithToken("shop", "secret")
+            .With("Controller:Web:Address", "127.0.0.1").With("Controller:Web:Port", port.ToString())
+            .With("Controller:Web:Tls:Certificate", cert).With("Controller:Web:Tls:Key", key).Build();
+        await host.StartAsync(TestContext.Current.CancellationToken);
+
+        try
+        {
+            // Act
+            async Task<string> SubjectAsync()
+            {
+                string? subject = null;
+                using var handler = new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, certificate, _, _) => { subject = certificate!.Subject; return true; } };
+                using var http = new HttpClient(handler);
+                (await http.GetAsync($"https://127.0.0.1:{port}/healthz", TestContext.Current.CancellationToken)).EnsureSuccessStatusCode();
+                return subject!;
+            }
+
+            var before = await SubjectAsync();
+            WriteCertificate(cert, key, "second");
+            File.SetLastWriteTimeUtc(cert, DateTime.UtcNow.AddMinutes(1));
+            var after = await SubjectAsync();
+
+            // Assert
+            before.ShouldBe("CN=first");
+            after.ShouldBe("CN=second");
+        }
+        finally
+        {
+            await host.StopAsync(TestContext.Current.CancellationToken);
+            directory.Delete(true);
+        }
+    }
+
+    [Fact]
+    public void CreateHost_refuses_a_certificate_for_the_dashboard_without_its_key()
+    {
+        // Arrange
+        var settings = new ControllerSettings().WithToken("shop", "secret").With("Controller:Web:Tls:Certificate", "/nowhere/tls.crt");
+
+        // Act
+        var build = () => settings.Build();
+
+        // Assert
+        build.ShouldThrow<ConfigurationException>().Message.ShouldContain("go together");
+    }
+
+    private static void WriteCertificate(string certFile, string keyFile, string name)
+    {
+        using var rsa = System.Security.Cryptography.RSA.Create(2048);
+        var request = new System.Security.Cryptography.X509Certificates.CertificateRequest($"CN={name}", rsa, System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pkcs1);
+        using var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddDays(1));
+        File.WriteAllText(certFile, certificate.ExportCertificatePem());
+        File.WriteAllText(keyFile, rsa.ExportPkcs8PrivateKeyPem());
+    }
+
+    [Fact]
     public async Task CreateHost_serves_the_state_of_the_replica_to_prometheus_when_a_port_is_set()
     {
         // Arrange

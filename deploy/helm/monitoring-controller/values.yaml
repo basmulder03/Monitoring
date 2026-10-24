@@ -40,6 +40,13 @@ webAuth:
   operatorGroup: ""         # people the proxy says belong to this group (header X-Forwarded-Groups) are operators, the rest viewers
   tokens: []                # - { name: wall-display, hash: "<sha-256 of the token>", role: viewer }
 
+# Serve the dashboard over https from this pod, instead of leaving that to an ingress or route. A secret with tls.crt and tls.key; a renewed certificate is picked up
+# without a restart. The replicas ask each other over https as well (peers), by the names of their pods, so the certificate must be valid for
+# monitoring-controller-N.monitoring-controller-headless.<namespace>.svc. When the secret also has ca.crt and ca is true, the replicas trust that authority for it.
+webTls:
+  existingSecret: ""
+  ca: false
+
 # What operators do on the dashboard (silences, acknowledgements) exists nowhere else, so each replica copies it from the others now and then.
 # With webAuth on, the replicas need a token to ask each other: put the hash of a token with role viewer in webAuth.tokens, and the token itself
 # in a secret with one key, named here.
