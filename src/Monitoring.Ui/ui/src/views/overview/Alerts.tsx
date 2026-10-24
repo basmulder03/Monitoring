@@ -94,7 +94,7 @@ function Silences({ canChange, refresh, now, onTakeBack }: { canChange: boolean;
       <h3>Silences in force</h3>
       <ul class="alerts">
         {loaded.value.map((silence) => (
-          <li class="alert" key={silence.id}>
+          <li class="silence" key={silence.id}>
             <span>
               {silence.rule === "*" ? "Every rule" : silence.rule}, {silence.subjectPrefix === "" ? "every subject" : `subjects starting with ${silence.subjectPrefix}`}
             </span>
@@ -123,7 +123,7 @@ function RecentAlerts({ refresh, now }: { refresh: unknown; now: number }) {
       <summary>Recent alerts</summary>
       <ul class="alerts">
         {loaded.value.map((o) => (
-          <li class="alert" key={`${o.key}@${o.started}`}>
+          <li class="occurrence" key={`${o.key}@${o.started}`}>
             <span class={`severity ${o.severity.toLowerCase()}`}>{o.severity}</span>
             <span>{o.subject}</span>
             <span class="muted">
