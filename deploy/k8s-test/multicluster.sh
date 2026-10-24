@@ -6,6 +6,7 @@
 #   deploy/k8s-test/multicluster.sh              builds the images, creates both clusters, tests, deletes them
 #   KEEP=1 deploy/k8s-test/multicluster.sh       leaves the clusters for a look
 #   SKIP_BUILD=1 deploy/k8s-test/multicluster.sh uses the images monitoring-*:dev that are there
+#   SKIP_FAILOVER=1 deploy/k8s-test/multicluster.sh skips the failover of the agents and goes on to the two controllers
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -156,6 +157,7 @@ ready_agents() { # context namespace
 watch_start() { : >"$work/watch"; ( while true; do if healthy "$1"; then echo ok; else echo bad; fi >>"$work/watch"; sleep 1; done ) & watcher=$!; pids+=($watcher); }
 watch_stop() { kill "$watcher" 2>/dev/null || true; wait "$watcher" 2>/dev/null || true; grep -c bad "$work/watch" || true; }
 
+if [ "${SKIP_FAILOVER:-0}" != 1 ]; then
 for pair in "kind-$a shop-a" "kind-$b shop-b"; do
   set -- $pair; ctx="$1"; ns="$2"
   two_ready() { [ "$(ready_agents "$ctx" "$ns")" = 2 ]; }
@@ -189,12 +191,125 @@ for pair in "kind-$a shop-a" "kind-$b shop-b"; do
   [ "$bad" -le 60 ] || fail "the application in $ns was out of sight for $bad s during a rollout of the agents"
   eventually 60 two_ready || fail "$ns has $(ready_agents "$ctx" "$ns") ready agents after the rollout"
 done
+fi
 
 step "A lost controller replica changes nothing for the scope of the other cluster"
 ka delete pod monitoring-controller-1 -n monitoring --grace-period=0 --force >/dev/null 2>&1
 healthy shop-b || fail "the scope of cluster B went away with one controller replica"
 ka rollout status statefulset/monitoring-controller -n monitoring --timeout=180s >/dev/null
 echo "ok"
+
+# --- controllers in both clusters, and one sender between them
+step "A controller in each cluster, every agent reporting to all four replicas"
+node_b="$(docker inspect -f '{{(index .NetworkSettings.Networks "kind").IPAddress}}' "$b-control-plane")"
+
+# What the controllers send is collected by a small receiver in cluster A that both clusters reach through a node port, and that prints every body it gets.
+docker image inspect python:3-alpine >/dev/null 2>&1 || docker pull -q python:3-alpine >/dev/null
+# One platform only: kind cannot load the multi-platform image of a registry as it is.
+docker save --platform linux/amd64 python:3-alpine -o "$work/python.tar" 2>/dev/null || docker save python:3-alpine -o "$work/python.tar"
+kind load image-archive "$work/python.tar" --name "$a" >/dev/null
+ka apply -f - >/dev/null <<'YAML'
+apiVersion: v1
+kind: Pod
+metadata: { name: receiver, labels: { app: receiver } }
+spec:
+  containers:
+    - name: receiver
+      image: python:3-alpine
+      imagePullPolicy: Never
+      command: [python, -u, -c]
+      args:
+        - |
+          import http.server
+          class H(http.server.BaseHTTPRequestHandler):
+              def do_POST(self):
+                  print(self.rfile.read(int(self.headers.get("Content-Length", 0))).decode(), flush=True)
+                  self.send_response(204); self.end_headers()
+              def log_message(self, *a): pass
+          http.server.ThreadingHTTPServer(("0.0.0.0", 8000), H).serve_forever()
+---
+apiVersion: v1
+kind: Service
+metadata: { name: receiver }
+spec:
+  type: NodePort
+  selector: { app: receiver }
+  ports: [{ port: 8000, targetPort: 8000, nodePort: 30555 }]
+YAML
+ka wait --for=condition=Ready pod/receiver --timeout=120s >/dev/null || fail "the receiver did not start"
+hooks() { ka logs receiver 2>/dev/null | grep '^{' || true; }
+
+all_agents="$node_a:30440,$node_a:30441,$node_b:30440,$node_b:30441"
+sites=("kind-$a $node_a dc1 0 $node_b" "kind-$b $node_b dc2 10 $node_a")
+for site in "${sites[@]}"; do
+  set -- $site; ctx="$1"; own="$2"; name="$3"; rank="$4"; other="$5"
+  if [ "$ctx" = "kind-$b" ]; then
+    kubectl --context "$ctx" create namespace monitoring >/dev/null
+    kubectl --context "$ctx" create secret generic controller-tls -n monitoring --from-file=tls.crt="$work/tls.crt" --from-file=tls.key="$work/tls.key" >/dev/null
+  fi
+  for i in 0 1; do
+    kubectl --context "$ctx" apply -n monitoring -f - >/dev/null <<YAML
+apiVersion: v1
+kind: Service
+metadata: { name: monitoring-controller-$i-external }
+spec:
+  type: NodePort
+  selector: { statefulset.kubernetes.io/pod-name: monitoring-controller-$i }
+  ports:
+    - { name: agents, port: 9440, targetPort: 9440, nodePort: 3044$i }
+    - { name: web, port: 8080, targetPort: 8080, nodePort: 3008$i }
+YAML
+  done
+  helm --kube-context "$ctx" upgrade --install monitoring-controller "$root/deploy/helm/monitoring-controller" -n monitoring \
+    --set image.repository=monitoring-controller --set image.tag=dev --set image.pullPolicy=Never \
+    --set "agentTokens[0].scope=*" --set "agentTokens[0].tokenHash=$hash" \
+    --set transport.mode=tls --set transport.existingSecret=controller-tls \
+    --set "replicaAddresses={$all_agents}" \
+    --set notifications.peerSender=true --set "notifications.webhooks[0].url=http://$node_a:30555/hook" \
+    --set replica.site="$name" --set replica.rank="$rank" \
+    --set "peers.extra={http://$other:30080,http://$other:30081}" \
+    --set 'extraEnv[0].name=MONITORING_Controller__Alerting__StartupGrace' --set 'extraEnv[0].value=00:00:05' >/dev/null
+  kubectl --context "$ctx" rollout status statefulset/monitoring-controller -n monitoring --timeout=180s >/dev/null || fail "the controller of $name did not become ready"
+done
+
+kb port-forward -n monitoring pod/monitoring-controller-0 18082:8080 >/dev/null 2>&1 &
+pids+=($!)
+ka port-forward -n monitoring pod/monitoring-controller-0 "$web_forward:8080" >/dev/null 2>&1 &
+pids+=($!)
+eventually 30 curl -fsS http://127.0.0.1:18082/api/overview || fail "the dashboard of cluster B cannot be reached"
+
+# The agents learn the other controllers from the first, when they connect again; the one in B has to know both scopes without anyone telling it.
+seen_in_b() { curl -fsS http://127.0.0.1:18082/api/scopes/shop-a >/dev/null && curl -fsS http://127.0.0.1:18082/api/scopes/shop-b >/dev/null; }
+eventually 150 seen_in_b || fail "the controller in cluster B does not show both scopes, so the agents did not start reporting to it"
+echo "ok"
+
+step "An alert is sent once, from one of the two sites"
+ka scale deployment/orders -n shop-a --replicas=0 >/dev/null
+fired() { hooks | grep -q '"status":"firing"'; }
+eventually 120 fired || fail "no controller sent the alert that the service in shop-a is down"
+sleep 25
+keys="$(hooks | python3 -c '
+import json, sys, collections
+count = collections.Counter()
+for line in sys.stdin:
+    d = json.loads(line)
+    if d["status"] == "firing":
+        count[d["key"]] += 1
+print(max(count.values()), len(count))
+')"
+echo "most times one alert was sent: ${keys% *}, alerts: ${keys#* }"
+[ "${keys% *}" = 1 ] || fail "an alert was sent more than once between the two sites ($keys)"
+echo "ok"
+
+step "With the first site's controllers gone, the other site sends, and nothing is lost"
+before="$(hooks | grep -c '"status":"firing"')"
+# The replicas of the first site are stopped for good (not restarted), so the second site cannot see them for as long as it takes to be sure.
+ka scale statefulset/monitoring-controller -n monitoring --replicas=0 >/dev/null
+more() { [ "$(hooks | grep -c '"status":"firing"')" -gt "$before" ]; }
+eventually 90 more || fail "the other site did not take over sending when the first was gone"
+echo "ok (a new sender tells again what it has not told before; the receiver de-duplicates by key)"
+ka scale statefulset/monitoring-controller -n monitoring --replicas=2 >/dev/null
+ka rollout status statefulset/monitoring-controller -n monitoring --timeout=180s >/dev/null || fail "the controller of the first site did not come back"
 
 echo
 echo "Multi-cluster test passed"

@@ -31,6 +31,14 @@ var settings = new Dictionary<string, string?>
     ["Controller:Registry:GoneRetention"] = "00:00:08",
     ["Controller:Registry:PurgeInterval"] = "00:00:02",
 };
+// With DEMO_SIGNED_IN=1 the dashboard believes the headers X-Forwarded-User and X-Forwarded-Groups from this machine, as it would behind a proxy that signs people in; a group named ops
+// makes an operator. That is what the recording of silencing an alert uses (docs/scripts/record-dashboard.mjs). Without it the dashboard is open and shows no buttons to change anything.
+if (Environment.GetEnvironmentVariable("DEMO_SIGNED_IN") == "1")
+{
+    settings["Controller:Web:Auth:TrustedProxies:0"] = "127.0.0.1";
+    settings["Controller:Web:Auth:OperatorGroup"] = "ops";
+}
+
 using var controller = ControllerComposition.CreateHost([], settings, Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}.json"));
 await controller.StartAsync();
 var endpoint = controller.Services.GetRequiredService<IAgentListener>().LocalEndPoint!;

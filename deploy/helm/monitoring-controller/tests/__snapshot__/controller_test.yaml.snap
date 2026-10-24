@@ -80,7 +80,7 @@ matches the snapshot of its default render:
       template:
         metadata:
           annotations:
-            checksum/settings: 3720510e06ee4fc2d5688fd12bcb987653d960267140fc0944ee7bcd2a8a1359
+            checksum/settings: e95ad87240d81174c2c08355be01860cd012281a830ece60967e442e28e9c807
           labels:
             app.kubernetes.io/instance: RELEASE-NAME
             app.kubernetes.io/name: monitoring-controller

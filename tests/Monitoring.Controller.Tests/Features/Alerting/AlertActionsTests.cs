@@ -201,6 +201,7 @@ public class AlertActionsTests
         builder.Services.AddSingleton(actions);
         builder.Services.AddSingleton(history ?? new AlertHistory(new FakeTimeProvider()));
         builder.Services.AddSingleton<TimeProvider>(new FakeTimeProvider());
+        builder.Services.AddSingleton(new AlertingOptions());
         builder.Services.AddWebAuth(o =>
         {
             if (authentication)
@@ -381,6 +382,42 @@ public class AlertActionsTests
         mine.Silences().Single().Reason.ShouldBe("maintenance");
         seen.Select(r => r.Uri.AbsoluteUri).ShouldBe(["http://down:8080/api/actions", "http://up:8080/api/actions"]);
         seen.ShouldAllBe(r => r.Authorization == "Bearer viewer-secret");
+    }
+
+    [Fact]
+    public async Task The_replica_that_ranks_first_among_those_it_can_reach_is_the_one_that_sends()
+    {
+        // Arrange: another data center's replica, rank 10, and this one, rank 0 or 20
+        var clock = new FakeTimeProvider();
+        var up = true;
+        var handler = new ReplyingHandler(_ =>
+        {
+            if (!up)
+            {
+                return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+            }
+
+            var reply = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"silences\":[],\"acknowledgements\":[]}") };
+            reply.Headers.Add(AlertActionsSync.ReplicaHeader, "10/dc2-controller-0");
+            return reply;
+        });
+        AlertActionsSync Replica(int rank) => new(new HttpClient(handler), new AlertActions(clock),
+            new AlertingOptions { Peers = [new Uri("http://dc2:8080")], ReplicaId = "dc1-controller-0", ReplicaRank = rank }, clock, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+        var first = Replica(0);
+        var second = Replica(20);
+
+        // Act
+        await first.SyncAsync(Ct);
+        await second.SyncAsync(Ct);
+        var whileLinked = (first.IsFirst, second.IsFirst);
+        up = false;
+        clock.Advance(TimeSpan.FromSeconds(31));
+        await second.SyncAsync(Ct);
+        var afterLinkBroke = second.IsFirst;
+
+        // Assert
+        whileLinked.ShouldBe((true, false));
+        afterLinkBroke.ShouldBeTrue(); // the peer cannot be reached, so both sides send: told twice rather than not at all
     }
 
     [Fact]

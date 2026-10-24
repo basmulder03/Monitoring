@@ -58,6 +58,10 @@ public static class NotificationsSlice
             services.AddSingleton<ILeaderElection>(provider => provider.GetRequiredService<LeaseLeaderElection>());
             services.AddHostedService(provider => provider.GetRequiredService<LeaseLeaderElection>());
         }
+        else if (options.Leader.Mode.Equals("peers", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<ILeaderElection>(provider => new PeerLeaderElection(provider.GetRequiredService<IReplicaPeers>()));
+        }
         else
         {
             services.AddSingleton<ILeaderElection, AlwaysLeader>();
@@ -90,9 +94,9 @@ public static class NotificationsSlice
             throw new ArgumentException($"The lowest severity must be 'warning' or 'critical', but is '{options.MinSeverity}'.", nameof(options));
         }
 
-        if (options.Leader.Mode.ToLowerInvariant() is not ("none" or "lease"))
+        if (options.Leader.Mode.ToLowerInvariant() is not ("none" or "lease" or "peers"))
         {
-            throw new ArgumentException($"The leader mode must be 'none' or 'lease', but is '{options.Leader.Mode}'.", nameof(options));
+            throw new ArgumentException($"The leader mode must be 'none', 'lease' or 'peers', but is '{options.Leader.Mode}'.", nameof(options));
         }
 
         ArgumentOutOfRangeException.ThrowIfLessThan(options.Leader.LeaseDuration, TimeSpan.FromSeconds(3));

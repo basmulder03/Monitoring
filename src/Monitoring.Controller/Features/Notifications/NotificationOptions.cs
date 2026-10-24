@@ -38,7 +38,7 @@ public sealed class EmailTarget
 /// <summary>How the controller picks its leader for sending.</summary>
 public sealed class LeaderOptions
 {
-    /// <summary><c>none</c>: every replica sends, and the receiver relies on the stable key to de-duplicate. <c>lease</c>: one replica sends, chosen through a Kubernetes Lease.</summary>
+    /// <summary><c>none</c>: every replica sends, and the receiver relies on the stable key to de-duplicate. <c>lease</c>: one replica sends, chosen through a Kubernetes Lease, which needs all replicas in one cluster. <c>peers</c>: one replica sends, the one that ranks first among those it can reach through <c>Controller:Peers</c> (see <c>ReplicaRank</c>), which also works across data centers.</summary>
     public string Mode { get; set; } = "none";
 
     /// <summary>The name of the Lease.</summary>

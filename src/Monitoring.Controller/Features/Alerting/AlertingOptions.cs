@@ -79,8 +79,17 @@ public sealed class AlertingOptions
     /// <summary>PEM file with the authority that signed the certificates of the peers, when they serve the dashboard over https with a certificate the system does not know.</summary>
     public string? PeerCaFile { get; set; }
 
+    /// <summary>Name of this replica among the others; the machine name (the pod name) when empty. It has to differ between replicas, also between data centers.</summary>
+    public string? ReplicaId { get; set; }
+
+    /// <summary>
+    /// Which replica ranks first: the one with the lowest rank, or with the lowest name when the rank is equal, among the replicas that can be reached. Only used to pick
+    /// the one replica that sends alerts when notifications use <c>Leader:Mode</c> <c>peers</c>. Give the replicas of the main data center a lower rank than the others.
+    /// </summary>
+    public int ReplicaRank { get; set; }
+
     /// <summary>How often the peers are asked.</summary>
-    public TimeSpan PeerInterval { get; set; } = TimeSpan.FromSeconds(30);
+    public TimeSpan PeerInterval { get; set; } = TimeSpan.FromSeconds(10);
 
     /// <summary>How long a vulnerable package version must be in use before its alert fires; zero fires at once.</summary>
     public TimeSpan VulnerablePackageWait { get; set; } = TimeSpan.Zero;

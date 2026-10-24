@@ -26,6 +26,10 @@ notifications:
   # Only one replica sends, chosen through a Kubernetes Lease (creates a service account and a role for that one object). Off: every replica sends,
   # and the receiver de-duplicates by the key in each message.
   oneSender: false
+  # One replica sends, chosen without Kubernetes: the one that ranks first among the replicas it can reach (see replica below). Use this instead of oneSender
+  # when the replicas run in more than one cluster or data center, because a Lease exists in one cluster only. When the link between the sites breaks
+  # both sides send, so an alert is told twice rather than not at all. It needs peers.extra to name the replicas of the other sites.
+  peerSender: false
   webhooks: []                # - { url: "https://hooks.example/alerts", secretSecret: { name: hook, key: secret } }  (JSON with an HMAC signature header when there is a secret)
   chats: []                   # - { urlSecret: { name: slack, key: url }, format: slack }   (slack, also for Mattermost and Google Chat, or discord)
   email: {}                   # { host: smtp.example, port: 587, from: monitoring@example, to: [oncall@example], user: x, passwordSecret: { name: smtp, key: password } }
@@ -52,8 +56,15 @@ webTls:
 # in a secret with one key, named here.
 peers:
   enabled: true
+  extra: []                 # the web addresses of replicas elsewhere, such as https://monitoring.dc2.example, one per replica
   existingSecret: ""
   key: token
+
+# Who this replica is when several sites run one: the site name goes in front of the pod name, so replicas of different clusters never share a name,
+# and the replicas of the main site get the lowest rank, which makes them the ones that send alerts when everything is up.
+replica:
+  site: ""
+  rank: 0
 
 # What the controller keeps across a restart, such as the history of changes. In memory by default, which loses it.
 state:

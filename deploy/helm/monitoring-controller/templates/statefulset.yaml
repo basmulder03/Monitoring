@@ -15,7 +15,7 @@ spec:
       labels: {{- include "monitoring-controller.selector" . | nindent 8 }}
       annotations:
         # A new central configuration needs no restart, but a changed setting here does.
-        checksum/settings: {{ toYaml (dict "tokens" .Values.agentTokens "dashboard" .Values.dashboard "aligned" .Values.alignedPackages "replicas" .Values.replicaAddresses "transport" .Values.transport "auth" .Values.serviceAccountAuth "notifications" .Values.notifications "state" .Values.state "webAuth" .Values.webAuth "webTls" .Values.webTls) | sha256sum }}
+        checksum/settings: {{ toYaml (dict "tokens" .Values.agentTokens "dashboard" .Values.dashboard "aligned" .Values.alignedPackages "replicas" .Values.replicaAddresses "transport" .Values.transport "auth" .Values.serviceAccountAuth "notifications" .Values.notifications "state" .Values.state "webAuth" .Values.webAuth "webTls" .Values.webTls "replica" .Values.replica "peerSender" .Values.notifications.peerSender "peersExtra" .Values.peers.extra) | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -61,11 +61,15 @@ spec:
             - name: MONITORING_Controller__Replicas__{{ $i }}
               value: {{ $address | quote }}
             {{- end }}
-            {{- if and .Values.peers.enabled (gt (int .Values.replicas) 1) }}
+            {{- if and .Values.peers.enabled (or (gt (int .Values.replicas) 1) .Values.peers.extra) }}
             {{- $name := include "monitoring-controller.name" . }}
             {{- range $i := until (int .Values.replicas) }}
             - name: MONITORING_Controller__Peers__{{ $i }}
               value: {{ printf "%s://%s-%d.%s-headless.%s.svc:%d" (ternary "https" "http" (not (empty $.Values.webTls.existingSecret))) $name $i $name $.Release.Namespace (int $.Values.service.webPort) | quote }}
+            {{- end }}
+            {{- range $j, $address := .Values.peers.extra }}
+            - name: MONITORING_Controller__Peers__{{ add $j (int $.Values.replicas) }}
+              value: {{ $address | quote }}
             {{- end }}
             {{- if and .Values.webTls.existingSecret .Values.webTls.ca }}
             - name: MONITORING_Controller__PeerCaFile
@@ -147,6 +151,19 @@ spec:
             {{- include "monitoring-controller.setting" (list "MONITORING_Controller__Notifications__Email__User" .user .userSecret) | nindent 12 }}
             {{- include "monitoring-controller.setting" (list "MONITORING_Controller__Notifications__Email__Password" "" .passwordSecret) | nindent 12 }}
             {{- end }}
+            {{- end }}
+            {{- if and .Values.notifications.oneSender .Values.notifications.peerSender }}{{ fail "notifications.oneSender and notifications.peerSender exclude each other" }}{{ end }}
+            {{- if .Values.notifications.peerSender }}
+            - name: MONITORING_Controller__Notifications__Leader__Mode
+              value: peers
+            {{- end }}
+            {{- if or .Values.notifications.peerSender .Values.replica.site }}
+            - name: POD_NAME
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+            - name: MONITORING_Controller__ReplicaId
+              value: "{{ required "replica.site names this site, so replicas of different clusters have different names" .Values.replica.site }}-$(POD_NAME)"
+            - name: MONITORING_Controller__ReplicaRank
+              value: {{ .Values.replica.rank | quote }}
             {{- end }}
             {{- if .Values.notifications.oneSender }}
             - name: MONITORING_Controller__Notifications__Leader__Mode

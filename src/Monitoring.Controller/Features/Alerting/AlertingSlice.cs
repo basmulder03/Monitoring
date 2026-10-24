@@ -98,6 +98,11 @@ public static class AlertingSlice
                 PeerClient(options.PeerCaFile), provider.GetRequiredService<AlertActions>(), options, provider.GetRequiredService<TimeProvider>(),
                 provider.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>().CreateLogger("Monitoring.Controller.AlertActions")));
             services.AddHostedService(provider => provider.GetRequiredService<AlertActionsSync>());
+            services.AddSingleton<IReplicaPeers>(provider => provider.GetRequiredService<AlertActionsSync>());
+        }
+        else
+        {
+            services.AddSingleton<IReplicaPeers, NoPeers>();
         }
 
         return services;

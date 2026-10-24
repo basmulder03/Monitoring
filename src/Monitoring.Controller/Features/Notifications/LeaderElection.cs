@@ -12,6 +12,16 @@ internal sealed class AlwaysLeader : ILeaderElection
     public bool IsLeader => true;
 }
 
+/// <summary>
+/// One replica sends: the one that ranks first among the replicas it can reach, which needs no shared Kubernetes cluster and so also works with replicas in several data centers.
+/// </summary>
+/// <param name="peers">What this replica knows of the others.</param>
+internal sealed class PeerLeaderElection(Alerting.IReplicaPeers peers) : ILeaderElection
+{
+    /// <inheritdoc />
+    public bool IsLeader => peers.IsFirst;
+}
+
 /// <summary>A Lease as the API server of Kubernetes holds it.</summary>
 /// <param name="Metadata">Its name and version.</param>
 /// <param name="Spec">Who holds it, and until when.</param>

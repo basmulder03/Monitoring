@@ -18,6 +18,12 @@ These recordings show the real dashboard, served by a real controller. The agent
 
 <p id="scope-text">Inside a scope, a failing instance goes from Running to Terminating to Gone while its replacement starts. The service with the problem opens by itself. A removed instance stays visible as Gone for ten minutes (the demo shortens that), so you can see what disappeared.</p>
 
+## Alerts: acknowledge and silence
+
+<video :src="withBase('/recordings/silence.webm')" controls loop muted autoplay playsinline preload="metadata" aria-describedby="silence-text"></video>
+
+<p id="silence-text">An operator marks an alert as seen, so everyone can tell somebody is on it, and silences another for an hour with a reason. The silence appears under the alerts with who made it and when it ends, and can be taken back. Only a person who signed in as an operator sees these buttons. Here the demo host believes the headers of a proxy, which is how it would work behind one.</p>
+
 ## Dependencies: who calls whom
 
 <video :src="withBase('/recordings/dependencies.webm')" controls loop muted autoplay playsinline preload="metadata" aria-describedby="dependencies-text"></video>
@@ -27,8 +33,8 @@ These recordings show the real dashboard, served by a real controller. The agent
 ## Try it and record it yourself
 
 ```sh
-dotnet run --project samples/Monitoring.Demo     # dashboard on http://127.0.0.1:5080
-cd docs && npm run record                         # writes docs/public/recordings/*.webm
+DEMO_SIGNED_IN=1 dotnet run --project samples/Monitoring.Demo     # dashboard on http://127.0.0.1:5080
+cd docs && npm run record                                          # writes docs/public/recordings/*.webm
 ```
 
 The components and icons of the dashboard are listed in [Dashboard components and icons](reference/ui). The [design](design#dashboard-ui) explains how it is made to be read from across a room.

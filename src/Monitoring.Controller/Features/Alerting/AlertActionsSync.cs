@@ -13,8 +13,13 @@ namespace Monitoring.Controller.Features.Alerting;
 /// <param name="options">Provides the peers and the interval.</param>
 /// <param name="time">Clock for the interval.</param>
 /// <param name="logger">Receives the peers that cannot be reached.</param>
-internal sealed class AlertActionsSync(HttpClient http, AlertActions actions, AlertingOptions options, TimeProvider time, ILogger logger) : BackgroundService
+internal sealed class AlertActionsSync(HttpClient http, AlertActions actions, AlertingOptions options, TimeProvider time, ILogger logger) : BackgroundService, IReplicaPeers
 {
+    /// <summary>The header with which a replica says who it is (<c>rank/name</c>) on <c>/api/actions</c>.</summary>
+    public const string ReplicaHeader = "X-Monitoring-Replica";
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Uri, (int Rank, string Id, DateTimeOffset Seen)> _seen = new();
+
     private const int MaxBytes = 1024 * 1024;
     private readonly HashSet<Uri> _unreachable = [];
 
@@ -34,6 +39,18 @@ internal sealed class AlertActionsSync(HttpClient http, AlertActions actions, Al
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
             // Shutdown requested.
+        }
+    }
+
+    /// <inheritdoc />
+    public bool IsFirst
+    {
+        get
+        {
+            var me = (options.ReplicaRank, Id: options.ReplicaId ?? Environment.MachineName);
+            var fresh = time.GetUtcNow() - (options.PeerInterval * 3);
+            return !_seen.Values.Any(peer =>
+                peer.Seen >= fresh && peer.Id != me.Id && (peer.Rank < me.ReplicaRank || (peer.Rank == me.ReplicaRank && string.CompareOrdinal(peer.Id, me.Id) < 0)));
         }
     }
 
@@ -70,6 +87,11 @@ internal sealed class AlertActionsSync(HttpClient http, AlertActions actions, Al
                     {
                         throw new InvalidDataException("The answer is too large.");
                     }
+                }
+
+                if (response.Headers.TryGetValues(ReplicaHeader, out var who) && who.FirstOrDefault()?.Split('/', 2) is [var rank, var id] && int.TryParse(rank, out var number))
+                {
+                    _seen[peer] = (number, id, time.GetUtcNow());
                 }
 
                 actions.Merge(JsonSerializer.Deserialize(limited.ToArray(), AlertActionsJsonContext.Default.ActionsExport) ?? new ActionsExport([], []));

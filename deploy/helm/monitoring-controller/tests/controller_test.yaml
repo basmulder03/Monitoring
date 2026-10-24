@@ -230,3 +230,30 @@ tests:
     documentSelector: { path: kind, value: StatefulSet }
     asserts:
       - notExists: { path: "spec.template.spec.containers[0].readinessProbe.httpGet.scheme" }
+
+  - it: with replicas in several sites picks the sender among the replicas it can reach, names itself by site, and asks the replicas elsewhere
+    template: templates/statefulset.yaml
+    documentSelector: { path: kind, value: StatefulSet }
+    set:
+      notifications: { peerSender: true }
+      replica: { site: dc2, rank: 10 }
+      peers: { enabled: true, extra: ["https://monitoring.dc1.example"] }
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: MONITORING_Controller__Notifications__Leader__Mode, value: peers }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: MONITORING_Controller__ReplicaId, value: "dc2-$(POD_NAME)" }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: MONITORING_Controller__ReplicaRank, value: "10" }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: MONITORING_Controller__Peers__2, value: "https://monitoring.dc1.example" }
+
+  - it: refuses to pick the sender through a lease and through the peers at once, and a peer sender without a site name
+    template: templates/statefulset.yaml
+    set: { notifications: { peerSender: true, oneSender: true }, replica: { site: dc1 } }
+    asserts:
+      - failedTemplate: { errorPattern: "exclude each other" }

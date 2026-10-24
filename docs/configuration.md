@@ -144,7 +144,7 @@ Besides the dashboard, alerts can be sent to a webhook, a chat or an email addre
 | `Controller:Notifications:MinSeverity` | `warning` | Only alerts of this severity and above are sent: `warning` or `critical` |
 | `Controller:Notifications:Interval` | `00:00:05` | How often the alerts are compared with what was sent |
 | `Controller:Notifications:Source` | host name | The name of this controller in what is sent, so receivers can tell environments apart |
-| `Controller:Notifications:Leader:Mode` | `none` | `none`: every replica sends, and the receiver de-duplicates by `key`. `lease`: one replica sends, chosen through a Kubernetes Lease |
+| `Controller:Notifications:Leader:Mode` | `none` | `none`: every replica sends, and the receiver de-duplicates by `key`. `lease`: one replica sends, chosen through a Kubernetes Lease, which needs all replicas in one cluster. `peers`: one replica sends, the one that ranks first among those it can reach, which also works across data centers, see [Replicas in several data centers](#replicas-in-several-data-centers) |
 | `Controller:Notifications:Leader:LeaseName`, `:LeaseNamespace`, `:LeaseDuration`, `:ApiServer` | `monitoring-controller-alerts`, the namespace of the pod, `00:00:15`, the cluster of the pod | The Lease to hold. The replica that holds it renews it every third of the duration; another takes over when it has been silent for the whole duration. A replica that cannot reach the API server stops sending when its own lease would have run out, so a failure costs at worst a repeated message |
 
 With `Mode=lease` the controller needs the right to create the Lease and to get and update that one object; the chart does this with `notifications.oneSender=true`. The Helm values are `notifications.webhooks`, `chats` and `email`, with `urlSecret`, `secretSecret`, `userSecret` and `passwordSecret` to read a value from a secret instead of the values file. A message can arrive twice when the leader changes at the wrong moment; use `key` to de-duplicate if that matters to you.
@@ -228,7 +228,7 @@ A silence keeps alerts out of the dashboard until it ends, for example during pl
 An operator can also act on an alert on the dashboard. **Acknowledge** says someone is looking at it: the alert stays in the list, with who and when, and the acknowledgement goes when the problem does. **Silence** hides an alert and the ones like it (the same rule, subjects starting with the same text) for 1 hour, 4 hours, 1 day or 7 days, with a reason; a silence can be taken back at any time and cannot last longer than 31 days. Silences in force are listed under the alerts, so nothing is hidden in secret, and what fired lately, with how long it lasted, is listed under "Recent alerts".
 
 - Only a person who signed in with the role of operator can do this (see [Who may see the dashboard](#who-may-see-the-dashboard)). On a dashboard that needs no sign-in nobody can, so the buttons are not shown and the routes refuse. Every request has to carry the header `X-Monitoring-Action`, which the dashboard adds and a page of another site cannot, and the controller logs who did what.
-- The replicas do not talk about what agents report, but what an operator did exists nowhere else. Each replica therefore copies it from the others every 30 seconds (the latest change of each silence and acknowledgement wins), so a silence made on one replica holds on all of them within that time, and a replica that restarted learns it again. With the Helm chart this is on and needs nothing, apart from a token when the dashboard needs a sign-in (see below). A replica that cannot be reached is logged once.
+- The replicas do not talk about what agents report, but what an operator did exists nowhere else. Each replica therefore copies it from the others every 10 seconds (the latest change of each silence and acknowledgement wins), so a silence made on one replica holds on all of them within that time, and a replica that restarted learns it again. With the Helm chart this is on and needs nothing, apart from a token when the dashboard needs a sign-in (see below). A replica that cannot be reached is logged once.
 - The state store keeps it across a restart when it keeps things (`Controller:State:SqlitePath`); in memory it is also learned again from the other replicas.
 - The history of alerts is kept per replica, in the state store when there is a file, up to the last 200 occurrences. What was still firing when the controller restarted is shown as ended, unknown.
 
@@ -236,7 +236,32 @@ An operator can also act on an alert on the dashboard. **Acknowledge** says some
 | --- | --- | --- |
 | `Controller:Peers:<n>` | none | The address of the web server of each other replica, such as `http://monitoring-controller-1.monitoring-controller-headless:8080`. The chart sets them from the replicas of the stateful set (`peers.enabled`) |
 | `Controller:PeerToken` | none | A token of a viewer, for when the dashboard needs a sign-in: its hash goes in `Controller:Web:Auth:Tokens` with the role `viewer` and the token itself in the secret named by `peers.existingSecret` in the chart. The token travels over plain HTTP inside the cluster, so give it no more than the viewer role |
-| `Controller:PeerInterval` | `00:00:30` | How often the other replicas are asked |
+| `Controller:PeerCaFile` | none | PEM file with the authority that signed the certificates of peers that serve the dashboard over https. The chart sets it with `webTls.ca` |
+| `Controller:PeerInterval` | `00:00:10` | How often the other replicas are asked |
+| `Controller:ReplicaId` | the machine name | The name of this replica. It has to be different for every replica, also across data centers; the chart puts `replica.site` in front of the pod name |
+| `Controller:ReplicaRank` | `0` | Which replica sends alerts with `Leader:Mode` `peers`: the lowest rank among the reachable replicas, then the lowest name. Give the main data center the lowest rank |
+
+### Replicas in several data centers
+
+You can run the controller replicas in more than one data center or cluster. The agents remain the only source of truth, so nothing has to be replicated between the sites. Every replica builds the whole picture from what the agents send it, and as long as every agent reports to every replica, the dashboards of all sites say the same.
+
+What you set up for that:
+
+- Give every replica its own address that the agents can reach, and list all of them in `replicaAddresses` of every controller. An agent learns the list from the first controller it connects to and then connects to each one. Every agent therefore sends everything to every site, so plan for that traffic between the sites.
+- Tell the replicas about each other with `peers.extra`, the web addresses of the replicas in the other sites. They copy silences and acknowledgements through these, so an operator's silence in one site holds in all of them. Use https and `webTls` for that on a network you do not control.
+- Set `replica.site` to a different name per site, so replicas of different clusters never share a name, and `replica.rank` lower for the main site.
+
+Alerts need one more choice. Every replica evaluates the rules and shows the same alerts on its dashboard, and without a choice every replica also sends them, so a receiver hears each alert once per replica. The `lease` mode cannot help, because a Lease lives in one cluster. Use `notifications.peerSender` in the chart (`Leader:Mode` `peers`): a replica sends only when no replica with a lower rank can be reached. While the main site is up it sends alone. When it is gone the next site takes over after about 30 seconds.
+
+A few things behave in ways you should know about:
+
+- When the link between two sites breaks, each side cannot reach the other, so both send. An alert is then told twice, never zero times. Receivers should already treat the `key` of a message as its identity, and this is the case where they have to.
+- A replica that takes over as sender has no memory of what the previous one told, so it tells the alerts that are firing again. The same applies to a replica that restarts without a state file.
+- The alert history and the state store belong to each replica. Only silences and acknowledgements are copied.
+- An agent in one site that loses its link to the other site shows as unknown on the controllers there, after `ScopeUnknownWait`, while the controllers in its own site still see it. That is what the unknown alert is for.
+- The dead-man's switch pings from every replica, which is what you want: it goes quiet only when no site is left.
+
+`deploy/k8s-test/multicluster.sh` runs this on two kind clusters, with a controller in each.
 
 ### Dependency graph
 

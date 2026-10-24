@@ -28,8 +28,11 @@ public static class AlertActionsEndpoints
             Results.Text(JsonSerializer.Serialize(history.Recent(int.TryParse(context.Request.Query["limit"], out var limit) ? limit : 50).ToList(), AlertActionsJsonContext.Default.ListAlertOccurrence), "application/json"));
 
         // What another replica asks for to show the same as this one.
-        endpoints.MapGet("/api/actions", (AlertActions actions) =>
-            Results.Text(JsonSerializer.Serialize(actions.Export(), AlertActionsJsonContext.Default.ActionsExport), "application/json"));
+        endpoints.MapGet("/api/actions", (HttpContext context, AlertActions actions, AlertingOptions options) =>
+        {
+            context.Response.Headers[AlertActionsSync.ReplicaHeader] = $"{options.ReplicaRank}/{options.ReplicaId ?? Environment.MachineName}";
+            return Results.Text(JsonSerializer.Serialize(actions.Export(), AlertActionsJsonContext.Default.ActionsExport), "application/json");
+        });
 
         endpoints.MapPost("/api/silences", async (HttpContext context, AlertActions actions, TimeProvider time) =>
         {

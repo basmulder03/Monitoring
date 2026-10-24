@@ -129,6 +129,11 @@ internal static class ControllerComposition
                 options.Email.To = [.. email.List("To")];
                 var election = notifications.Section("Leader");
                 options.Leader.Mode = election.Text("Mode", options.Leader.Mode);
+                if (options.Leader.Mode.Equals("peers", StringComparison.OrdinalIgnoreCase) && controller.List("Peers").Count == 0)
+                {
+                    throw new ConfigurationException("Setting 'Controller:Notifications:Leader:Mode' is 'peers', which needs the other replicas under 'Controller:Peers'.");
+                }
+
                 options.Leader.LeaseName = election.Text("LeaseName", options.Leader.LeaseName);
                 options.Leader.LeaseNamespace = election.Optional("LeaseNamespace");
                 options.Leader.LeaseDuration = election.Duration("LeaseDuration", options.Leader.LeaseDuration);
@@ -195,6 +200,8 @@ internal static class ControllerComposition
                 options.Peers = [.. controller.List("Peers").Select(address => new Uri(address, UriKind.RelativeOrAbsolute))];
                 options.PeerToken = controller.Optional("PeerToken");
                 options.PeerCaFile = controller.Optional("PeerCaFile");
+                options.ReplicaId = controller.Optional("ReplicaId");
+                options.ReplicaRank = controller.Int("ReplicaRank", 0);
                 options.PeerInterval = controller.Duration("PeerInterval", options.PeerInterval);
             })
             .AddDashboard(options =>
