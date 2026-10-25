@@ -79,6 +79,24 @@ jobs:
       - name: Sizes
         run: ls -l published/*/Plover.Controller published/*/Plover.Agent published/*/Plover.Sidecar published/*/Plover.Injector | awk '{ print $5, $9 }'
 
+  # The tests that read the real Service Control Manager, the real host and real named pipes skip themselves on Linux, so they run here.
+  # The Native AOT publish and the install as a service stay in the nightly (windows-nightly.yml), because they take longer.
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test what talks to Windows
+        run: |
+          dotnet test --project tests/Plover.Agent.Tests --configuration Release
+          dotnet test --project tests/Plover.Client.Tests --configuration Release
+
   # The images are built, not pushed: a Dockerfile that no longer builds should fail the change that broke it.
   images:
     runs-on: ubuntu-latest

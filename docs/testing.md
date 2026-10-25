@@ -62,7 +62,7 @@ PLOVER_TEST_POSTGRES='Host=127.0.0.1;Port=54329;Username=postgres;Password=test'
 
 ## Windows
 
-Code that talks to Windows (the Service Control Manager and the like) has tests that skip themselves with an explanation anywhere else. To run them on a Windows machine, publish the test project for it, which works from Linux too, copy the folder over and start the executable:
+Code that talks to Windows (the Service Control Manager and the like) has tests that skip themselves with an explanation anywhere else. CI runs them on a Windows runner for every push and pull request (the `windows` job of `ci.yml`); the nightly adds the Native AOT publish and the install as a service. To run them on a Windows machine, publish the test project for it, which works from Linux too, copy the folder over and start the executable:
 
 ```sh
 dotnet publish tests/Plover.Agent.Tests -c Release -r win-x64 --self-contained -p:PublishAot=false -o out
