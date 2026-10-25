@@ -29,8 +29,9 @@ jobs:
           done
       - name: Fetch the history
         run: |
-          if git ls-remote --exit-code --heads origin perf-results >/dev/null; then
-            git worktree add perf-results origin/perf-results
+          # checkout fetches only the default branch, so origin/perf-results has to be fetched first
+          if git fetch origin perf-results; then
+            git worktree add perf-results FETCH_HEAD
           else
             git worktree add --orphan -b perf-results perf-results
           fi
