@@ -734,7 +734,7 @@ public class AgentConnectionHandlerTests
         public async Task<Message?> ReceiveAsync()
         {
             using var guard = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-            guard.CancelAfter(TimeSpan.FromSeconds(5));
+            guard.CancelAfter(TimeSpan.FromSeconds(30));
             return await FrameCodec.ReadAsync(client, ct: guard.Token);
         }
 

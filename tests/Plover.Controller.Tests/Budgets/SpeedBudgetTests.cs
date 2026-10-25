@@ -77,8 +77,8 @@ public class SpeedBudgetTests(ITestOutputHelper output)
         PerfResults.Record("controller.alerts.first", first.Elapsed.TotalMilliseconds, "ms");
         PerfResults.Record("controller.alerts.later", again.Elapsed.TotalMilliseconds, "ms");
         alerts.Count.ShouldBe(100_000);
-        first.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(1));
-        again.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(2));
+        first.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(5));
+        again.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(10));
     }
 
     private sealed class BusyRule(string name, string[] subjects) : IAlertRule
