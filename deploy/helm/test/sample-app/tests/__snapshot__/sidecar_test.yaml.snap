@@ -43,7 +43,7 @@ matches the snapshot of the default render:
                       fieldPath: metadata.namespace
                 - name: PLOVER_Sidecar__Labels__team
                   value: orders
-              image: plover-sidecar:0.1.0
+              image: plover-sidecar:1.0.0
               imagePullPolicy: IfNotPresent
               name: plover-sidecar
               resources:

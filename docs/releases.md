@@ -24,7 +24,7 @@ Semantic versioning. The protocol has its own version, carried in `Hello`: a pee
 ## How to release
 
 1. Put the changes of the version under a `## [x.y.z]` heading in `CHANGELOG.md`. Its text becomes the release notes, and the release fails without it.
-2. Tag a commit of `main` whose CI is green and push the tag: `git tag v0.1.0 && git push origin v0.1.0`. A tag with a dash, such as `v0.2.0-rc.1`, is published as a prerelease and does not move the `latest` image tag.
+2. Tag a commit of `main` whose CI is green and push the tag: `git tag v1.0.0 && git push origin v1.0.0`. A tag with a dash, such as `v0.2.0-rc.1`, is published as a prerelease and does not move the `latest` image tag.
 3. The workflow creates the GitHub release and then, in parallel, packs the two NuGet packages, builds and pushes the four images, packages and pushes the four charts, and zips the Windows agent. The charts and packages take the version of the tag, and the charts default to the image of that version.
 
 The workflow does not run the tests again, which is why the tag goes on a green commit.

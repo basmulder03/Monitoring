@@ -7,8 +7,8 @@ matches the snapshot of its default render with a certificate from cert-manager:
         app.kubernetes.io/instance: RELEASE-NAME
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: plover-injector
-        app.kubernetes.io/version: 0.1.0
-        helm.sh/chart: plover-injector-0.1.0
+        app.kubernetes.io/version: 1.0.0
+        helm.sh/chart: plover-injector-1.0.0
       name: plover-injector
     spec:
       replicas: 2
@@ -27,7 +27,7 @@ matches the snapshot of its default render with a certificate from cert-manager:
           containers:
             - env:
                 - name: PLOVER_Injector__SidecarImage
-                  value: ghcr.io/basmulder03/plover-sidecar:0.1.0
+                  value: ghcr.io/basmulder03/plover-sidecar:1.0.0
                 - name: PLOVER_Injector__ImagePullPolicy
                   value: IfNotPresent
                 - name: PLOVER_Injector__AgentAddress
@@ -38,7 +38,7 @@ matches the snapshot of its default render with a certificate from cert-manager:
                   value: /etc/injector/tls/tls.crt
                 - name: PLOVER_Injector__Key
                   value: /etc/injector/tls/tls.key
-              image: ghcr.io/basmulder03/plover-injector:0.1.0
+              image: ghcr.io/basmulder03/plover-injector:1.0.0
               imagePullPolicy: IfNotPresent
               livenessProbe:
                 httpGet:
@@ -87,8 +87,8 @@ matches the snapshot of its default render with a certificate from cert-manager:
         app.kubernetes.io/instance: RELEASE-NAME
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: plover-injector
-        app.kubernetes.io/version: 0.1.0
-        helm.sh/chart: plover-injector-0.1.0
+        app.kubernetes.io/version: 1.0.0
+        helm.sh/chart: plover-injector-1.0.0
       name: plover-injector
     spec:
       ports:
@@ -106,8 +106,8 @@ matches the snapshot of its default render with a certificate from cert-manager:
         app.kubernetes.io/instance: RELEASE-NAME
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: plover-injector
-        app.kubernetes.io/version: 0.1.0
-        helm.sh/chart: plover-injector-0.1.0
+        app.kubernetes.io/version: 1.0.0
+        helm.sh/chart: plover-injector-1.0.0
       name: plover-injector
     spec:
       dnsNames:
@@ -127,8 +127,8 @@ matches the snapshot of its default render with a certificate from cert-manager:
         app.kubernetes.io/instance: RELEASE-NAME
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: plover-injector
-        app.kubernetes.io/version: 0.1.0
-        helm.sh/chart: plover-injector-0.1.0
+        app.kubernetes.io/version: 1.0.0
+        helm.sh/chart: plover-injector-1.0.0
       name: plover-injector-plover
     webhooks:
       - admissionReviewVersions:

@@ -1,7 +1,7 @@
 {
   "sidecar": {
     "name": "plover-sidecar",
-    "image": "plover-sidecar:0.1.0",
+    "image": "plover-sidecar:1.0.0",
     "imagePullPolicy": "IfNotPresent",
     "restartPolicy": "Always",
     "securityContext": {

@@ -2,9 +2,9 @@
 
 Versions follow semantic versioning. The protocol has its own version, and a change that old and new components cannot serve side by side is called out here. The text under a version is what its GitHub release shows.
 
-## [0.1.0]
+## [1.0.0]
 
-The first release.
+The first release, at 1.0.0.
 
 - The controller: replicas that each receive everything from every agent, alerting with silences and acknowledgements, the service graph, metric history, change markers, a dead man's switch and an optional Prometheus export. The dashboard is embedded, so it is one executable.
 - The agent: discovers pods, containers and Windows services, takes data from sidecars, and keeps the state of one scope.

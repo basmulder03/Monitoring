@@ -2,6 +2,6 @@ image: { repository: example/orders, tag: "1.0.0" }
 plover:
   enabled: true
   labels: { team: orders }
-  image: { repository: plover-sidecar, tag: "0.1.0" }
+  image: { repository: plover-sidecar, tag: "1.0.0" }
   agentAddress: plover-agent:9441
   nativeSidecar: true

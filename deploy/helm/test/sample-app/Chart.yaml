@@ -2,8 +2,8 @@ apiVersion: v2
 name: sample-app
 description: "A tiny application chart that includes the Plover sidecar; it shows how to use it and is what the chart tests render."
 type: application
-version: 0.1.0
+version: 1.0.0
 dependencies:
   - name: plover-sidecar
-    version: 0.1.0
+    version: 1.0.0
     repository: file://../../plover-sidecar

@@ -19,7 +19,7 @@ public class DefinitionTests
     /// <summary>What the golden file is made from; the check of the template uses the same values.</summary>
     private static PodMutator Mutator() => new(new InjectorOptions
     {
-        SidecarImage = "plover-sidecar:0.1.0",
+        SidecarImage = "plover-sidecar:1.0.0",
         AgentAddress = "plover-agent:9441",
         Labels = { ["team"] = "orders" },
     });

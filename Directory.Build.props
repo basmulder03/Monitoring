@@ -13,7 +13,7 @@
   </PropertyGroup>
   <!-- Package metadata; only the projects that can be packed use it (Client, Protocol). The release workflow (.github/workflows/release.yml) packs the two of them. -->
   <PropertyGroup>
-    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionPrefix>1.0.0</VersionPrefix>
     <Authors>Bas Mulder</Authors>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://basmulder03.github.io/Plover/</PackageProjectUrl>

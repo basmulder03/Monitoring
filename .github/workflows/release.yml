@@ -1,6 +1,6 @@
 name: Release
 
-# git tag v0.1.0 && git push origin v0.1.0
+# git tag v1.0.0 && git push origin v1.0.0
 # Tests are not run again here: tag a commit of main whose CI is green. A tag with a dash (v0.2.0-rc.1) is published as a prerelease.
 on:
   push:

@@ -19,7 +19,7 @@
     plover:
       enabled: true
       labels: { team: orders }            # free-form labels sent with the registration
-      image: { repository: plover-sidecar, tag: "0.1.0" }
+      image: { repository: plover-sidecar, tag: "1.0.0" }
       agentAddress: plover-agent:9441  # the Service of the agent of the namespace
       nativeSidecar: true                  # false on Kubernetes before 1.29, where it becomes a second container
 
