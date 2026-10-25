@@ -15,6 +15,8 @@ import sys
 
 WINDOW = 7
 KEEP = 365
+# A median of one or two runs is just one runner's mood; judge only once there is some history.
+MIN_RUNS = 3
 FACTOR = 2.0
 # What a value must exceed the median by, besides the factor: a jump from 1 ms to 3 ms on a shared runner is noise.
 FLOOR = {"ms": 25.0, "us": 1.0, "MB": 5.0, "KB": 100.0, "B": 1.0}
@@ -39,7 +41,7 @@ def main(run_path, results_path, page_path, sha):
             print(f"new   {name}: {now['value']:.3f} {now['unit']}")
             continue
         median = statistics.median(before)
-        regressed = now["value"] > median * FACTOR and now["value"] - median > FLOOR.get(now["unit"], 0)
+        regressed = len(before) >= MIN_RUNS and now["value"] > median * FACTOR and now["value"] - median > FLOOR.get(now["unit"], 0)
         print(f"{'WORSE' if regressed else 'ok   '} {name}: {now['value']:.3f} {now['unit']} (median of {len(before)} runs: {median:.3f})")
         if regressed:
             problems.append(f"{name} is {now['value']:.3f} {now['unit']}, the median of the last runs is {median:.3f}")
