@@ -11,7 +11,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
-  <!-- Package metadata; only the projects that can be packed use it (Client, Protocol). Nothing is published from here, see the release steps in #56. -->
+  <!-- Package metadata; only the projects that can be packed use it (Client, Protocol). The release workflow (.github/workflows/release.yml) packs the two of them. -->
   <PropertyGroup>
     <VersionPrefix>0.1.0</VersionPrefix>
     <Authors>Bas Mulder</Authors>

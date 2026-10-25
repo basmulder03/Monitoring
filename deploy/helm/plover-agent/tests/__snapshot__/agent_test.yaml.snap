@@ -41,7 +41,7 @@ matches the snapshot of its default render:
                   value: plover-sidecar
                 - name: PLOVER_Agent__Transport__Mode
                   value: none
-              image: plover-agent:0.1.0
+              image: ghcr.io/basmulder03/plover-agent:0.1.0
               imagePullPolicy: IfNotPresent
               name: agent
               ports:

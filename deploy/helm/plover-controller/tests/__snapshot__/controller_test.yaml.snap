@@ -119,7 +119,7 @@ matches the snapshot of its default render:
                   value: none
                 - name: PLOVER_Controller__Notifications__MinSeverity
                   value: warning
-              image: plover-controller:0.1.0
+              image: ghcr.io/basmulder03/plover-controller:0.1.0
               imagePullPolicy: IfNotPresent
               livenessProbe:
                 httpGet:

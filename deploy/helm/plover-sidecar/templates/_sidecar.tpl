@@ -41,7 +41,7 @@
 {{- $m := .Values.plover -}}
 {{- $image := default dict $m.image -}}
 - name: plover-sidecar
-  image: "{{ default "plover-sidecar" $image.repository }}:{{ default "latest" $image.tag }}"
+  image: "{{ default "ghcr.io/basmulder03/plover-sidecar" $image.repository }}:{{ default "latest" $image.tag }}"
   imagePullPolicy: {{ default "IfNotPresent" $image.pullPolicy }}
   {{- if include "plover.sidecar.native" . }}
   restartPolicy: Always

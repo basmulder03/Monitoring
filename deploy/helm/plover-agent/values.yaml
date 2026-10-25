@@ -1,5 +1,5 @@
 image:
-  repository: plover-agent
+  repository: ghcr.io/basmulder03/plover-agent
   tag: ""            # defaults to the chart's appVersion
   pullPolicy: IfNotPresent
 

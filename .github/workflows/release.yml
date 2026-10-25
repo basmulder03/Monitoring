@@ -1,0 +1,132 @@
+name: Release
+
+# git tag v0.1.0 && git push origin v0.1.0
+# Tests are not run again here: tag a commit of main whose CI is green. A tag with a dash (v0.2.0-rc.1) is published as a prerelease.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  VERSION: ${{ github.ref_name }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Create the release from the changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${VERSION#v}"
+          # The notes are the section of this version in CHANGELOG.md; the step fails when there is none.
+          awk -v v="$v" '$0 ~ "^## \\[?"v"\\]?" { on = 1; next } /^## / { on = 0 } on' CHANGELOG.md > notes.md
+          test -s notes.md
+          gh release create "$VERSION" --title "$VERSION" --notes-file notes.md $([[ "$v" == *-* ]] && echo --prerelease)
+
+  nuget:
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: Pack the libraries
+        run: |
+          dotnet pack src/Plover.Protocol -c Release -p:Version="${VERSION#v}" -o nupkgs
+          dotnet pack src/Plover.Client -c Release -p:Version="${VERSION#v}" -o nupkgs
+      - name: Attach the packages to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$VERSION" nupkgs/*.nupkg
+      # Trusted publishing: nuget.org trusts this repository and this workflow file (a policy on the account, see docs/releases.md), so no API key is stored.
+      # Until NUGET_USER (the nuget.org profile name) is set as a repository variable, the packages are only attached to the release.
+      - name: Log in to nuget.org
+        id: login
+        if: vars.NUGET_USER != ''
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+      - name: Push to nuget.org
+        if: vars.NUGET_USER != ''
+        run: dotnet nuget push "nupkgs/*.nupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+  images:
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        project: [Controller, Agent, Sidecar, Injector]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      # amd64 only: the Dockerfile compiles for the machine it runs on (Native AOT does not cross-compile), see deploy/README.md.
+      - name: Build and push the image
+        run: |
+          v="${VERSION#v}"
+          name="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/plover-$(echo '${{ matrix.project }}' | tr '[:upper:]' '[:lower:]')"
+          tags="-t $name:$v"
+          [[ "$v" == *-* ]] || tags="$tags -t $name:latest"
+          docker build --build-arg PROJECT=${{ matrix.project }} $tags -f deploy/Dockerfile .
+          docker push --all-tags "$name"
+
+  charts:
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v5
+        with:
+          version: v4.3.1
+      - run: echo "${{ github.token }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+      # The charts take the version of the release, and so does the image they default to (appVersion).
+      - name: Package and push the charts
+        run: |
+          v="${VERSION#v}"
+          for chart in plover-controller plover-agent plover-injector plover-sidecar; do
+            helm package "deploy/helm/$chart" --version "$v" --app-version "$v"
+            helm push "$chart-$v.tgz" "oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts"
+          done
+
+  windows-agent:
+    needs: release
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: Publish the agent and zip it with the installer
+        shell: pwsh
+        run: |
+          $v = $env:VERSION.TrimStart('v')
+          dotnet publish src/Plover.Agent -c Release -r win-x64 -o published/Agent -p:Version=$v
+          Copy-Item deploy/windows/install-agent.ps1 published/Agent
+          Compress-Archive -Path published/Agent/* -DestinationPath "plover-agent-win-x64-$v.zip"
+      - name: Attach the zip to the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload $env:VERSION (Get-ChildItem plover-agent-win-x64-*.zip)

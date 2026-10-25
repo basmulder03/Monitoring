@@ -1,5 +1,5 @@
 image:
-  repository: plover-injector
+  repository: ghcr.io/basmulder03/plover-injector
   tag: ""            # defaults to the chart's appVersion
   pullPolicy: IfNotPresent
 
@@ -10,7 +10,7 @@ failurePolicy: Ignore
 
 # What is added to a pod. The same sidecar as the library chart includes; a test checks that the two are the same.
 sidecar:
-  image: { repository: plover-sidecar, tag: "" }
+  image: { repository: ghcr.io/basmulder03/plover-sidecar, tag: "" }
   imagePullPolicy: IfNotPresent
   agentAddress: plover-agent:9441     # the Service of the agent of the namespace
   nativeSidecar: true                     # false on Kubernetes before 1.29

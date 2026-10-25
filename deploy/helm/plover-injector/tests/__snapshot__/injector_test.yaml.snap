@@ -19,7 +19,7 @@ matches the snapshot of its default render with a certificate from cert-manager:
       template:
         metadata:
           annotations:
-            checksum/settings: baab82e04d33fc39666c86a943bb055ed4203dfa2e65fb44145a8429a07150f7
+            checksum/settings: 72884d0a31797eae4fea9d5081db1eae09381d65b07a13b5d43fbd633394a321
           labels:
             app.kubernetes.io/instance: RELEASE-NAME
             app.kubernetes.io/name: plover-injector
@@ -27,7 +27,7 @@ matches the snapshot of its default render with a certificate from cert-manager:
           containers:
             - env:
                 - name: PLOVER_Injector__SidecarImage
-                  value: plover-sidecar:0.1.0
+                  value: ghcr.io/basmulder03/plover-sidecar:0.1.0
                 - name: PLOVER_Injector__ImagePullPolicy
                   value: IfNotPresent
                 - name: PLOVER_Injector__AgentAddress
@@ -38,7 +38,7 @@ matches the snapshot of its default render with a certificate from cert-manager:
                   value: /etc/injector/tls/tls.crt
                 - name: PLOVER_Injector__Key
                   value: /etc/injector/tls/tls.key
-              image: plover-injector:0.1.0
+              image: ghcr.io/basmulder03/plover-injector:0.1.0
               imagePullPolicy: IfNotPresent
               livenessProbe:
                 httpGet:
