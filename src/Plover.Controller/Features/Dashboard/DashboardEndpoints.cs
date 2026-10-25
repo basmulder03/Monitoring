@@ -42,6 +42,7 @@ public static class DashboardEndpoints
         endpoints.MapGet("/tv", () => Asset("index.html"));
         endpoints.MapGet("/app.js", () => Asset("app.js"));
         endpoints.MapGet("/styles.css", () => Asset("styles.css"));
+        endpoints.MapGet("/logo.svg", () => Asset("logo.svg"));
 
         return endpoints;
     }

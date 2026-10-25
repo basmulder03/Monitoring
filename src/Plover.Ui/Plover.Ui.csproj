@@ -12,7 +12,7 @@
 
   <!-- The dashboard is TypeScript. It is type-checked and bundled into wwwroot, which is embedded in this assembly, so the controller stays one executable.
        Node and npm are needed to build; the build says so when they are missing. Behind a proxy that inspects TLS, see docs/testing.md. -->
-  <Target Name="BuildDashboard" BeforeTargets="AssignTargetPaths" Inputs="@(UiSource)" Outputs="$(UiOutput)/app.js;$(UiOutput)/styles.css;$(UiOutput)/index.html">
+  <Target Name="BuildDashboard" BeforeTargets="AssignTargetPaths" Inputs="@(UiSource)" Outputs="$(UiOutput)/app.js;$(UiOutput)/styles.css;$(UiOutput)/index.html;$(UiOutput)/logo.svg">
     <Exec Command="npm --version" ContinueOnError="true" StandardOutputImportance="low" StandardErrorImportance="low" IgnoreExitCode="true">
       <Output TaskParameter="ExitCode" PropertyName="NpmCheck" />
     </Exec>

@@ -9,6 +9,7 @@ public static class UiAssets
         ["index.html"] = "text/html; charset=utf-8",
         ["app.js"] = "text/javascript; charset=utf-8",
         ["styles.css"] = "text/css; charset=utf-8",
+        ["logo.svg"] = "image/svg+xml",
     };
 
     /// <summary>The paths of all embedded files.</summary>

@@ -1,4 +1,4 @@
-// Bundles the dashboard into the files the controller embeds: app.js, styles.css and index.html in ../wwwroot.
+// Bundles the dashboard into the files the controller embeds: app.js, styles.css, index.html and logo.svg in ../wwwroot.
 import { build } from "esbuild";
 import { copyFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -30,3 +30,4 @@ await build({
 });
 
 await copyFile(new URL("public/index.html", import.meta.url), new URL("index.html", out));
+await copyFile(new URL("public/logo.svg", import.meta.url), new URL("logo.svg", out));

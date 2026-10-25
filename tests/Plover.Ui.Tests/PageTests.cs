@@ -10,6 +10,7 @@ public class PageTests
     [InlineData("index.html", "text/html; charset=utf-8")]
     [InlineData("app.js", "text/javascript; charset=utf-8")]
     [InlineData("styles.css", "text/css; charset=utf-8")]
+    [InlineData("logo.svg", "image/svg+xml")]
     public void Every_file_is_embedded_and_has_its_media_type(string path, string mediaType)
     {
         // Arrange: the path comes from the test data
