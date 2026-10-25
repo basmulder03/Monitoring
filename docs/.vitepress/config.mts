@@ -6,6 +6,7 @@ export default defineConfig({
   description: 'A small, stateless, Native AOT monitoring system for .NET 10 workloads on Kubernetes and Windows.',
   base: '/Plover/',
   cleanUrls: true,
+  head: [['link', { rel: 'icon', type: 'image/svg+xml', href: '/Plover/logo.svg' }]],
   lastUpdated: true,
   srcExclude: ['node_modules/**'],
   // A fenced block marked mermaid becomes the Mermaid component, which draws it in the browser (see theme/Mermaid.vue).
@@ -23,6 +24,7 @@ export default defineConfig({
   // The trend page is fetched from the perf-results branch when the site is deployed, so it is not there while the links are checked.
   ignoreDeadLinks: [/performance-trend/],
   themeConfig: {
+    logo: '/logo.svg',
     nav: [
       { text: 'Design', link: '/design' },
       { text: 'Configuration', link: '/configuration' },
