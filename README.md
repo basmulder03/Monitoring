@@ -2,7 +2,7 @@
 
 Plover is a small, stateless, Native AOT monitoring system for .NET 10 workloads on Kubernetes and Windows. One live dashboard shows the health, metrics and service dependencies of every namespace or server, across environments and data centers, with alerting. It needs no service mesh, no Prometheus stack and no database.
 
-The project is in early development. It works end to end and is tested, but nothing is released or published yet. The [roadmap](https://github.com/basmulder03/Plover/issues/61) says what is built and what is left.
+Version 1.0.0 is out. It works end to end and is tested; see the [changelog](CHANGELOG.md) for what it contains.
 
 Documentation: <https://basmulder03.github.io/Plover/>
 
@@ -15,6 +15,17 @@ dotnet run --project samples/Plover.Demo
 ```
 
 Then open <http://127.0.0.1:5080>. The demo runs a real controller with made-up agents that play a small incident again and again, so you can click through the dashboard without a cluster.
+
+## Install
+
+| What | Where |
+| --- | --- |
+| Client library | `dotnet add package Plover.Client` ([NuGet](https://www.nuget.org/packages/Plover.Client)) |
+| Controller, agent, sidecar, injector | Images `ghcr.io/basmulder03/plover-controller`, `plover-agent`, `plover-sidecar` and `plover-injector` (amd64) |
+| Helm charts | `oci://ghcr.io/basmulder03/charts/plover-controller` and `plover-agent`, `plover-injector`, `plover-sidecar` |
+| Windows agent | `plover-agent-win-x64-<version>.zip` on the [releases page](https://github.com/basmulder03/Plover/releases) |
+
+[deploy/README.md](deploy/README.md) has the commands, and the [start page](https://basmulder03.github.io/Plover/start) walks through them in order.
 
 ## How it fits together
 

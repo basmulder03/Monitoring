@@ -32,7 +32,7 @@ The [design](design) goes through all of this in detail, and the [glossary](glos
 
 ## Putting it on your own workloads
 
-1. Install the controller chart with the hash of an enrollment token. The token itself stays with you.
+1. Install the controller chart with the hash of an enrollment token. The token itself stays with you. The charts and images are on ghcr.io (`oci://ghcr.io/basmulder03/charts/plover-controller`), and the client library is on NuGet (`dotnet add package Plover.Client`).
 2. Install the agent chart in each namespace you want to monitor, with the address of the controller and the token.
 3. Give each application the sidecar, either by adding the sidecar library chart to its chart or by labelling its namespace so that the injector adds it.
 4. Add the client library to the application and call `AddPlover`.

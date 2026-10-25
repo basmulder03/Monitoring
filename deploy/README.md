@@ -37,6 +37,8 @@ helm install plover-agent deploy/helm/plover-agent \
   --set scope.labels.environment=prod
 ```
 
+The charts are also published, so nothing has to be cloned: `helm install plover-controller oci://ghcr.io/basmulder03/charts/plover-controller --version 1.0.0 ...` takes the same values, and the images they use come from `ghcr.io/basmulder03`. An application chart depends on the sidecar library chart with `repository: oci://ghcr.io/basmulder03/charts`.
+
 An application chart gets monitored by depending on `plover-sidecar` and including its pieces once in the pod template; `deploy/helm/test/sample-app` shows how, and the comment at the top of `_sidecar.tpl` lists the values. The application also needs the Plover client in its code.
 
 - Agents inside the cluster reach the replicas through the addresses of the stateful set. For agents in other clusters, give one address per replica in `replicaAddresses`, for example the host of a route per replica; that needs `tls` or `mtls`.

@@ -1,6 +1,6 @@
 # Security policy
 
-This project is in early development and has no released versions yet.
+Security fixes go into the latest 1.x release; there is no backport to older versions.
 
 ## Reporting a vulnerability
 

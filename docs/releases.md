@@ -1,8 +1,8 @@
 # Releases
 
-Nothing has been published yet. There are no packages on NuGet, no images in a registry and no charts in an OCI registry; what exists is the source, and the pipelines that prove it builds, publishes with Native AOT and passes its tests (see [Testing](testing)). Publishing is a deliberate step the owner takes: pushing a version tag runs `.github/workflows/release.yml` (see [How to release](#how-to-release)). It is tracked in [issue 56](https://github.com/basmulder03/Plover/issues/56).
+Version 1.0.0 is published: two packages on NuGet, four images and four charts on ghcr.io, and a zip of the Windows agent on the GitHub release. Publishing is a deliberate step the owner takes: pushing a version tag runs `.github/workflows/release.yml` (see [How to release](#how-to-release)). It is tracked in [issue 56](https://github.com/basmulder03/Plover/issues/56).
 
-## What a release will contain
+## What a release contains
 
 | Artifact | Form |
 | --- | --- |
@@ -15,10 +15,10 @@ Nothing has been published yet. There are no packages on NuGet, no images in a r
 
 Semantic versioning. The protocol has its own version, carried in `Hello`: a peer one version away is served, so a rollout can run old and new components side by side. A change that cannot be served that way is a major version of the protocol and is called out in the changelog.
 
-## Before the first release
+## Before a release
 
-- The name, the licence (Apache-2.0) and the package names are checked once more.
 - The speed and size budgets are green over a run of nights (see [Speed budgets](performance)).
+- `CHANGELOG.md` has a section for the version.
 - The owner agrees to publish.
 
 ## How to release

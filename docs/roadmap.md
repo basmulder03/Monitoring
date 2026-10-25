@@ -15,8 +15,8 @@ The tests are unit, component, browser, specifications and architecture tests, a
 | What | State |
 | --- | --- |
 | Documentation site ([67](https://github.com/basmulder03/Plover/issues/67)) | Live; grows with the code, the reference pages are generated |
-| Packaging and publishing ([56](https://github.com/basmulder03/Plover/issues/56)) | Not started on purpose: nothing is published without the owner's go-ahead (see [Releases](releases)) |
-| Name ([57](https://github.com/basmulder03/Plover/issues/57)) | Decided: the code and the repository are called Plover. A last trademark and package-name check is left for the day of the first publish |
+| Packaging and publishing ([56](https://github.com/basmulder03/Plover/issues/56)) | Done: 1.0.0 is on NuGet, ghcr.io and the releases page (see [Releases](releases)) |
+| Name ([57](https://github.com/basmulder03/Plover/issues/57)) | Decided: the code and the repository are called Plover. No trademark search in the official registers was done; a rename stays possible |
 
 ## Not planned
 
