@@ -28,8 +28,8 @@ describe("the system view", () => {
   it("shows each replica with how many agents are connected and how far behind it is, and marks the one that answers", async () => {
     const page = await openSystem(status({
       replicas: [
-        { address: "plover-controller-0.monitoring:9440", thisReplica: true, agentsReporting: 2, agentsConnected: 2, maxLag: 0 },
-        { address: "plover-controller-1.monitoring:9440", thisReplica: false, agentsReporting: 2, agentsConnected: 1, maxLag: 12 },
+        { address: "plover-controller-0.plover:9440", thisReplica: true, agentsReporting: 2, agentsConnected: 2, maxLag: 0 },
+        { address: "plover-controller-1.plover:9440", thisReplica: false, agentsReporting: 2, agentsConnected: 1, maxLag: 12 },
       ],
       healthy: false,
     }));
