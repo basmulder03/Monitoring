@@ -1,0 +1,13 @@
+{{- if eq .Values.tls.mode "certManager" }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "plover-injector.name" . }}
+  labels: {{- include "plover-injector.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "plover-injector.secret" . }}
+  dnsNames: {{- include "plover-injector.dnsNames" . | splitList "\n" | toYaml | nindent 4 }}
+  issuerRef:
+    name: {{ required "tls.issuerRef.name is needed with tls.mode certManager" .Values.tls.issuerRef.name }}
+    kind: {{ .Values.tls.issuerRef.kind }}
+{{- end }}

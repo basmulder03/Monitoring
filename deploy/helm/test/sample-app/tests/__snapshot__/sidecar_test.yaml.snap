@@ -16,36 +16,36 @@ matches the snapshot of the default render:
         spec:
           containers:
             - env:
-                - name: MONITORING_SOCKET
-                  value: /var/run/monitoring/monitoring.sock
+                - name: PLOVER_SOCKET
+                  value: /var/run/plover/plover.sock
               image: example/orders:1.0.0
               name: orders
               volumeMounts:
-                - mountPath: /var/run/monitoring
-                  name: monitoring-socket
+                - mountPath: /var/run/plover
+                  name: plover-socket
           initContainers:
             - env:
-                - name: MONITORING_Sidecar__Agent
-                  value: monitoring-agent:9441
-                - name: MONITORING_Sidecar__Library__Socket
-                  value: /var/run/monitoring/monitoring.sock
-                - name: MONITORING_Sidecar__Pod__Ip
+                - name: PLOVER_Sidecar__Agent
+                  value: plover-agent:9441
+                - name: PLOVER_Sidecar__Library__Socket
+                  value: /var/run/plover/plover.sock
+                - name: PLOVER_Sidecar__Pod__Ip
                   valueFrom:
                     fieldRef:
                       fieldPath: status.podIP
-                - name: MONITORING_Sidecar__Pod__Node
+                - name: PLOVER_Sidecar__Pod__Node
                   valueFrom:
                     fieldRef:
                       fieldPath: spec.nodeName
-                - name: MONITORING_Sidecar__Pod__Namespace
+                - name: PLOVER_Sidecar__Pod__Namespace
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
-                - name: MONITORING_Sidecar__Labels__team
+                - name: PLOVER_Sidecar__Labels__team
                   value: orders
-              image: monitoring-sidecar:0.1.0
+              image: plover-sidecar:0.1.0
               imagePullPolicy: IfNotPresent
-              name: monitoring-sidecar
+              name: plover-sidecar
               resources:
                 limits:
                   memory: 64Mi
@@ -60,10 +60,10 @@ matches the snapshot of the default render:
                     - ALL
                 readOnlyRootFilesystem: true
               volumeMounts:
-                - mountPath: /var/run/monitoring
-                  name: monitoring-socket
+                - mountPath: /var/run/plover
+                  name: plover-socket
           volumes:
             - emptyDir:
                 medium: Memory
                 sizeLimit: 1Mi
-              name: monitoring-socket
+              name: plover-socket

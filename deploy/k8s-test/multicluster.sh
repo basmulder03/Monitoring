@@ -5,13 +5,13 @@
 #
 #   deploy/k8s-test/multicluster.sh              builds the images, creates both clusters, tests, deletes them
 #   KEEP=1 deploy/k8s-test/multicluster.sh       leaves the clusters for a look
-#   SKIP_BUILD=1 deploy/k8s-test/multicluster.sh uses the images monitoring-*:dev that are there
+#   SKIP_BUILD=1 deploy/k8s-test/multicluster.sh uses the images plover-*:dev that are there
 #   SKIP_FAILOVER=1 deploy/k8s-test/multicluster.sh skips the failover of the agents and goes on to the two controllers
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
-a=monitoring-a
-b=monitoring-b
+a=plover-a
+b=plover-b
 web_forward=18081
 work="$(mktemp -d)"
 pids=()
@@ -26,8 +26,8 @@ diagnose() {
   for ctx in "$a" "$b"; do
     echo "--- pods in $ctx"; kubectl --context "kind-$ctx" get pods -A 2>&1 | head -30
   done
-  ka logs -n monitoring monitoring-controller-0 --tail=30 2>&1 | head -40 || true
-  kb logs -n shop-b -l app.kubernetes.io/name=monitoring-agent --tail=30 --prefix 2>&1 | head -60 || true
+  ka logs -n plover plover-controller-0 --tail=30 2>&1 | head -40 || true
+  kb logs -n shop-b -l app.kubernetes.io/name=plover-agent --tail=30 --prefix 2>&1 | head -60 || true
 }
 
 cleanup() {
@@ -54,17 +54,17 @@ now() { date +%s; }
 if [ "${SKIP_BUILD:-0}" != 1 ]; then
   step "Images"
   build() { docker build -q --build-arg PROJECT="$1" ${3:+--build-arg PROJECT_PATH="$3"} -t "$2:dev" -f "$root/deploy/Dockerfile" "$root" >/dev/null; }
-  build Controller monitoring-controller
-  build Agent monitoring-agent
-  build Sidecar monitoring-sidecar
-  build SampleApp monitoring-sampleapp samples/Monitoring.SampleApp
+  build Controller plover-controller
+  build Agent plover-agent
+  build Sidecar plover-sidecar
+  build SampleApp plover-sampleapp samples/Plover.SampleApp
 fi
 
 step "Two clusters"
 for name in "$a" "$b"; do
   kind delete cluster --name "$name" >/dev/null 2>&1 || true
   kind create cluster --name "$name" --wait 120s >/dev/null
-  for image in monitoring-controller monitoring-agent monitoring-sidecar monitoring-sampleapp; do
+  for image in plover-controller plover-agent plover-sidecar plover-sampleapp; do
     kind load docker-image "$image:dev" --name "$name" >/dev/null
   done
 done
@@ -73,34 +73,34 @@ echo "the node of A is $node_a"
 
 step "Certificates and the token"
 # One name for the controller, whichever address an agent reaches it on: the agents are told to expect it (transport.serverName).
-openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=monitoring-test-ca" -keyout "$work/ca.key" -out "$work/ca.crt" 2>/dev/null
-openssl req -newkey rsa:2048 -nodes -subj "/CN=monitoring-controller" -keyout "$work/tls.key" -out "$work/tls.csr" 2>/dev/null
-printf 'subjectAltName=DNS:monitoring-controller\nextendedKeyUsage=serverAuth\n' >"$work/ext"
+openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=plover-test-ca" -keyout "$work/ca.key" -out "$work/ca.crt" 2>/dev/null
+openssl req -newkey rsa:2048 -nodes -subj "/CN=plover-controller" -keyout "$work/tls.key" -out "$work/tls.csr" 2>/dev/null
+printf 'subjectAltName=DNS:plover-controller\nextendedKeyUsage=serverAuth\n' >"$work/ext"
 openssl x509 -req -in "$work/tls.csr" -CA "$work/ca.crt" -CAkey "$work/ca.key" -CAcreateserial -days 2 -extfile "$work/ext" -out "$work/tls.crt" 2>/dev/null
 token="$(head -c 24 /dev/urandom | base64 | tr -d '=+/')"
 hash="$(printf '%s' "$token" | sha256sum | cut -d' ' -f1)"
 
 step "Controller in A, one address per replica"
-ka create namespace monitoring >/dev/null
-ka create secret generic controller-tls -n monitoring --from-file=tls.crt="$work/tls.crt" --from-file=tls.key="$work/tls.key" >/dev/null
+ka create namespace plover >/dev/null
+ka create secret generic controller-tls -n plover --from-file=tls.crt="$work/tls.crt" --from-file=tls.key="$work/tls.key" >/dev/null
 # A replica is reached from the other cluster through its own node port; the agents learn all of them from the controller and connect to each.
 for i in 0 1; do
-  ka apply -n monitoring -f - >/dev/null <<YAML
+  ka apply -n plover -f - >/dev/null <<YAML
 apiVersion: v1
 kind: Service
-metadata: { name: monitoring-controller-$i-external }
+metadata: { name: plover-controller-$i-external }
 spec:
   type: NodePort
-  selector: { statefulset.kubernetes.io/pod-name: monitoring-controller-$i }
+  selector: { statefulset.kubernetes.io/pod-name: plover-controller-$i }
   ports: [{ port: 9440, targetPort: 9440, nodePort: 3044$i }]
 YAML
 done
-helm --kube-context "kind-$a" install monitoring-controller "$root/deploy/helm/monitoring-controller" -n monitoring \
-  --set image.repository=monitoring-controller --set image.tag=dev --set image.pullPolicy=Never \
+helm --kube-context "kind-$a" install plover-controller "$root/deploy/helm/plover-controller" -n plover \
+  --set image.repository=plover-controller --set image.tag=dev --set image.pullPolicy=Never \
   --set "agentTokens[0].scope=*" --set "agentTokens[0].tokenHash=$hash" \
   --set transport.mode=tls --set transport.existingSecret=controller-tls \
   --set "replicaAddresses={$node_a:30440,$node_a:30441}" >/dev/null
-ka rollout status statefulset/monitoring-controller -n monitoring --timeout=180s >/dev/null || fail "the controller did not become ready"
+ka rollout status statefulset/plover-controller -n plover --timeout=180s >/dev/null || fail "the controller did not become ready"
 
 # The same for both clusters: an agent pair that competes for a lease, and a sample application.
 install_scope() { # context namespace
@@ -108,16 +108,16 @@ install_scope() { # context namespace
   kubectl --context "$ctx" create namespace "$ns" >/dev/null
   kubectl --context "$ctx" create secret generic agent-token -n "$ns" --from-literal=token="$token" >/dev/null
   kubectl --context "$ctx" create secret generic agent-ca -n "$ns" --from-file=ca.crt="$work/ca.crt" >/dev/null
-  helm --kube-context "$ctx" install monitoring-agent "$root/deploy/helm/monitoring-agent" -n "$ns" \
-    --set image.repository=monitoring-agent --set image.tag=dev --set image.pullPolicy=Never \
+  helm --kube-context "$ctx" install plover-agent "$root/deploy/helm/plover-agent" -n "$ns" \
+    --set image.repository=plover-agent --set image.tag=dev --set image.pullPolicy=Never \
     --set "controller.addresses={$node_a:30440,$node_a:30441}" --set token.existingSecret=agent-token \
-    --set transport.mode=tls --set transport.existingSecret=agent-ca --set transport.serverName=monitoring-controller \
+    --set transport.mode=tls --set transport.existingSecret=agent-ca --set transport.serverName=plover-controller \
     --set highAvailability.enabled=true --set scope.labels.environment=test --set "scope.labels.datacenter=${ctx#kind-}" >/dev/null
   ( cd "$root/deploy/helm/test/sample-app" && helm dependency update >/dev/null )
   helm --kube-context "$ctx" install sample "$root/deploy/helm/test/sample-app" -n "$ns" \
-    --set image.repository=monitoring-sampleapp --set image.tag=dev \
-    --set monitoring.image.repository=monitoring-sidecar --set monitoring.image.tag=dev --set monitoring.image.pullPolicy=Never \
-    --set monitoring.agentAddress=monitoring-agent:9441 >/dev/null
+    --set image.repository=plover-sampleapp --set image.tag=dev \
+    --set plover.image.repository=plover-sidecar --set plover.image.tag=dev --set plover.image.pullPolicy=Never \
+    --set plover.agentAddress=plover-agent:9441 >/dev/null
   kubectl --context "$ctx" patch deployment orders -n "$ns" --type=json \
     -p '[{"op":"add","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"Never"}]' >/dev/null
   kubectl --context "$ctx" rollout status deployment/orders -n "$ns" --timeout=180s >/dev/null || fail "the sample application in $ns did not become ready"
@@ -127,7 +127,7 @@ step "Agents and a sample application in both clusters"
 install_scope "kind-$a" shop-a
 install_scope "kind-$b" shop-b
 
-ka port-forward -n monitoring pod/monitoring-controller-0 "$web_forward:8080" >/dev/null 2>&1 &
+ka port-forward -n plover pod/plover-controller-0 "$web_forward:8080" >/dev/null 2>&1 &
 pids+=($!)
 eventually 30 api /api/overview || fail "the dashboard of the controller cannot be reached"
 
@@ -141,15 +141,15 @@ healthy() { local s; s="$(summary "$1")" || return 1; [[ "$s" == *" sample=Healt
 step "One controller shows the scopes of both clusters"
 eventually 120 healthy shop-a || fail "the scope of cluster A is not healthy"
 eventually 120 healthy shop-b || fail "the scope of cluster B, across clusters, is not healthy"
-api /api/overview | grep -q '"datacenter":"monitoring-b"' || fail "the labels of cluster B did not arrive"
+api /api/overview | grep -q '"datacenter":"plover-b"' || fail "the labels of cluster B did not arrive"
 echo "ok"
 
 # --- agent failover, once per cluster
 holder() { # context namespace
-  kubectl --context "$1" get lease monitoring-agent -n "$2" -o jsonpath='{.spec.holderIdentity}' 2>/dev/null
+  kubectl --context "$1" get lease plover-agent -n "$2" -o jsonpath='{.spec.holderIdentity}' 2>/dev/null
 }
 ready_agents() { # context namespace
-  kubectl --context "$1" get pods -n "$2" -l app.kubernetes.io/name=monitoring-agent \
+  kubectl --context "$1" get pods -n "$2" -l app.kubernetes.io/name=plover-agent \
     -o jsonpath='{range .items[*]}{.status.containerStatuses[0].ready}{"\n"}{end}' | grep -c true || true
 }
 
@@ -179,12 +179,12 @@ for pair in "kind-$a shop-a" "kind-$b shop-b"; do
   bad="$(watch_stop)"
   echo "the application was not shown as healthy for $bad s"
   [ "$bad" -le 60 ] || fail "the application in $ns was out of sight for $bad s after a crashed holder"
-  kubectl --context "$ctx" rollout status deployment/monitoring-agent -n "$ns" --timeout=120s >/dev/null || fail "the agents of $ns did not recover"
+  kubectl --context "$ctx" rollout status deployment/plover-agent -n "$ns" --timeout=120s >/dev/null || fail "the agents of $ns did not recover"
 
   step "$ns: a rollout of the agents never leaves the scope without one"
   watch_start "$ns"
-  kubectl --context "$ctx" rollout restart deployment/monitoring-agent -n "$ns" >/dev/null
-  kubectl --context "$ctx" rollout status deployment/monitoring-agent -n "$ns" --timeout=180s >/dev/null || fail "the rollout of the agents in $ns did not finish"
+  kubectl --context "$ctx" rollout restart deployment/plover-agent -n "$ns" >/dev/null
+  kubectl --context "$ctx" rollout status deployment/plover-agent -n "$ns" --timeout=180s >/dev/null || fail "the rollout of the agents in $ns did not finish"
   eventually 120 healthy "$ns" || fail "the application in $ns was not healthy again within two minutes of a rollout of the agents (it says: $(summary "$ns" || echo nothing))"
   bad="$(watch_stop)"
   echo "the application was not shown as healthy for $bad s"
@@ -194,9 +194,9 @@ done
 fi
 
 step "A lost controller replica changes nothing for the scope of the other cluster"
-ka delete pod monitoring-controller-1 -n monitoring --grace-period=0 --force >/dev/null 2>&1
+ka delete pod plover-controller-1 -n plover --grace-period=0 --force >/dev/null 2>&1
 healthy shop-b || fail "the scope of cluster B went away with one controller replica"
-ka rollout status statefulset/monitoring-controller -n monitoring --timeout=180s >/dev/null
+ka rollout status statefulset/plover-controller -n plover --timeout=180s >/dev/null
 echo "ok"
 
 # --- controllers in both clusters, and one sender between them
@@ -244,37 +244,37 @@ sites=("kind-$a $node_a dc1 0 $node_b" "kind-$b $node_b dc2 10 $node_a")
 for site in "${sites[@]}"; do
   set -- $site; ctx="$1"; own="$2"; name="$3"; rank="$4"; other="$5"
   if [ "$ctx" = "kind-$b" ]; then
-    kubectl --context "$ctx" create namespace monitoring >/dev/null
-    kubectl --context "$ctx" create secret generic controller-tls -n monitoring --from-file=tls.crt="$work/tls.crt" --from-file=tls.key="$work/tls.key" >/dev/null
+    kubectl --context "$ctx" create namespace plover >/dev/null
+    kubectl --context "$ctx" create secret generic controller-tls -n plover --from-file=tls.crt="$work/tls.crt" --from-file=tls.key="$work/tls.key" >/dev/null
   fi
   for i in 0 1; do
-    kubectl --context "$ctx" apply -n monitoring -f - >/dev/null <<YAML
+    kubectl --context "$ctx" apply -n plover -f - >/dev/null <<YAML
 apiVersion: v1
 kind: Service
-metadata: { name: monitoring-controller-$i-external }
+metadata: { name: plover-controller-$i-external }
 spec:
   type: NodePort
-  selector: { statefulset.kubernetes.io/pod-name: monitoring-controller-$i }
+  selector: { statefulset.kubernetes.io/pod-name: plover-controller-$i }
   ports:
     - { name: agents, port: 9440, targetPort: 9440, nodePort: 3044$i }
     - { name: web, port: 8080, targetPort: 8080, nodePort: 3008$i }
 YAML
   done
-  helm --kube-context "$ctx" upgrade --install monitoring-controller "$root/deploy/helm/monitoring-controller" -n monitoring \
-    --set image.repository=monitoring-controller --set image.tag=dev --set image.pullPolicy=Never \
+  helm --kube-context "$ctx" upgrade --install plover-controller "$root/deploy/helm/plover-controller" -n plover \
+    --set image.repository=plover-controller --set image.tag=dev --set image.pullPolicy=Never \
     --set "agentTokens[0].scope=*" --set "agentTokens[0].tokenHash=$hash" \
     --set transport.mode=tls --set transport.existingSecret=controller-tls \
     --set "replicaAddresses={$all_agents}" \
     --set notifications.peerSender=true --set "notifications.webhooks[0].url=http://$node_a:30555/hook" \
     --set replica.site="$name" --set replica.rank="$rank" \
     --set "peers.extra={http://$other:30080,http://$other:30081}" \
-    --set 'extraEnv[0].name=MONITORING_Controller__Alerting__StartupGrace' --set 'extraEnv[0].value=00:00:05' >/dev/null
-  kubectl --context "$ctx" rollout status statefulset/monitoring-controller -n monitoring --timeout=180s >/dev/null || fail "the controller of $name did not become ready"
+    --set 'extraEnv[0].name=PLOVER_Controller__Alerting__StartupGrace' --set 'extraEnv[0].value=00:00:05' >/dev/null
+  kubectl --context "$ctx" rollout status statefulset/plover-controller -n plover --timeout=180s >/dev/null || fail "the controller of $name did not become ready"
 done
 
-kb port-forward -n monitoring pod/monitoring-controller-0 18082:8080 >/dev/null 2>&1 &
+kb port-forward -n plover pod/plover-controller-0 18082:8080 >/dev/null 2>&1 &
 pids+=($!)
-ka port-forward -n monitoring pod/monitoring-controller-0 "$web_forward:8080" >/dev/null 2>&1 &
+ka port-forward -n plover pod/plover-controller-0 "$web_forward:8080" >/dev/null 2>&1 &
 pids+=($!)
 eventually 30 curl -fsS http://127.0.0.1:18082/api/overview || fail "the dashboard of cluster B cannot be reached"
 
@@ -304,12 +304,12 @@ echo "ok"
 step "With the first site's controllers gone, the other site sends, and nothing is lost"
 before="$(hooks | grep -c '"status":"firing"')"
 # The replicas of the first site are stopped for good (not restarted), so the second site cannot see them for as long as it takes to be sure.
-ka scale statefulset/monitoring-controller -n monitoring --replicas=0 >/dev/null
+ka scale statefulset/plover-controller -n plover --replicas=0 >/dev/null
 more() { [ "$(hooks | grep -c '"status":"firing"')" -gt "$before" ]; }
 eventually 90 more || fail "the other site did not take over sending when the first was gone"
 echo "ok (a new sender tells again what it has not told before; the receiver de-duplicates by key)"
-ka scale statefulset/monitoring-controller -n monitoring --replicas=2 >/dev/null
-ka rollout status statefulset/monitoring-controller -n monitoring --timeout=180s >/dev/null || fail "the controller of the first site did not come back"
+ka scale statefulset/plover-controller -n plover --replicas=2 >/dev/null
+ka rollout status statefulset/plover-controller -n plover --timeout=180s >/dev/null || fail "the controller of the first site did not come back"
 
 echo
 echo "Multi-cluster test passed"

@@ -14,8 +14,8 @@ every=${2:-30}
 port=5081
 here=$(cd "$(dirname "$0")/.." && pwd)
 
-dotnet build "$here/samples/Monitoring.Demo" --configuration Release -v quiet >/dev/null
-demo=$(ls "$here"/artifacts/*/bin/Monitoring.Demo/release/Monitoring.Demo 2>/dev/null | head -1)
+dotnet build "$here/samples/Plover.Demo" --configuration Release -v quiet >/dev/null
+demo=$(ls "$here"/artifacts/*/bin/Plover.Demo/release/Plover.Demo 2>/dev/null | head -1)
 [ -x "$demo" ] || { echo "The demo host was not built." >&2; exit 2; }
 
 "$demo" "$port" >soak-demo.log 2>&1 &

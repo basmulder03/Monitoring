@@ -1,15 +1,15 @@
 # Start here
 
-Monitoring shows, on one live page, whether the services in your Kubernetes namespaces and on your Windows servers are healthy, and which service calls which. It is written for .NET 10 and is small enough to run next to every application. It stores nothing: if you restart any part, it rebuilds its picture from the parts around it.
+Plover shows, on one live page, whether the services in your Kubernetes namespaces and on your Windows servers are healthy, and which service calls which. It is written for .NET 10 and is small enough to run next to every application. It stores nothing: if you restart any part, it rebuilds its picture from the parts around it.
 
 ## See it first
 
 You need the .NET 10 SDK and Node.js 22, because the build of the dashboard uses Node.
 
 ```sh
-git clone https://github.com/basmulder03/Monitoring
-cd Monitoring
-dotnet run --project samples/Monitoring.Demo
+git clone https://github.com/basmulder03/Plover
+cd Plover
+dotnet run --project samples/Plover.Demo
 ```
 
 Open <http://127.0.0.1:5080>. The demo starts a real controller and three agents that are made up. About every twenty seconds a pod in the `shop` scope gets slow, fails and is replaced by a new one, while a queue backs up in `billing`. You can click through the whole dashboard while it happens, and the alerts come and go as they would for real.
@@ -24,7 +24,7 @@ The Dependencies view draws which service calls which, and how often. It is buil
 
 ## How the parts fit
 
-An application references the client library and adds one line, `AddMonitoring`, which makes it answer questions about its name, version, health and metrics. On Kubernetes a small sidecar in the same pod talks to the library, registers the pod and sends heartbeats. One agent per namespace follows the pods through the Kubernetes API and collects what the sidecars report. Two or more controllers receive everything from every agent, work out the health of the whole, evaluate the alert rules and serve the dashboard.
+An application references the client library and adds one line, `AddPlover`, which makes it answer questions about its name, version, health and metrics. On Kubernetes a small sidecar in the same pod talks to the library, registers the pod and sends heartbeats. One agent per namespace follows the pods through the Kubernetes API and collects what the sidecars report. Two or more controllers receive everything from every agent, work out the health of the whole, evaluate the alert rules and serve the dashboard.
 
 Every connection is opened from the lower part towards the upper one, so a part never needs to know the address of the parts below it. A controller that restarts is complete again after its agents send a fresh snapshot. On a Windows server one agent replaces the sidecar and the namespace agent.
 
@@ -35,9 +35,9 @@ The [design](design) goes through all of this in detail, and the [glossary](glos
 1. Install the controller chart with the hash of an enrollment token. The token itself stays with you.
 2. Install the agent chart in each namespace you want to monitor, with the address of the controller and the token.
 3. Give each application the sidecar, either by adding the sidecar library chart to its chart or by labelling its namespace so that the injector adds it.
-4. Add the client library to the application and call `AddMonitoring`.
+4. Add the client library to the application and call `AddPlover`.
 
-The exact commands and values are in [deploy/README.md](https://github.com/basmulder03/Monitoring/blob/main/deploy/README.md). For Windows servers, read [Windows servers](windows). For OpenShift, read [OpenShift](openshift). Every setting is listed in [Configuration](configuration).
+The exact commands and values are in [deploy/README.md](https://github.com/basmulder03/Plover/blob/main/deploy/README.md). For Windows servers, read [Windows servers](windows). For OpenShift, read [OpenShift](openshift). Every setting is listed in [Configuration](configuration).
 
 ## Where to go next
 

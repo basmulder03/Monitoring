@@ -2,7 +2,7 @@
 **/obj/
 artifacts/
 **/node_modules/
-src/Monitoring.Ui/wwwroot/
+src/Plover.Ui/wwwroot/
 .git/
 .github/
 docs/

@@ -5,7 +5,7 @@
 | Scope | The group of services one agent reports on: a Kubernetes namespace or a Windows server. It is the unit of a tile on the dashboard. |
 | Service | A logical application, for example `orders`. It can have several instances. |
 | Instance | One running copy of a service: a pod on Kubernetes, a process on Windows. |
-| Container | A container inside a pod, shown under its instance so you can tell whether the application, the monitoring sidecar or another sidecar is the problem. |
+| Container | A container inside a pod, shown under its instance so you can tell whether the application, the Plover sidecar or another sidecar is the problem. |
 | Client library | The NuGet package an application references. It exposes the application's name, version, health checks and metrics, and counts calls to its dependencies. |
 | Sidecar | A small container next to the application in each pod. It registers the pod with the agent, sends heartbeats and answers the agent's requests with what the library says. |
 | Agent | One per namespace or Windows server. It decides which instances exist, collects what the sidecars report and sends it to every controller. |

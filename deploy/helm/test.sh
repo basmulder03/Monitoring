@@ -8,11 +8,11 @@ root="$PWD"
 command -v helm >/dev/null 2>&1 || { echo "FAIL: helm is needed" >&2; exit 1; }
 helm plugin list | grep -q '^unittest' || { echo "FAIL: the helm-unittest plugin is needed; see the top of this file" >&2; exit 1; }
 
-helm lint monitoring-agent --set 'controller.addresses={controller:9440}' --set token.existingSecret=agent-token
-helm lint monitoring-controller --set 'agentTokens[0].scope=*' --set 'agentTokens[0].tokenHash=abc'
+helm lint plover-agent --set 'controller.addresses={controller:9440}' --set token.existingSecret=agent-token
+helm lint plover-controller --set 'agentTokens[0].scope=*' --set 'agentTokens[0].tokenHash=abc'
 
 helm dependency update test/sample-app >/dev/null
-helm unittest monitoring-agent monitoring-controller monitoring-injector test/sample-app
+helm unittest plover-agent plover-controller plover-injector test/sample-app
 
 # The sidecar the injector adds must be the one the library chart includes.
 if python3 -c 'import yaml' 2>/dev/null; then

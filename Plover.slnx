@@ -1,0 +1,36 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Plover.Agent/Plover.Agent.csproj" />
+    <Project Path="src/Plover.Client/Plover.Client.csproj" />
+    <Project Path="src/Plover.Common/Plover.Common.csproj" />
+    <Project Path="src/Plover.Controller/Plover.Controller.csproj" />
+    <Project Path="src/Plover.Hosting/Plover.Hosting.csproj" />
+    <Project Path="src/Plover.Protocol/Plover.Protocol.csproj" />
+    <Project Path="src/Plover.Injector/Plover.Injector.csproj" />
+    <Project Path="src/Plover.Sidecar/Plover.Sidecar.csproj" />
+    <Project Path="src/Plover.Ui/Plover.Ui.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Plover.DatabaseSample/Plover.DatabaseSample.csproj" />
+    <Project Path="samples/Plover.Demo/Plover.Demo.csproj" />
+    <Project Path="samples/Plover.SampleApp/Plover.SampleApp.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Plover.AppHost/Plover.AppHost.csproj" />
+    <Project Path="tests/Plover.Agent.Tests/Plover.Agent.Tests.csproj" />
+    <Project Path="tests/Plover.Architecture.Tests/Plover.Architecture.Tests.csproj" />
+    <Project Path="tests/Plover.Client.Tests/Plover.Client.Tests.csproj" />
+    <Project Path="tests/Plover.Common.Tests/Plover.Common.Tests.csproj" />
+    <Project Path="tests/Plover.Component.Tests/Plover.Component.Tests.csproj" />
+    <Project Path="tests/Plover.Controller.Tests/Plover.Controller.Tests.csproj" />
+    <Project Path="tests/Plover.Hosting.Tests/Plover.Hosting.Tests.csproj" />
+    <Project Path="tests/Plover.Injector.Tests/Plover.Injector.Tests.csproj" />
+    <Project Path="tests/Plover.Protocol.Tests/Plover.Protocol.Tests.csproj" />
+    <Project Path="tests/Plover.Sidecar.Tests/Plover.Sidecar.Tests.csproj" />
+    <Project Path="tests/Plover.FakeCluster/Plover.FakeCluster.csproj" />
+    <Project Path="tests/Plover.TestApplications/Plover.TestApplications.csproj" />
+    <Project Path="tests/Plover.Specifications/Plover.Specifications.csproj" />
+    <Project Path="tests/Plover.Tests.Shared/Plover.Tests.Shared.csproj" />
+    <Project Path="tests/Plover.Ui.Tests/Plover.Ui.Tests.csproj" />
+  </Folder>
+</Solution>

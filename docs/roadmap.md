@@ -1,6 +1,6 @@
 # Roadmap
 
-The work is tracked as GitHub issues, with [issue 61](https://github.com/basmulder03/Monitoring/issues/61) as the list that ties them together. This page says where things stand; the issues have the detail.
+The work is tracked as GitHub issues, with [issue 61](https://github.com/basmulder03/Plover/issues/61) as the list that ties them together. This page says where things stand; the issues have the detail.
 
 ## Built
 
@@ -14,9 +14,9 @@ The tests are unit, component, browser, specifications and architecture tests, a
 
 | What | State |
 | --- | --- |
-| Documentation site ([67](https://github.com/basmulder03/Monitoring/issues/67)) | Live; grows with the code, the reference pages are generated |
-| Packaging and publishing ([56](https://github.com/basmulder03/Monitoring/issues/56)) | Not started on purpose: nothing is published without the owner's go-ahead (see [Releases](releases)) |
-| Name ([57](https://github.com/basmulder03/Monitoring/issues/57)) | Decided: the code and the repository are called Monitoring. A last trademark and package-name check is left for the day of the first publish |
+| Documentation site ([67](https://github.com/basmulder03/Plover/issues/67)) | Live; grows with the code, the reference pages are generated |
+| Packaging and publishing ([56](https://github.com/basmulder03/Plover/issues/56)) | Not started on purpose: nothing is published without the owner's go-ahead (see [Releases](releases)) |
+| Name ([57](https://github.com/basmulder03/Plover/issues/57)) | Decided: the code and the repository are called Plover. A last trademark and package-name check is left for the day of the first publish |
 
 ## Not planned
 

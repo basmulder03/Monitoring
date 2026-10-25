@@ -51,26 +51,26 @@ check() { # name measured limit unit
   fi
 }
 
-export MONITORING_Controller__Listen__Address=127.0.0.1
-export MONITORING_Controller__Listen__Port="$agent_port"
-export MONITORING_Controller__Web__Address=127.0.0.1
-export MONITORING_Controller__Web__Port="$web_port"
-export MONITORING_Controller__AgentTokens__0__Scope="*"
-export MONITORING_Controller__AgentTokens__0__TokenHash="$hash"
-"$root/Controller/Monitoring.Controller" >"$logs/controller.log" 2>&1 &
+export PLOVER_Controller__Listen__Address=127.0.0.1
+export PLOVER_Controller__Listen__Port="$agent_port"
+export PLOVER_Controller__Web__Address=127.0.0.1
+export PLOVER_Controller__Web__Port="$web_port"
+export PLOVER_Controller__AgentTokens__0__Scope="*"
+export PLOVER_Controller__AgentTokens__0__TokenHash="$hash"
+"$root/Controller/Plover.Controller" >"$logs/controller.log" 2>&1 &
 controller=$!
 pids+=("$controller")
 controller_ms="$(ready_after curl -fsS "http://127.0.0.1:$web_port/api/overview")"
 
 started() { grep -q "Application started" "$1"; }
 
-MONITORING_Agent__ScopeName=budget MONITORING_Agent__Token="$token" MONITORING_Agent__Controllers="127.0.0.1:$agent_port" \
-  "$root/Agent/Monitoring.Agent" >"$logs/agent.log" 2>&1 &
+PLOVER_Agent__ScopeName=budget PLOVER_Agent__Token="$token" PLOVER_Agent__Controllers="127.0.0.1:$agent_port" \
+  "$root/Agent/Plover.Agent" >"$logs/agent.log" 2>&1 &
 agent=$!
 pids+=("$agent")
 agent_ms="$(ready_after started "$logs/agent.log")"
 
-MONITORING_Sidecar__Agent="127.0.0.1:1" "$root/Sidecar/Monitoring.Sidecar" >"$logs/sidecar.log" 2>&1 &
+PLOVER_Sidecar__Agent="127.0.0.1:1" "$root/Sidecar/Plover.Sidecar" >"$logs/sidecar.log" 2>&1 &
 sidecar=$!
 pids+=("$sidecar")
 sidecar_ms="$(ready_after started "$logs/sidecar.log")"

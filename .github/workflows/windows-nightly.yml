@@ -23,12 +23,12 @@ jobs:
       # The tests that read the real Service Control Manager, the real host and real named pipes skip themselves everywhere else.
       - name: Test what talks to Windows
         run: |
-          dotnet test --project tests/Monitoring.Agent.Tests --configuration Release
-          dotnet test --project tests/Monitoring.Client.Tests --configuration Release
-          dotnet test --project tests/Monitoring.Component.Tests --configuration Release --filter-class "*ApplicationToControllerTests"
+          dotnet test --project tests/Plover.Agent.Tests --configuration Release
+          dotnet test --project tests/Plover.Client.Tests --configuration Release
+          dotnet test --project tests/Plover.Component.Tests --configuration Release --filter-class "*ApplicationToControllerTests"
       # Native AOT for Windows needs the native build tools, which this runner has; a warning is a failure, as in the Linux job.
       - name: Publish the agent as Native AOT
-        run: dotnet publish src/Monitoring.Agent -c Release -r win-x64 -o published/Agent -warnaserror
+        run: dotnet publish src/Plover.Agent -c Release -r win-x64 -o published/Agent -warnaserror
       - name: Install it as a service, kill it and remove it
         shell: pwsh
         run: deploy/windows/test-service.ps1 -Path published/Agent

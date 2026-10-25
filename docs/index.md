@@ -2,7 +2,7 @@
 layout: doc
 ---
 
-# Monitoring
+# Plover
 
 A small, stateless, Native AOT monitoring system for .NET 10 workloads on Kubernetes and Windows. It gives you one live dashboard of health, metrics and service dependencies across environments and data centers, with alerting, and without a service mesh or a database.
 

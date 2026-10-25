@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsAotCompatible>false</IsAotCompatible>
+    <!-- Reqnroll looks up the culture of the feature files by name, which the invariant mode of the other projects does not allow. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <!-- The generated code behind the .feature files has no documentation and long names; it is not ours to polish. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="4.0.2" />
+    <PackageReference Include="Reqnroll.xunit.v3" Version="3.3.4" />
+    <PackageReference Include="Aspire.Hosting.Testing" Version="13.6.4" />
+    <PackageReference Include="Shouldly" Version="4.3.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The scenarios share one running environment and change it, so they take turns. -->
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Plover.AppHost/Plover.AppHost.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,10 +1,10 @@
 import { defineConfig } from 'vitepress'
 
-// Served from https://basmulder03.github.io/Monitoring/. A dead link fails the build, which is the link check of CI.
+// Served from https://basmulder03.github.io/Plover/. A dead link fails the build, which is the link check of CI.
 export default defineConfig({
-  title: 'Monitoring',
+  title: 'Plover',
   description: 'A small, stateless, Native AOT monitoring system for .NET 10 workloads on Kubernetes and Windows.',
-  base: '/Monitoring/',
+  base: '/Plover/',
   cleanUrls: true,
   lastUpdated: true,
   srcExclude: ['node_modules/**'],
@@ -28,7 +28,7 @@ export default defineConfig({
       { text: 'Configuration', link: '/configuration' },
       { text: 'Reference', link: '/reference' },
       { text: 'Speed budgets', link: '/performance' },
-      { text: 'GitHub', link: 'https://github.com/basmulder03/Monitoring' },
+      { text: 'GitHub', link: 'https://github.com/basmulder03/Plover' },
     ],
     sidebar: [
       {
@@ -94,6 +94,6 @@ export default defineConfig({
     ],
     search: { provider: 'local' },
     outline: [2, 3],
-    socialLinks: [{ icon: 'github', link: 'https://github.com/basmulder03/Monitoring' }],
+    socialLinks: [{ icon: 'github', link: 'https://github.com/basmulder03/Plover' }],
   },
 })

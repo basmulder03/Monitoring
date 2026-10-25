@@ -6,21 +6,21 @@ The controller and the agent read their bootstrap settings from the same sources
 
 From lowest to highest priority, so a later source overrides an earlier one:
 
-1. A JSON file. By default `monitoring.json` in the current directory; set `MONITORING_CONFIG_FILE` to use another path. The file is optional, and comments are allowed.
-2. Environment variables starting with `MONITORING_`. A nested setting uses a double underscore: `Agent:ScopeName` becomes `MONITORING_Agent__ScopeName`.
+1. A JSON file. By default `plover.json` in the current directory; set `PLOVER_CONFIG_FILE` to use another path. The file is optional, and comments are allowed.
+2. Environment variables starting with `PLOVER_`. A nested setting uses a double underscore: `Agent:ScopeName` becomes `PLOVER_Agent__ScopeName`.
 3. Command line arguments: `--Agent:ScopeName=shop`.
 
-A list can be written as a JSON array, as indexed variables (`MONITORING_Agent__Controllers__0=...`), or as one comma-separated value (`MONITORING_Agent__Controllers=a:9440,b:9440`).
+A list can be written as a JSON array, as indexed variables (`PLOVER_Agent__Controllers__0=...`), or as one comma-separated value (`PLOVER_Agent__Controllers=a:9440,b:9440`).
 Durations are written as `hh:mm:ss`, for example `00:00:30`; fractions of a second use a dot (`00:00:00.250`).
 
-Logging is controlled by the usual `Logging:LogLevel` settings, for example `MONITORING_Logging__LogLevel__Default=Debug`.
+Logging is controlled by the usual `Logging:LogLevel` settings, for example `PLOVER_Logging__LogLevel__Default=Debug`.
 
 ## Checking a configuration
 
 `--check` builds the controller or the agent exactly as it would start, with the same settings, files and certificates, and exits without starting anything. It prints `The configuration is valid.` and exits with 0, or says what is wrong and exits with 78 (see below). For the controller it also reads the central configuration file (`Controller:Configuration:File`), which while running is only logged when it is bad, with the last good one staying in force. Run it in the pipeline that rolls out a change, with the same environment as the real thing:
 
 ```sh
-Monitoring.Controller --check
+Plover.Controller --check
 ```
 
 The log line of the controller about a dashboard without sign-in shows in the output as well, which is what a check is for.
@@ -106,7 +106,7 @@ How often agents read what their applications report is decided centrally, not o
 Layers, the most specific winning: the built-in defaults, then `defaults`, then every override whose `labels` all match the scope, then every override whose `scope` matches (and whose labels, if given, match too), then every override for a `service`, and last a local override on the agent. Within the same kind, a later rule wins. A rule has to match on a scope, a service or labels; use `defaults` for everyone.
 
 - A service narrows a rule to the applications of that service: `{ "match": { "service": "reports" }, "set": { "pullSeconds": 120 } }` makes the agents pull the metrics of the `reports` application every two minutes and leaves every other service alone. A service rule can also name a scope or labels, and then only counts on the agents that match them. The agent reads what is set for a service as the application introduces itself.
-- A local override is set on the agent itself, for example `Agent:Overrides:PullSeconds` or `MONITORING_Agent__Overrides__PullSeconds`, and wins over everything above, but only for the settings that the central file lists under `overridable` (`pullSeconds`, `edgeFlushSeconds`). The central file stays in charge: a setting it does not list cannot be changed on the machine, and an agent that has not heard from a controller yet ignores its local overrides.
+- A local override is set on the agent itself, for example `Agent:Overrides:PullSeconds` or `PLOVER_Agent__Overrides__PullSeconds`, and wins over everything above, but only for the settings that the central file lists under `overridable` (`pullSeconds`, `edgeFlushSeconds`). The central file stays in charge: a setting it does not list cannot be changed on the machine, and an agent that has not heard from a controller yet ignores its local overrides.
 
 - Each agent gets a configuration with a version that changes whenever any of its settings does, and applies it without a restart. An agent that cannot reach a controller keeps the last one; after a restart it uses the built-in defaults until a controller answers.
 - A file that cannot be read, is not valid JSON, has a name that is not a setting or a value outside 1 to 3600 seconds is rejected as a whole, the error is logged, and what was in force stays in force. Fix the file and it is picked up at the next look.
@@ -138,14 +138,14 @@ Besides the dashboard, alerts can be sent to a webhook, a chat or an email addre
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `Controller:Notifications:Webhooks:<n>:Url` | none | A webhook that receives each notification as JSON: `status` (`firing` or `resolved`), `key` (stable, so a receiver can de-duplicate), `rule`, `subject`, `severity`, `since`, `source` |
-| `Controller:Notifications:Webhooks:<n>:Secret` | none | When set, each request carries `X-Monitoring-Timestamp` (Unix seconds) and `X-Monitoring-Signature: sha256=<hex>`, the HMAC-SHA256 with this secret of the timestamp, a dot and the body. The receiver recomputes it and refuses a timestamp that is more than a few minutes old, so a captured request cannot be sent again |
+| `Controller:Notifications:Webhooks:<n>:Secret` | none | When set, each request carries `X-Plover-Timestamp` (Unix seconds) and `X-Plover-Signature: sha256=<hex>`, the HMAC-SHA256 with this secret of the timestamp, a dot and the body. The receiver recomputes it and refuses a timestamp that is more than a few minutes old, so a captured request cannot be sent again |
 | `Controller:Notifications:Chats:<n>:Url`, `:Format` | none, `slack` | An incoming webhook of a chat. `slack` posts `{"text": …}` (Slack, Mattermost, Google Chat), `discord` posts `{"content": …}`. The message is one line such as `[CRITICAL] service-down: shop/payments (prod-a, since …)` |
 | `Controller:Notifications:Email:Host`, `:Port`, `:Ssl`, `:User`, `:Password`, `:From`, `:To:<n>` | none, `587`, `true` | An SMTP server, the sender and the receivers; used when a host is set, and then the sender and at least one receiver are required |
 | `Controller:Notifications:MinSeverity` | `warning` | Only alerts of this severity and above are sent: `warning` or `critical` |
 | `Controller:Notifications:Interval` | `00:00:05` | How often the alerts are compared with what was sent |
 | `Controller:Notifications:Source` | host name | The name of this controller in what is sent, so receivers can tell environments apart |
 | `Controller:Notifications:Leader:Mode` | `none` | `none`: every replica sends, and the receiver de-duplicates by `key`. `lease`: one replica sends, chosen through a Kubernetes Lease, which needs all replicas in one cluster. `peers`: one replica sends, the one that ranks first among those it can reach, which also works across data centers, see [Replicas in several data centers](#replicas-in-several-data-centers) |
-| `Controller:Notifications:Leader:LeaseName`, `:LeaseNamespace`, `:LeaseDuration`, `:ApiServer` | `monitoring-controller-alerts`, the namespace of the pod, `00:00:15`, the cluster of the pod | The Lease to hold. The replica that holds it renews it every third of the duration; another takes over when it has been silent for the whole duration. A replica that cannot reach the API server stops sending when its own lease would have run out, so a failure costs at worst a repeated message |
+| `Controller:Notifications:Leader:LeaseName`, `:LeaseNamespace`, `:LeaseDuration`, `:ApiServer` | `plover-controller-alerts`, the namespace of the pod, `00:00:15`, the cluster of the pod | The Lease to hold. The replica that holds it renews it every third of the duration; another takes over when it has been silent for the whole duration. A replica that cannot reach the API server stops sending when its own lease would have run out, so a failure costs at worst a repeated message |
 
 With `Mode=lease` the controller needs the right to create the Lease and to get and update that one object; the chart does this with `notifications.oneSender=true`. The Helm values are `notifications.webhooks`, `chats` and `email`, with `urlSecret`, `secretSecret`, `userSecret` and `passwordSecret` to read a value from a secret instead of the values file. A message can arrive twice when the leader changes at the wrong moment; use `key` to de-duplicate if that matters to you.
 
@@ -183,7 +183,7 @@ The controller checks every package version in use against advisories in the [OS
 
 With `Fetch:Enabled` the controller downloads two public sources when it starts and then every 24 hours: the OSV export of the NuGet advisories (`https://osv-vulnerabilities.storage.googleapis.com/NuGet/all.zip`, about 3 MB) and the vulnerability feed of nuget.org (`https://api.nuget.org/v3/vulnerabilities/index.json`, a few hundred KB). Both come from the GitHub Advisory Database. What they send is added to the file or folder from `Advisories`, and an advisory that several of them have is kept once, from the file first.
 
-- Nothing about your packages leaves the controller. A request is a plain HTTPS GET of the address above and of the pages that feed names on the same host. There is no query, no package name and no identifier of your system; the only header besides the standard ones is `User-Agent: Monitoring-controller`. The whole advisory list is downloaded and matched locally, which is also why no per-package service is used.
+- Nothing about your packages leaves the controller. A request is a plain HTTPS GET of the address above and of the pages that feed names on the same host. There is no query, no package name and no identifier of your system; the only header besides the standard ones is `User-Agent: Plover-controller`. The whole advisory list is downloaded and matched locally, which is also why no per-package service is used.
 - Only HTTPS is accepted, certificates are checked as usual, and a redirect to an address that is not HTTPS is refused. The environment variables `HTTPS_PROXY` and `NO_PROXY` apply.
 - A download is limited to 64 MB before and after decompression, a zip to 100,000 files of at most 2 MB each. What is sent is only parsed, never run, and only advisories about NuGet packages are kept.
 - A source that cannot be reached or sends something unusable is logged with its host name and skipped; what it sent last time stays in force, and the other sources are not held up. The controller starts without waiting for any of it, and the page says how many advisories are loaded and when.
@@ -227,14 +227,14 @@ A silence keeps alerts out of the dashboard until it ends, for example during pl
 
 An operator can also act on an alert on the dashboard. **Acknowledge** says someone is looking at it: the alert stays in the list, with who and when, and the acknowledgement goes when the problem does. **Silence** hides an alert and the ones like it (the same rule, subjects starting with the same text) for 1 hour, 4 hours, 1 day or 7 days, with a reason; a silence can be taken back at any time and cannot last longer than 31 days. Silences in force are listed under the alerts, so nothing is hidden in secret, and what fired lately, with how long it lasted, is listed under "Recent alerts".
 
-- Only a person who signed in with the role of operator can do this (see [Who may see the dashboard](#who-may-see-the-dashboard)). On a dashboard that needs no sign-in nobody can, so the buttons are not shown and the routes refuse. Every request has to carry the header `X-Monitoring-Action`, which the dashboard adds and a page of another site cannot, and the controller logs who did what.
+- Only a person who signed in with the role of operator can do this (see [Who may see the dashboard](#who-may-see-the-dashboard)). On a dashboard that needs no sign-in nobody can, so the buttons are not shown and the routes refuse. Every request has to carry the header `X-Plover-Action`, which the dashboard adds and a page of another site cannot, and the controller logs who did what.
 - The replicas do not talk about what agents report, but what an operator did exists nowhere else. Each replica therefore copies it from the others every 10 seconds (the latest change of each silence and acknowledgement wins), so a silence made on one replica holds on all of them within that time, and a replica that restarted learns it again. With the Helm chart this is on and needs nothing, apart from a token when the dashboard needs a sign-in (see below). A replica that cannot be reached is logged once.
 - The state store keeps it across a restart when it keeps things (`Controller:State:SqlitePath`); in memory it is also learned again from the other replicas.
 - The history of alerts is kept per replica, in the state store when there is a file, up to the last 200 occurrences. What was still firing when the controller restarted is shown as ended, unknown.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `Controller:Peers:<n>` | none | The address of the web server of each other replica, such as `http://monitoring-controller-1.monitoring-controller-headless:8080`. The chart sets them from the replicas of the stateful set (`peers.enabled`) |
+| `Controller:Peers:<n>` | none | The address of the web server of each other replica, such as `http://plover-controller-1.plover-controller-headless:8080`. The chart sets them from the replicas of the stateful set (`peers.enabled`) |
 | `Controller:PeerToken` | none | A token of a viewer, for when the dashboard needs a sign-in: its hash goes in `Controller:Web:Auth:Tokens` with the role `viewer` and the token itself in the secret named by `peers.existingSecret` in the chart. The token travels over plain HTTP inside the cluster, so give it no more than the viewer role |
 | `Controller:PeerCaFile` | none | PEM file with the authority that signed the certificates of peers that serve the dashboard over https. The chart sets it with `webTls.ca` |
 | `Controller:PeerInterval` | `00:00:10` | How often the other replicas are asked |
@@ -319,7 +319,7 @@ Agents in Kubernetes need no shared secret. With `Controller:ServiceAccounts:Ena
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `Controller:ServiceAccounts:Enabled` | `false` | Accept service account tokens |
-| `Controller:ServiceAccounts:Audience` | `monitoring-controller` | The audience the tokens must be made for; the agent's projected token has to ask for the same one, so a token made for another service never opens this one |
+| `Controller:ServiceAccounts:Audience` | `plover-controller` | The audience the tokens must be made for; the agent's projected token has to ask for the same one, so a token made for another service never opens this one |
 | `Controller:ServiceAccounts:Scopes:<namespace>` | the namespace itself | The scope a namespace reports as, when it is not named after the namespace |
 | `Controller:ServiceAccounts:ApiServer`, `TokenFile`, `CaFile` | the pod's own | How the controller reaches the API server, for a controller that does not run in the cluster of its agents |
 | `Agent:TokenFile` | none | A file with the token, read again for every connection; instead of `Agent:Token` |
@@ -357,7 +357,7 @@ Agents known by their certificate. With `mtls` the certificate can stand in for 
 
 The controller serves the dashboard itself, so there is nothing else to install. Open `http://<controller>:8080/` in a browser.
 
-It speaks plain HTTP unless you give it a certificate, and an ingress or route usually ends TLS in front of it. To serve https from the pod itself set `Controller:Web:Tls:Certificate` and `Controller:Web:Tls:Key` (PEM files). A renewed certificate is read when the files change, without a restart. The chart does this with `webTls.existingSecret` (a secret with `tls.crt` and `tls.key`). The replicas then ask each other for the operator actions over https too, by the names of their pods, so the certificate has to be valid for `monitoring-controller-N.monitoring-controller-headless.<namespace>.svc`; with `webTls.ca: true` and a `ca.crt` in the secret they trust that authority for it (`Controller:PeerCaFile`).
+It speaks plain HTTP unless you give it a certificate, and an ingress or route usually ends TLS in front of it. To serve https from the pod itself set `Controller:Web:Tls:Certificate` and `Controller:Web:Tls:Key` (PEM files). A renewed certificate is read when the files change, without a restart. The chart does this with `webTls.existingSecret` (a secret with `tls.crt` and `tls.key`). The replicas then ask each other for the operator actions over https too, by the names of their pods, so the certificate has to be valid for `plover-controller-N.plover-controller-headless.<namespace>.svc`; with `webTls.ca: true` and a `ca.crt` in the secret they trust that authority for it (`Controller:PeerCaFile`).
 
 | Path | Shows |
 | --- | --- |
@@ -429,7 +429,7 @@ The agent learns which instances exist from the platform it runs on. `Agent:Disc
 | `Agent:Discovery:Kubernetes:TokenFile` | in-cluster token file | File with the service account token, read again for every request because Kubernetes rotates it |
 | `Agent:Discovery:Kubernetes:Token` | none | A fixed token instead of a token file; meant for development |
 | `Agent:Discovery:Kubernetes:CaFile` | in-cluster certificate authority | PEM file with the certificate authority that signed the API server's certificate |
-| `Agent:Discovery:Kubernetes:MonitoringSidecarContainer` | `monitoring-sidecar` | Name of this system's own sidecar container. When it fails, the instance is shown as Degraded with the cause, not Unhealthy |
+| `Agent:Discovery:Kubernetes:PloverSidecarContainer` | `plover-sidecar` | Name of this system's own sidecar container. When it fails, the instance is shown as Degraded with the cause, not Unhealthy |
 | `Agent:Discovery:Kubernetes:ResyncInterval` | `00:01:00` | How long a watch stays open before the pods are listed again in full, which repairs a missed event |
 | `Agent:Discovery:Kubernetes:PodMetrics` | `false` | Shows what each pod uses, from the metrics API of the cluster (it needs a metrics server). See below |
 | `Agent:Discovery:Kubernetes:RetryMinDelay` | `00:00:01` | Shortest wait before retrying after a failure |
@@ -444,7 +444,7 @@ The agent needs a namespace-scoped role that can read pods and list events, serv
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: monitoring-agent
+  name: plover-agent
 rules:
   - apiGroups: [""]
     resources: ["pods"]
@@ -480,7 +480,7 @@ How a pod becomes an instance:
 | Being deleted, or Failed | Terminating |
 | Succeeded (a finished job) | Not shown |
 | All containers ready | Healthy |
-| Only the monitoring sidecar is failing or not ready | Degraded, with a check named `monitoring sidecar` |
+| Only the Plover sidecar is failing or not ready | Degraded, with a check named `Plover sidecar` |
 | Running but not ready | Degraded |
 | A container stuck in `CrashLoopBackOff`, an image pull error, a configuration error, or exited with an error | Unhealthy |
 | Pending without a problem, or phase Unknown | Unknown |
@@ -495,7 +495,7 @@ How a pod becomes an instance:
 }
 ```
 
-with the token in the environment: `MONITORING_Agent__Token=...`.
+with the token in the environment: `PLOVER_Agent__Token=...`.
 
 ### More than one agent
 
@@ -506,13 +506,13 @@ The sidecars reconnect to the new holder, so the scope shows what the sidecars h
 | Setting | Default | Meaning |
 |---|---|---|
 | `Agent:Discovery:Kubernetes:LeaderElection:Enabled` | `false` | Competes for the lease. The chart sets it with `highAvailability.enabled`, which also runs two replicas, and lets the role read and change that one lease |
-| `Agent:Discovery:Kubernetes:LeaderElection:LeaseName` | `monitoring-agent` | Name of the Lease |
+| `Agent:Discovery:Kubernetes:LeaderElection:LeaseName` | `plover-agent` | Name of the Lease |
 | `Agent:Discovery:Kubernetes:LeaderElection:LeaseDuration` | `15s` | How long after its last renewal the lease can be taken over |
 | `Agent:Discovery:Kubernetes:LeaderElection:RenewInterval` | `5s` | How often the holder renews and the others look |
 
 ### Windows services
 
-On a Windows server the agent runs as one process per machine and the machine is the scope; its labels come from `Agent:Labels` in the local configuration file like any other agent. With `Agent:Discovery:Kind` set to `windows` it asks the Service Control Manager every few seconds and shows the services you list, even when the application behind them knows nothing of the monitoring client.
+On a Windows server the agent runs as one process per machine and the machine is the scope; its labels come from `Agent:Labels` in the local configuration file like any other agent. With `Agent:Discovery:Kind` set to `windows` it asks the Service Control Manager every few seconds and shows the services you list, even when the application behind them knows nothing of the Plover client.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -538,27 +538,27 @@ The processes of the listed services that are running carry `windows.process.mem
 
 Clock skew is not measured: the agent has no trusted time to compare with.
 
-Applications that use the monitoring client report over a named pipe, as they do through a sidecar on Kubernetes, and the agent matches each with its service by process id. The service must be on the allowlist and running; an application in a process that is not that service's is turned away, as far as the process id it announces says: the agent goes by the process id in the application's hello and does not check it against the process that really opened the pipe. The library connects to the pipe `monitoring-agent` by default on Windows (set `MONITORING_AGENT_PIPE` or `MonitoringOptions.AgentPipe` for another name, or blank for none), introduces itself with its process id, program, name and version, sends heartbeats with its health and answers pulls for its health, metrics and calls exactly as a sidecar does. If there is no agent it retries quietly and the application is not affected.
+Applications that use the Plover client report over a named pipe, as they do through a sidecar on Kubernetes, and the agent matches each with its service by process id. The service must be on the allowlist and running; an application in a process that is not that service's is turned away, as far as the process id it announces says: the agent goes by the process id in the application's hello and does not check it against the process that really opened the pipe. The library connects to the pipe `plover-agent` by default on Windows (set `PLOVER_AGENT_PIPE` or `PloverOptions.AgentPipe` for another name, or blank for none), introduces itself with its process id, program, name and version, sends heartbeats with its health and answers pulls for its health, metrics and calls exactly as a sidecar does. If there is no agent it retries quietly and the application is not affected.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `Agent:Sidecars:Pipe:Name` | `monitoring-agent` with Windows discovery, else none | The name of the pipe the applications connect to |
+| `Agent:Sidecars:Pipe:Name` | `plover-agent` with Windows discovery, else none | The name of the pipe the applications connect to |
 | `Agent:Sidecars:Pipe:Allow` | none | The accounts the monitored applications run as, such as `NT SERVICE\billing` or `DOMAIN\svc-orders`. The pipe lets in only these, the system, the administrators, the agent's own account and the built-in Local Service and Network Service accounts, so a user that is not one of these cannot report as an application. The accounts that are let in trust each other: one of them can announce the process id of another monitored service and report in its place, so give a monitored application an account of its own and keep the list short. An account that does not exist stops the agent from starting |
 | `Agent:Sidecars:Listen:Enabled` | `false` with Windows discovery, else `true` | Whether to also listen on a TCP port for sidecars; a Windows server only needs the pipe
 
 ### Running as a Windows service
 
-`deploy/windows/install-agent.ps1` installs the agent as a service that starts with the machine. Put `Monitoring.Agent.exe` and its `monitoring.json` in one folder, and run from an elevated PowerShell:
+`deploy/windows/install-agent.ps1` installs the agent as a service that starts with the machine. Put `Plover.Agent.exe` and its `plover.json` in one folder, and run from an elevated PowerShell:
 
 ```powershell
-.\install-agent.ps1 -Path C:\MonitoringAgent                  # install and start
-.\install-agent.ps1 -Path C:\MonitoringAgent -Account 'DOMAIN\svc-monitoring'   # run as another account, asks for the password
-.\install-agent.ps1 -Path C:\MonitoringAgent -Uninstall
+.\install-agent.ps1 -Path C:\PloverAgent                  # install and start
+.\install-agent.ps1 -Path C:\PloverAgent -Account 'DOMAIN\svc-monitoring'   # run as another account, asks for the password
+.\install-agent.ps1 -Path C:\PloverAgent -Uninstall
 ```
 
-- A service starts in the system folder, so the agent reads `monitoring.json` from the folder of the program when it runs as a service; `MONITORING_CONFIG_FILE` still overrides that.
+- A service starts in the system folder, so the agent reads `plover.json` from the folder of the program when it runs as a service; `PLOVER_CONFIG_FILE` still overrides that.
 - Recovery is set to restart after 5 seconds, again after 5, then after 30, and the count resets after a day without failures. A stop with a non-zero exit code counts as a failure, so a configuration error is retried and the server is not left unmonitored in silence.
-- The agent logs to the Windows event log (Application, source `MonitoringAgent`) as well as to the console.
+- The agent logs to the Windows event log (Application, source `PloverAgent`) as well as to the console.
 - The default account is Local System. For a smaller set of rights, use an account that may read the services and processes it is to report on.
 
 ### Sidecars
@@ -580,7 +580,7 @@ How often metrics and dependency calls are read is not set here but in the contr
 
 An instance whose sidecar is gone is shown as Unhealthy until the sidecar returns. A sidecar that says goodbye on purpose, as during a rollout, does not cause that: the agent only forgets what the application reported. A pod that exists but has no sidecar keeps what the platform says about it.
 
-The sidecar's own settings (`Sidecar:` in its environment, `MONITORING_Sidecar__...`) include `Pod:Ip`, `Pod:Node` and `Pod:Namespace`, which the chart template and the injector fill from the Downward API. They are sent in the registration as the labels `pod.ip`, `node` and `namespace`, unless a label of that name is set by hand with `Labels:<name>`. The pod name is the host name, which is already the default instance id.
+The sidecar's own settings (`Sidecar:` in its environment, `PLOVER_Sidecar__...`) include `Pod:Ip`, `Pod:Node` and `Pod:Namespace`, which the chart template and the injector fill from the Downward API. They are sent in the registration as the labels `pod.ip`, `node` and `namespace`, unless a label of that name is set by hand with `Labels:<name>`. The pod name is the host name, which is already the default instance id.
 
 ### Containers
 
@@ -588,8 +588,8 @@ Each pod is shown down to its containers, taken from the same pod watch, so no e
 
 | Container | Role |
 | --- | --- |
-| The first container that is not the monitoring sidecar | Application |
-| The container named by `MonitoringSidecarContainer` | Monitoring sidecar |
+| The first container that is not the Plover sidecar | Application |
+| The container named by `PloverSidecarContainer` | Plover sidecar |
 | Any other container, and init containers that keep running (native sidecars) | Other sidecar |
 | Init containers | Init: shown while they run or after they failed, and left out once they finished without error |
 
@@ -608,7 +608,7 @@ Each container also carries its restart count, image, image digest, the reason a
 An application can report how long its TLS certificates are valid, so a lapse is warned about before it causes an outage. It is off until you name the certificates:
 
 ```csharp
-builder.Services.AddMonitoring(options =>
+builder.Services.AddPlover(options =>
 {
     // A file, such as the secret a Kubernetes certificate is mounted from; it is read again each time, so a renewal needs no restart.
     options.Certificates.Add(CertificateWatch.File("https", "/etc/tls/tls.crt"));
@@ -618,20 +618,20 @@ builder.Services.AddMonitoring(options =>
 });
 ```
 
-Each certificate becomes the gauge `monitoring.certificate.expiry_days`, tagged `certificate=<name>`, with the days left (negative once it has expired). A certificate that cannot be read at one reading is left out of it, which shows as a gap. The controller alerts on it as described under `CertificateWarningDays` and `CertificateCriticalDays`; replicas that share a certificate count as one, and the one that expires first decides.
+Each certificate becomes the gauge `plover.certificate.expiry_days`, tagged `certificate=<name>`, with the days left (negative once it has expired). A certificate that cannot be read at one reading is left out of it, which shows as a gap. The controller alerts on it as described under `CertificateWarningDays` and `CertificateCriticalDays`; replicas that share a certificate count as one, and the one that expires first decides.
 
 ### Queues an application depends on
 
 The application knows how to ask its broker, so it says what to ask:
 
 ```csharp
-builder.Services.AddMonitoring(options =>
+builder.Services.AddPlover(options =>
 {
     options.Queues.Add(new QueueWatch("orders", () => cache.Read("orders")));   // QueueStats(Depth, Consumers, DeadLetters)
 });
 ```
 
-The function is called each time the metrics are read, every few seconds, so answer from a cache or a cheap call. Each queue becomes the gauges `monitoring.queue.depth`, `monitoring.queue.consumers` and `monitoring.queue.dead_letters`, tagged `queue=<name>`; what the broker does not tell (`null`), or a queue that cannot be read at that moment, is left out and shows as a gap. The controller alerts on dead letters and on waiting messages without consumers (`QueueWithoutConsumersWait`); replicas ask the same broker, so a consumer seen by one of them counts.
+The function is called each time the metrics are read, every few seconds, so answer from a cache or a cheap call. Each queue becomes the gauges `plover.queue.depth`, `plover.queue.consumers` and `plover.queue.dead_letters`, tagged `queue=<name>`; what the broker does not tell (`null`), or a queue that cannot be read at that moment, is left out and shows as a gap. The controller alerts on dead letters and on waiting messages without consumers (`QueueWithoutConsumersWait`); replicas ask the same broker, so a consumer seen by one of them counts.
 
 ### Database connection pools
 
@@ -642,12 +642,12 @@ Nothing needs to be set up for Npgsql: it publishes the pool as `db.client.conne
 A database call becomes an edge to the server and database, with its calls, errors and duration, and a span with the statement (with the values taken out). No code is needed beyond naming the activity source of the provider, because the client only listens to the sources you list:
 
 ```csharp
-builder.Services.AddMonitoring(options => options.TraceSources.Add("Npgsql"));
+builder.Services.AddPlover(options => options.TraceSources.Add("Npgsql"));
 ```
 
 | Provider | Source | Checked |
 | --- | --- | --- |
-| Npgsql 9 (PostgreSQL) | `Npgsql` | Against a real server, JIT and Native AOT (`samples/Monitoring.DatabaseSample`): the edge, the failed query counted as an error, the statement with its values replaced, no trim or AOT warning |
+| Npgsql 9 (PostgreSQL) | `Npgsql` | Against a real server, JIT and Native AOT (`samples/Plover.DatabaseSample`): the edge, the failed query counted as an error, the statement with its values replaced, no trim or AOT warning |
 
 Other providers work when they publish activities with the `db.system` tag and the address of the server, in the older (`net.peer.name`, `db.name`, `db.statement`) or the current (`server.address`, `db.namespace`, `db.query.text`) names; a failure is recognized from the status of the activity, the `error.type` tag, the `otel.status_code` tag or an `exception` event. They have not been tried here: SqlClient and the others are yours to check with the sample, which takes one connection string.
 
@@ -656,7 +656,7 @@ Other providers work when they publish activities with the `db.system` tag and t
 A Native AOT application cannot be patched at run time, so the messages are counted by two calls around the application's own send and receive. They know nothing about the broker library, so the client stays free of one: you pass the code that sets and reads a property of your message. Register once:
 
 ```csharp
-builder.Services.AddMonitoring(options => options.UseActiveMq());
+builder.Services.AddPlover(options => options.UseActiveMq());
 ```
 
 ```csharp
@@ -668,11 +668,11 @@ try { producer.Send(message); } catch (Exception ex) { send.Fail(ex); throw; }
 using var process = MonitoredMessaging.StartProcess(MonitoredMessaging.ActiveMq, "invoices", name => message.Properties.GetString(name));
 ```
 
-The graph then shows `sender → queue → receiver`. A message without a usable `traceparent` starts a trace of its own. Without monitoring both calls return `null` and do nothing, so the application code needs no check. The calls are tested with plain dictionaries as the message, and against a real ActiveMQ Artemis broker through the Artemis .NET client (AMQP; the trace id arrives unchanged at the receiver). That test runs when `MONITORING_TEST_ARTEMIS=host:port:user:password` is set, as it is in CI. Classic ActiveMQ with OpenWire was not tried, but the calls only need a string property, which every client has.
+The graph then shows `sender → queue → receiver`. A message without a usable `traceparent` starts a trace of its own. Without monitoring both calls return `null` and do nothing, so the application code needs no check. The calls are tested with plain dictionaries as the message, and against a real ActiveMQ Artemis broker through the Artemis .NET client (AMQP; the trace id arrives unchanged at the receiver). That test runs when `PLOVER_TEST_ARTEMIS=host:port:user:password` is set, as it is in CI. Classic ActiveMQ with OpenWire was not tried, but the calls only need a string property, which every client has.
 
 ### What the library says about itself
 
-The client reports its own state as metrics, which the agent pulls with the rest and which show on the instance: `monitoring.client.spans_buffered` and `spans_dropped` (spans thrown away before anyone read them; a number that keeps rising says `SpanBufferSize` is too small for the traffic), `monitoring.client.edges` (dependencies counted; the limit is `MaxEdges`), `monitoring.client.metric_series` (the limit is `MaxMetricSeries`), `monitoring.client.sidecar_connections` (sidecars connected over the socket) and `monitoring.client.agent_connected` (1 while the agent of the machine has accepted the application, over the pipe on Windows).
+The client reports its own state as metrics, which the agent pulls with the rest and which show on the instance: `plover.client.spans_buffered` and `spans_dropped` (spans thrown away before anyone read them; a number that keeps rising says `SpanBufferSize` is too small for the traffic), `plover.client.edges` (dependencies counted; the limit is `MaxEdges`), `plover.client.metric_series` (the limit is `MaxMetricSeries`), `plover.client.sidecar_connections` (sidecars connected over the socket) and `plover.client.agent_connected` (1 while the agent of the machine has accepted the application, over the pipe on Windows).
 
 ### Raw TCP connections
 
@@ -686,10 +686,10 @@ It works like `TcpClient.ConnectAsync` and also counts the attempt, with how lon
 
 ### Packages of an application
 
-An application that references the monitoring client lists the packages it is built from, so the dashboard can show what each service contains. A Native AOT binary cannot ask NuGet at run time, so the list is written during the build: the client package ships MSBuild targets (`build/Monitoring.Client.targets`) that read what NuGet restored (direct and transitive packages with their versions) and embed it in the application. Nothing needs to be configured.
+An application that references the Plover client lists the packages it is built from, so the dashboard can show what each service contains. A Native AOT binary cannot ask NuGet at run time, so the list is written during the build: the client package ships MSBuild targets (`build/Plover.Client.targets`) that read what NuGet restored (direct and transitive packages with their versions) and embed it in the application. Nothing needs to be configured.
 
 - The list is only made for executables (applications and services), not for libraries.
-- Turn it off for a project with `<MonitoringReportPackages>false</MonitoringReportPackages>`; the application then reports an empty list.
+- Turn it off for a project with `<PloverReportPackages>false</PloverReportPackages>`; the application then reports an empty list.
 - The agent asks for the list once per sidecar connection, as soon as the application has reported its health, because it can only change with a new version of the application.
 
 
@@ -702,12 +702,12 @@ An application that references the monitoring client lists the packages it is bu
 
 Both report through the pipeline they already use, as metrics (no settings; the agent reports every 15 seconds, and only fixed names are used, so memory stays bounded).
 
-- Sidecar: added to the metrics of its application, so they show on the instance: `monitoring.sidecar.memory_bytes`, `cpu_seconds`, `uptime_seconds`, `library_pull_ms` (the latest question to the application) and `library_connected` (1 when the application answered the latest question).
-- Agent: reported as the application of its own pod, which becomes the service `monitoring-agent` (only when the pod is in a namespace the agent discovers): `monitoring.agent.memory_bytes`, `cpu_seconds`, `uptime_seconds`, `instances_watched`, `controller_connections`, `sidecar_connections`, `frames_sent`, `pull_ms` (the latest answer of a sidecar), `kubernetes_errors` and `kubernetes_relists`.
+- Sidecar: added to the metrics of its application, so they show on the instance: `plover.sidecar.memory_bytes`, `cpu_seconds`, `uptime_seconds`, `library_pull_ms` (the latest question to the application) and `library_connected` (1 when the application answered the latest question).
+- Agent: reported as the application of its own pod, which becomes the service `plover-agent` (only when the pod is in a namespace the agent discovers): `plover.agent.memory_bytes`, `cpu_seconds`, `uptime_seconds`, `instances_watched`, `controller_connections`, `sidecar_connections`, `frames_sent`, `pull_ms` (the latest answer of a sidecar), `kubernetes_errors` and `kubernetes_relists`.
 
 Towards each controller replica the agent reports, tagged with the replica as `replica=host:port`, whether it is connected (`replica_connected`, 1 or 0) and, while it is, how many changes of its scope the replica has not yet acknowledged (`replica_lag`). A replica that is never reached shows as 0 and one that is taken out of the list disappears. Because every replica receives this from every agent, each of them can show the state of all of them without talking to the others.
 
-The System page of the dashboard (and the tile on the overview) shows this controller replica (with the frames per second the agents send, measured over windows of five seconds, and how many instances and metric series it holds), then every replica the agents connect to with how many agents are connected and how far behind it is, then the pods that run without a monitoring sidecar. A replica that is behind or that an agent cannot reach raises the alerts `replica-behind` and `replica-unreachable` on any controller that sees it, including the others when one replica is down.
+The System page of the dashboard (and the tile on the overview) shows this controller replica (with the frames per second the agents send, measured over windows of five seconds, and how many instances and metric series it holds), then every replica the agents connect to with how many agents are connected and how far behind it is, then the pods that run without a Plover sidecar. A replica that is behind or that an agent cannot reach raises the alerts `replica-behind` and `replica-unreachable` on any controller that sees it, including the others when one replica is down.
 
 ## Prometheus export
 
@@ -718,7 +718,7 @@ Each of the controller, the agent and the sidecar can serve its own values in th
 | `Controller:Prometheus:Port`, `Agent:Prometheus:Port`, `Sidecar:Prometheus:Port` | `0` (off) | The port that serves `GET /metrics` |
 | `Controller:Prometheus:Address`, `Agent:Prometheus:Address`, `Sidecar:Prometheus:Address` | `127.0.0.1` | The IP address to listen on. Local only until you change it; there is no authentication, so put it on a network you trust |
 
-The values are the ones described under "What the agent and the sidecar report about themselves", and for the controller the System view (`monitoring_controller_uptime_seconds`, `scopes`, `agents_connected`, `event_clients`, `memory_bytes`, `healthy`, `alert_evaluation_ms`, `frames_per_second`, `instances` and `series`). Dots in names become underscores, and every value is exposed as a gauge. The controller serves it from its own listener, not the dashboard's port.
+The values are the ones described under "What the agent and the sidecar report about themselves", and for the controller the System view (`plover_controller_uptime_seconds`, `scopes`, `agents_connected`, `event_clients`, `memory_bytes`, `healthy`, `alert_evaluation_ms`, `frames_per_second`, `instances` and `series`). Dots in names become underscores, and every value is exposed as a gauge. The controller serves it from its own listener, not the dashboard's port.
 
 ## Metric history
 
@@ -734,25 +734,25 @@ The history of an instance is dropped when its sidecar disconnects. The request 
 
 ## The injector
 
-The Helm template of the sidecar needs a change in the chart of every application. For applications whose chart you do not own, a small web server, the injector, adds the sidecar to a pod when it is created, the way a service mesh does. Install it once per cluster, as a cluster administrator, because the registration of the webhook is cluster-wide (`deploy/helm/monitoring-injector`):
+The Helm template of the sidecar needs a change in the chart of every application. For applications whose chart you do not own, a small web server, the injector, adds the sidecar to a pod when it is created, the way a service mesh does. Install it once per cluster, as a cluster administrator, because the registration of the webhook is cluster-wide (`deploy/helm/plover-injector`):
 
 ```sh
-helm install monitoring-injector deploy/helm/monitoring-injector -n monitoring \
-  --set sidecar.agentAddress=monitoring-agent:9441
-kubectl label namespace shop monitoring/inject=true     # every new pod of the namespace gets the sidecar
+helm install plover-injector deploy/helm/plover-injector -n plover \
+  --set sidecar.agentAddress=plover-agent:9441
+kubectl label namespace shop plover/inject=true     # every new pod of the namespace gets the sidecar
 ```
 
-- Who is changed. A pod is given the sidecar when its namespace carries the label `monitoring/inject=true`, or the pod carries it itself, and not when the pod carries `monitoring/inject=false`. Only new pods are changed, so roll the deployments of a namespace after labelling it. The namespace of the injector itself and the ones under `excludedNamespaces` (by default `kube-system` and `kube-public`) are never changed.
-- What is added. The sidecar as a native sidecar (Kubernetes 1.29 and later; `sidecar.nativeSidecar=false` makes it a second container), a small in-memory volume for the socket, and for each container of the pod the volume and the variable `MONITORING_SOCKET`. This is the same sidecar the library chart includes: both are checked against one golden file (`deploy/injector/sidecar.golden.json`), so a pod does not depend on how it got its sidecar. The agent of the namespace has to be there, at `sidecar.agentAddress`.
-- It never stops a pod. The failure policy is `Ignore` by default, so when the injector is down pods start without the sidecar, and show up under "Pods without a monitoring sidecar" on the System page. Run two replicas (the default). With `failurePolicy=Fail` a pod that cannot be checked is refused, which keeps everything monitored and makes the injector a dependency of the whole cluster; be sure before you choose it.
-- It does not make the application monitored by itself. The application still needs the monitoring client in its code; the sidecar only carries what the client reports.
+- Who is changed. A pod is given the sidecar when its namespace carries the label `plover/inject=true`, or the pod carries it itself, and not when the pod carries `plover/inject=false`. Only new pods are changed, so roll the deployments of a namespace after labelling it. The namespace of the injector itself and the ones under `excludedNamespaces` (by default `kube-system` and `kube-public`) are never changed.
+- What is added. The sidecar as a native sidecar (Kubernetes 1.29 and later; `sidecar.nativeSidecar=false` makes it a second container), a small in-memory volume for the socket, and for each container of the pod the volume and the variable `PLOVER_SOCKET`. This is the same sidecar the library chart includes: both are checked against one golden file (`deploy/injector/sidecar.golden.json`), so a pod does not depend on how it got its sidecar. The agent of the namespace has to be there, at `sidecar.agentAddress`.
+- It never stops a pod. The failure policy is `Ignore` by default, so when the injector is down pods start without the sidecar, and show up under "Pods without a Plover sidecar" on the System page. Run two replicas (the default). With `failurePolicy=Fail` a pod that cannot be checked is refused, which keeps everything monitored and makes the injector a dependency of the whole cluster; be sure before you choose it.
+- It does not make the application monitored by itself. The application still needs the Plover client in its code; the sidecar only carries what the client reports.
 - Certificate. The API server only talks to a webhook over TLS and has to trust its certificate: `tls.mode=generate` (the default) makes one when the chart is installed or upgraded and is meant for trying it out, `certManager` asks cert-manager (`tls.issuerRef`) and keeps it renewed, `openshift` lets the service CA of OpenShift make it, and `existingSecret` uses a secret you made together with the `tls.caBundle` that signed it. The injector looks at the files of the certificate again (`Injector:CertificateCheckInterval`, 30 seconds by default, when a connection is made), so a renewal needs no restart; a half-written or unreadable replacement is ignored and the working certificate stays. Kubernetes brings a changed secret to the pods after a minute or so.
 
-| Setting (environment variable `MONITORING_Injector__...`) | Default | Meaning |
+| Setting (environment variable `PLOVER_Injector__...`) | Default | Meaning |
 | --- | --- | --- |
 | `SidecarImage` | required | The image of the sidecar |
 | `ImagePullPolicy` | `IfNotPresent` | When the image of the sidecar is pulled |
-| `AgentAddress` | `monitoring-agent:9441` | The agent of the namespace, as the sidecar reaches it |
+| `AgentAddress` | `plover-agent:9441` | The agent of the namespace, as the sidecar reaches it |
 | `NativeSidecar` | `true` | A native sidecar, or an ordinary second container |
 | `Labels:<name>` | none | Labels the sidecar sends with the registration |
 | `Certificate`, `Key` | required | The PEM files with the certificate and the key |

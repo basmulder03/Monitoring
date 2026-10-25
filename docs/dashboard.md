@@ -4,7 +4,7 @@ import { withBase } from 'vitepress'
 
 # The dashboard in motion
 
-These recordings show the real dashboard, served by a real controller. The agents behind it are made up (`samples/Monitoring.Demo`), but they speak the real protocol and play the same short incident again and again.
+These recordings show the real dashboard, served by a real controller. The agents behind it are made up (`samples/Plover.Demo`), but they speak the real protocol and play the same short incident again and again.
 
 ## Overview: scopes turn degraded and recover
 
@@ -33,7 +33,7 @@ These recordings show the real dashboard, served by a real controller. The agent
 ## Try it and record it yourself
 
 ```sh
-DEMO_SIGNED_IN=1 dotnet run --project samples/Monitoring.Demo     # dashboard on http://127.0.0.1:5080
+DEMO_SIGNED_IN=1 dotnet run --project samples/Plover.Demo     # dashboard on http://127.0.0.1:5080
 cd docs && npm run record                                          # writes docs/public/recordings/*.webm
 ```
 

@@ -1,0 +1,20 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.6.3">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsAotCompatible>false</IsAotCompatible>
+    <IsPackable>false</IsPackable>
+    <UserSecretsId>plover-apphost</UserSecretsId>
+    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" Version="13.6.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Plover.TestApplications/Plover.TestApplications.csproj" />
+    <ProjectReference Include="../Plover.FakeCluster/Plover.FakeCluster.csproj" />
+    <ProjectReference Include="../../src/Plover.Controller/Plover.Controller.csproj" />
+    <ProjectReference Include="../../src/Plover.Agent/Plover.Agent.csproj" />
+    <ProjectReference Include="../../src/Plover.Sidecar/Plover.Sidecar.csproj" />
+    <ProjectReference Include="../../samples/Plover.SampleApp/Plover.SampleApp.csproj" />
+  </ItemGroup>
+</Project>

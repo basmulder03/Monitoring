@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Plover.Protocol\Plover.Protocol.csproj" />
+    <ProjectReference Include="..\Plover.Hosting\Plover.Hosting.csproj" />
+    <ProjectReference Include="..\Plover.Ui\Plover.Ui.csproj" />
+    <ProjectReference Include="..\Plover.Common\Plover.Common.csproj" />
+  </ItemGroup>
+  <PropertyGroup>
+    <PublishAot>true</PublishAot>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Plover.Controller.Tests" />
+    <InternalsVisibleTo Include="Plover.Component.Tests" />
+    <InternalsVisibleTo Include="Plover.Demo" />
+  </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.13" />
+  </ItemGroup>
+</Project>

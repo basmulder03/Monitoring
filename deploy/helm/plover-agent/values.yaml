@@ -1,0 +1,68 @@
+image:
+  repository: plover-agent
+  tag: ""            # defaults to the chart's appVersion
+  pullPolicy: IfNotPresent
+
+# The scope this agent reports as. The dashboard shows it as a tile.
+scope:
+  name: ""           # defaults to the namespace of the release
+  labels: {}         # for example: { environment: prod, datacenter: a }
+
+controller:
+  # The bootstrap address of the controller as host:port. The controller answers with the address of every replica.
+  addresses: []
+
+# How the agent proves who it is. With serviceAccount it presents the token of its own Kubernetes service account, which Kubernetes projects into the pod and
+# rotates, and the controller (serviceAccountAuth in its chart, with the same audience) asks the API server whether it is valid; there is no secret to hand out.
+# With token it presents a shared token from a secret.
+auth:
+  mode: token         # token or serviceAccount
+  audience: plover-controller
+
+# The token that proves who the agent is, with auth.mode token. Create the secret yourself; it needs one key, "token".
+token:
+  existingSecret: ""
+  key: token
+
+# How the connection to the controller is protected: none, tls or mtls. See docs/configuration.md.
+transport:
+  mode: none
+  # A secret with ca.crt (and tls.crt and tls.key for mtls), mounted at /etc/plover/transport.
+  existingSecret: ""
+  serverName: ""
+
+# Name of the Plover sidecar container in the pods of the namespace, so a failing sidecar is not reported as a failing application.
+sidecarContainer: plover-sidecar
+
+# Shows what each pod uses of the processor and memory it asked for. Needs a metrics server in the cluster; the chart then also lets the agent read the metrics API.
+podMetrics: false
+
+service:
+  port: 9441         # where the sidecars connect
+
+# Who may reach the port of the sidecars. The sidecars of the namespace dial it in plain text and the agent believes which pod they say they are,
+# so only the pods of the namespace may reach it. This needs a network plugin that enforces network policies, and does nothing without one.
+networkPolicy:
+  enabled: true
+  extraFrom: []      # more sources, as in the "from" of a network policy, for example [{ namespaceSelector: { matchLabels: { name: tools } } }]
+
+# The agent checks that a sidecar connects from the address of the pod it says it is. Turn it off only when something in between (a service mesh,
+# a proxy) changes the source address of the connection, and restrict who may reach the port with networkPolicy instead.
+sidecars:
+  verifyPeerAddress: true
+
+# Runs more than one agent, so a rollout or a lost node does not leave the scope Unknown. The agents compete for a Lease: the one that holds it
+# takes the sidecars and connects to the controllers, the others wait and turn sidecars away until one takes over, which takes about 15 seconds.
+highAvailability:
+  enabled: false
+  replicas: 2
+
+resources:
+  requests: { cpu: 25m, memory: 32Mi }
+  limits: { memory: 128Mi }
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}
+extraEnv: []

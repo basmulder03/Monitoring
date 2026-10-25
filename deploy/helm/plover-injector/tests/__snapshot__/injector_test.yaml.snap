@@ -1,0 +1,200 @@
+matches the snapshot of its default render with a certificate from cert-manager:
+  1: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      labels:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: plover-injector
+        app.kubernetes.io/version: 0.1.0
+        helm.sh/chart: plover-injector-0.1.0
+      name: plover-injector
+    spec:
+      replicas: 2
+      selector:
+        matchLabels:
+          app.kubernetes.io/instance: RELEASE-NAME
+          app.kubernetes.io/name: plover-injector
+      template:
+        metadata:
+          annotations:
+            checksum/settings: baab82e04d33fc39666c86a943bb055ed4203dfa2e65fb44145a8429a07150f7
+          labels:
+            app.kubernetes.io/instance: RELEASE-NAME
+            app.kubernetes.io/name: plover-injector
+        spec:
+          containers:
+            - env:
+                - name: PLOVER_Injector__SidecarImage
+                  value: plover-sidecar:0.1.0
+                - name: PLOVER_Injector__ImagePullPolicy
+                  value: IfNotPresent
+                - name: PLOVER_Injector__AgentAddress
+                  value: plover-agent:9441
+                - name: PLOVER_Injector__NativeSidecar
+                  value: "true"
+                - name: PLOVER_Injector__Certificate
+                  value: /etc/injector/tls/tls.crt
+                - name: PLOVER_Injector__Key
+                  value: /etc/injector/tls/tls.key
+              image: plover-injector:0.1.0
+              imagePullPolicy: IfNotPresent
+              livenessProbe:
+                httpGet:
+                  path: /healthz
+                  port: webhook
+                  scheme: HTTPS
+                initialDelaySeconds: 10
+              name: injector
+              ports:
+                - containerPort: 8443
+                  name: webhook
+              readinessProbe:
+                httpGet:
+                  path: /healthz
+                  port: webhook
+                  scheme: HTTPS
+              resources:
+                limits:
+                  memory: 128Mi
+                requests:
+                  cpu: 25m
+                  memory: 32Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - mountPath: /etc/injector/tls
+                  name: tls
+                  readOnly: true
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          volumes:
+            - name: tls
+              secret:
+                secretName: plover-injector-tls
+  2: |
+    apiVersion: v1
+    kind: Service
+    metadata:
+      labels:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: plover-injector
+        app.kubernetes.io/version: 0.1.0
+        helm.sh/chart: plover-injector-0.1.0
+      name: plover-injector
+    spec:
+      ports:
+        - name: webhook
+          port: 443
+          targetPort: webhook
+      selector:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/name: plover-injector
+  3: |
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    metadata:
+      labels:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: plover-injector
+        app.kubernetes.io/version: 0.1.0
+        helm.sh/chart: plover-injector-0.1.0
+      name: plover-injector
+    spec:
+      dnsNames:
+        - plover-injector.plover.svc
+        - plover-injector.plover.svc.cluster.local
+      issuerRef:
+        kind: ClusterIssuer
+        name: ca
+      secretName: plover-injector-tls
+  4: |
+    apiVersion: admissionregistration.k8s.io/v1
+    kind: MutatingWebhookConfiguration
+    metadata:
+      annotations:
+        cert-manager.io/inject-ca-from: plover/plover-injector
+      labels:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: plover-injector
+        app.kubernetes.io/version: 0.1.0
+        helm.sh/chart: plover-injector-0.1.0
+      name: plover-injector-plover
+    webhooks:
+      - admissionReviewVersions:
+          - v1
+        clientConfig:
+          service:
+            name: plover-injector
+            namespace: plover
+            path: /mutate/namespace
+        failurePolicy: Ignore
+        name: namespaces.inject.plover.local
+        namespaceSelector:
+          matchExpressions:
+            - key: kubernetes.io/metadata.name
+              operator: NotIn
+              values:
+                - kube-system
+                - kube-public
+                - plover
+          matchLabels:
+            plover/inject: "true"
+        objectSelector:
+          matchExpressions:
+            - key: plover/inject
+              operator: NotIn
+              values:
+                - "false"
+        rules:
+          - apiGroups:
+              - ""
+            apiVersions:
+              - v1
+            operations:
+              - CREATE
+            resources:
+              - pods
+        sideEffects: None
+        timeoutSeconds: 5
+      - admissionReviewVersions:
+          - v1
+        clientConfig:
+          service:
+            name: plover-injector
+            namespace: plover
+            path: /mutate
+        failurePolicy: Ignore
+        name: pods.inject.plover.local
+        namespaceSelector:
+          matchExpressions:
+            - key: kubernetes.io/metadata.name
+              operator: NotIn
+              values:
+                - kube-system
+                - kube-public
+                - plover
+        objectSelector:
+          matchLabels:
+            plover/inject: "true"
+        rules:
+          - apiGroups:
+              - ""
+            apiVersions:
+              - v1
+            operations:
+              - CREATE
+            resources:
+              - pods
+        sideEffects: None
+        timeoutSeconds: 5

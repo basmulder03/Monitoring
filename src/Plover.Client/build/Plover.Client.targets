@@ -1,0 +1,31 @@
+<Project>
+  <!--
+    Lists the packages an application is built from and embeds the list in the application, so the Plover client can report it.
+    A Native AOT binary cannot ask NuGet what it contains, so this is done at build time, from what NuGet resolved.
+    Turn it off with <PloverReportPackages>false</PloverReportPackages>.
+    The file has one package per line: "D name" for a package the project asks for itself, "P name version" for every package built in.
+  -->
+  <PropertyGroup>
+    <PloverReportPackages Condition="'$(PloverReportPackages)' == ''">true</PloverReportPackages>
+  </PropertyGroup>
+
+  <Target Name="PloverWritePackages" BeforeTargets="AssignTargetPaths" DependsOnTargets="ResolvePackageAssets"
+          Condition="'$(PloverReportPackages)' == 'true' And '$(OutputType)' != 'Library'">
+    <PropertyGroup>
+      <!-- Worked out here, not at the top: where the intermediate files go is only known once the SDK has been read. -->
+      <PloverPackagesFile>$([MSBuild]::NormalizePath($(MSBuildProjectDirectory), $(IntermediateOutputPath), plover.packages.txt))</PloverPackagesFile>
+    </PropertyGroup>
+    <ItemGroup>
+      <_PloverResolved Include="@(RuntimeCopyLocalItems);@(ResolvedCompileFileDefinitions)" Condition="'%(NuGetPackageId)' != ''" />
+      <_PloverPackage Include="@(_PloverResolved->'P %(NuGetPackageId) %(NuGetPackageVersion)')" />
+      <_PloverDirect Include="@(PackageReference->'D %(Identity)')" />
+    </ItemGroup>
+    <RemoveDuplicates Inputs="@(_PloverPackage)">
+      <Output TaskParameter="Filtered" ItemName="_PloverPackageUnique" />
+    </RemoveDuplicates>
+    <WriteLinesToFile File="$(PloverPackagesFile)" Lines="@(_PloverDirect);@(_PloverPackageUnique)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <EmbeddedResource Include="$(PloverPackagesFile)" LogicalName="Plover.Packages" />
+    </ItemGroup>
+  </Target>
+</Project>

@@ -1,0 +1,122 @@
+image:
+  repository: plover-controller
+  tag: ""            # defaults to the chart's appVersion
+  pullPolicy: IfNotPresent
+
+# Identical replicas that are all active. Every agent feeds every replica, so losing one changes nothing for the others.
+replicas: 2
+
+# The tokens agents may register with; only hashes are kept. scope "*" lets any agent that holds the token register under the scope it announces.
+# Hash a token with: printf '%s' 'the-token' | sha256sum
+agentTokens: []
+# - { scope: "*", tokenHash: "<sha-256 of the enrollment token>" }
+
+# Let agents prove who they are with the token of their Kubernetes service account instead of a shared secret. The controller asks the API server
+# whether a token is valid (a cluster role binding to system:auth-delegator is created for that), and an agent may only report as the scope named
+# after the namespace of its service account, or the one given under scopes. The agent chart's auth.mode must be serviceAccount, with the same audience.
+serviceAccountAuth:
+  enabled: false
+  audience: plover-controller
+  scopes: {}          # for example: { shop-prod: shop } to let the namespace shop-prod report as the scope shop
+
+# Where alerts are sent besides the dashboard. A channel hears of each alert once when it starts and once when it ends (what it was told is kept in the state store below).
+# Any value that is a secret can be read from a secret instead: urlSecret, secretSecret, userSecret, passwordSecret take { name, key }.
+notifications:
+  minSeverity: warning        # warning or critical
+  # Only one replica sends, chosen through a Kubernetes Lease (creates a service account and a role for that one object). Off: every replica sends,
+  # and the receiver de-duplicates by the key in each message.
+  oneSender: false
+  # One replica sends, chosen without Kubernetes: the one that ranks first among the replicas it can reach (see replica below). Use this instead of oneSender
+  # when the replicas run in more than one cluster or data center, because a Lease exists in one cluster only. When the link between the sites breaks
+  # both sides send, so an alert is told twice rather than not at all. It needs peers.extra to name the replicas of the other sites.
+  peerSender: false
+  webhooks: []                # - { url: "https://hooks.example/alerts", secretSecret: { name: hook, key: secret } }  (JSON with an HMAC signature header when there is a secret)
+  chats: []                   # - { urlSecret: { name: slack, key: url }, format: slack }   (slack, also for Mattermost and Google Chat, or discord)
+  email: {}                   # { host: smtp.example, port: 587, from: plover@example, to: [oncall@example], user: x, passwordSecret: { name: smtp, key: password } }
+
+# Who may look at the dashboard. With nothing set it is open, as before; keep it on a network you trust. Set a trusted proxy or a token and every request must prove who it is
+# (/healthz stays open for the platform). A proxy you run (oauth2-proxy, the OpenShift OAuth proxy, an ingress that authenticates) signs people in and says who they are in the header
+# X-Forwarded-User; it is only believed when it connects from one of trustedProxies (addresses or networks), because anyone else could write the same header.
+# A token is for a wall display or a script: it goes in /tv?token=... (kept in a cookie), or in the header Authorization: Bearer ...; only its hash is kept here.
+# Make one with: head -c 32 /dev/urandom | base64 | tr -d '=+/' ; hash it with: printf '%s' 'the-token' | sha256sum
+webAuth:
+  trustedProxies: []        # for example ["10.0.0.0/8"]
+  operatorGroup: ""         # people the proxy says belong to this group (header X-Forwarded-Groups) are operators, the rest viewers
+  tokens: []                # - { name: wall-display, hash: "<sha-256 of the token>", role: viewer }
+
+# Serve the dashboard over https from this pod, instead of leaving that to an ingress or route. A secret with tls.crt and tls.key; a renewed certificate is picked up
+# without a restart. The replicas ask each other over https as well (peers), by the names of their pods, so the certificate must be valid for
+# plover-controller-N.plover-controller-headless.<namespace>.svc. When the secret also has ca.crt and ca is true, the replicas trust that authority for it.
+webTls:
+  existingSecret: ""
+  ca: false
+
+# What operators do on the dashboard (silences, acknowledgements) exists nowhere else, so each replica copies it from the others now and then.
+# With webAuth on, the replicas need a token to ask each other: put the hash of a token with role viewer in webAuth.tokens, and the token itself
+# in a secret with one key, named here.
+peers:
+  enabled: true
+  extra: []                 # the web addresses of replicas elsewhere, such as https://plover.dc2.example, one per replica
+  existingSecret: ""
+  key: token
+
+# Who this replica is when several sites run one: the site name goes in front of the pod name, so replicas of different clusters never share a name,
+# and the replicas of the main site get the lowest rank, which makes them the ones that send alerts when everything is up.
+replica:
+  site: ""
+  rank: 0
+
+# What the controller keeps across a restart, such as the history of changes. In memory by default, which loses it.
+state:
+  sqlite:
+    enabled: false            # keep it in a SQLite file on an emptyDir: it survives a restart of the container, not a reschedule of the pod
+
+# The individual address of every replica as agents must reach it, host:port. By default the pods of the stateful set, which is enough
+# for agents inside the cluster. For agents elsewhere give one address per replica, for example the host of a route per replica.
+replicaAddresses: []
+
+# The central configuration file: how often agents read what the applications report, per environment or scope. See docs/configuration.md.
+centralConfiguration: |
+  {
+    "defaults": { "pullSeconds": 15, "edgeFlushSeconds": 10 }
+  }
+
+# How agent connections are protected: none, tls or mtls. A secret with tls.crt and tls.key (and ca.crt for the authority of agent
+# certificates when mtls) is mounted at /etc/plover/transport.
+transport:
+  mode: none
+  existingSecret: ""
+
+# Which scope labels the dashboard groups by, outermost first.
+dashboard:
+  groupBy: [environment, datacenter]
+
+# Libraries that must be used in the same version everywhere, and how strictly: exact, minor or major.
+alignedPackages: []
+# - { package: "Microsoft.Extensions.*", spread: major }
+
+# Advisories in the OSV format, so vulnerable package versions are found. Without it nothing is checked.
+advisories:
+  existingConfigMap: ""   # a config map whose keys are advisory files
+  # Optional: let the controller download advisories itself, now and then. It sends a plain HTTPS GET to the addresses below and nothing about
+  # your packages. Off by default, so a closed network needs no exception. With enabled: true and no sources, these two public sources are used:
+  # https://osv-vulnerabilities.storage.googleapis.com/NuGet/all.zip and https://api.nuget.org/v3/vulnerabilities/index.json
+  fetch:
+    enabled: false
+    interval: "24:00:00"
+    sources: []           # - { kind: osv, url: "https://..." }   kind is osv or nuget; the address must be https
+
+service:
+  agentPort: 9440
+  webPort: 8080
+
+resources:
+  requests: { cpu: 100m, memory: 128Mi }
+  limits: { memory: 512Mi }
+
+nodeSelector: {}
+tolerations: []
+# Replicas on different nodes by default; better still in different data centers, which needs your own rule.
+affinity: {}
+podAnnotations: {}
+extraEnv: []

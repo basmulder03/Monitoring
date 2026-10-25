@@ -23,13 +23,13 @@ cleanup() {
 trap 'failed=1; cleanup' ERR
 trap cleanup EXIT
 
-export MONITORING_Controller__Listen__Address=127.0.0.1
-export MONITORING_Controller__Listen__Port="$agent_port"
-export MONITORING_Controller__Web__Address=127.0.0.1
-export MONITORING_Controller__Web__Port="$web_port"
-export MONITORING_Controller__AgentTokens__0__Scope="*"
-export MONITORING_Controller__AgentTokens__0__TokenHash="$hash"
-"$root/Controller/Monitoring.Controller" >"$logs/controller.log" 2>&1 &
+export PLOVER_Controller__Listen__Address=127.0.0.1
+export PLOVER_Controller__Listen__Port="$agent_port"
+export PLOVER_Controller__Web__Address=127.0.0.1
+export PLOVER_Controller__Web__Port="$web_port"
+export PLOVER_Controller__AgentTokens__0__Scope="*"
+export PLOVER_Controller__AgentTokens__0__TokenHash="$hash"
+"$root/Controller/Plover.Controller" >"$logs/controller.log" 2>&1 &
 pids+=($!)
 
 for _ in $(seq 1 50); do
@@ -38,12 +38,12 @@ for _ in $(seq 1 50); do
 done
 curl -fsS "http://127.0.0.1:$web_port/api/overview" >/dev/null
 
-MONITORING_Agent__ScopeName=smoke MONITORING_Agent__Token="$token" MONITORING_Agent__Controllers="127.0.0.1:$agent_port" \
-  "$root/Agent/Monitoring.Agent" >"$logs/agent.log" 2>&1 &
+PLOVER_Agent__ScopeName=smoke PLOVER_Agent__Token="$token" PLOVER_Agent__Controllers="127.0.0.1:$agent_port" \
+  "$root/Agent/Plover.Agent" >"$logs/agent.log" 2>&1 &
 pids+=($!)
 
 # The sidecar has no application to ask, so it only has to start and keep running.
-MONITORING_Sidecar__Agent="127.0.0.1:1" "$root/Sidecar/Monitoring.Sidecar" >"$logs/sidecar.log" 2>&1 &
+PLOVER_Sidecar__Agent="127.0.0.1:1" "$root/Sidecar/Plover.Sidecar" >"$logs/sidecar.log" 2>&1 &
 sidecar=$!
 pids+=("$sidecar")
 
@@ -66,9 +66,9 @@ kill -0 "$sidecar" 2>/dev/null || { echo "The sidecar stopped"; false; }
 # The injector answers an admission review over TLS, and adds the sidecar for a pod of a namespace that asked.
 injector_port=$((40000 + RANDOM % 10000))
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=localhost" -keyout "$logs/injector.key" -out "$logs/injector.crt" >/dev/null 2>&1
-MONITORING_Injector__SidecarImage=monitoring-sidecar:smoke MONITORING_Injector__Certificate="$logs/injector.crt" MONITORING_Injector__Key="$logs/injector.key" \
-  MONITORING_Injector__Web__Address=127.0.0.1 MONITORING_Injector__Web__Port="$injector_port" \
-  "$root/Injector/Monitoring.Injector" >"$logs/injector.log" 2>&1 &
+PLOVER_Injector__SidecarImage=plover-sidecar:smoke PLOVER_Injector__Certificate="$logs/injector.crt" PLOVER_Injector__Key="$logs/injector.key" \
+  PLOVER_Injector__Web__Address=127.0.0.1 PLOVER_Injector__Web__Port="$injector_port" \
+  "$root/Injector/Plover.Injector" >"$logs/injector.log" 2>&1 &
 pids+=($!)
 for _ in $(seq 1 50); do
   curl -fsSk "https://127.0.0.1:$injector_port/healthz" >/dev/null 2>&1 && break

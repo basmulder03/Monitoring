@@ -1,9 +1,9 @@
 apiVersion: v2
 name: sample-app
-description: "A tiny application chart that includes the monitoring sidecar; it shows how to use it and is what the chart tests render."
+description: "A tiny application chart that includes the Plover sidecar; it shows how to use it and is what the chart tests render."
 type: application
 version: 0.1.0
 dependencies:
-  - name: monitoring-sidecar
+  - name: plover-sidecar
     version: 0.1.0
-    repository: file://../../monitoring-sidecar
+    repository: file://../../plover-sidecar

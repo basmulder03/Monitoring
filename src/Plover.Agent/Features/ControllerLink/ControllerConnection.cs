@@ -1,0 +1,112 @@
+using Plover.Protocol.Reports;
+using System.Net.Sockets;
+using System.Security.Authentication;
+using Microsoft.Extensions.Logging;
+using Plover.Agent.Features.SelfMonitoring;
+using Plover.Common;
+using Plover.Protocol.Messages;
+
+namespace Plover.Agent.Features.ControllerLink;
+
+/// <summary>
+/// Keeps one controller replica connected: connects, runs a session, and reconnects with backoff and jitter
+/// until cancelled. Nothing is ever lost, because every new session starts from a fresh snapshot.
+/// </summary>
+/// <param name="connect">Opens the connection.</param>
+/// <param name="runSession">Runs a session over it.</param>
+/// <param name="options">The reconnect delays.</param>
+/// <param name="time">Clock for the waits.</param>
+/// <param name="random">Returns a random number from 0 up to 1 for the jitter.</param>
+/// <param name="telemetry">Told that the replica is not connected until it is, and to forget it when the loop ends; optional.</param>
+/// <param name="logger">Receives connection failures.</param>
+internal sealed class ControllerConnection(
+    ConnectAsync connect,
+    RunSessionAsync runSession,
+    ControllerLinkOptions options,
+    TimeProvider time,
+    Func<double> random,
+    ILogger<ControllerConnection> logger,
+    IAgentTelemetry? telemetry = null)
+{
+    /// <summary>Connects to the replica and keeps the connection up until cancelled.</summary>
+    /// <param name="address">The replica as <c>host:port</c>.</param>
+    /// <param name="onConfig">Called with every <see cref="Config"/> the replica sends.</param>
+    /// <param name="ct">Stops the loop.</param>
+    /// <returns>A task that completes when cancelled or when the agent has said goodbye.</returns>
+    public async Task RunAsync(string address, Action<Config> onConfig, CancellationToken ct)
+    {
+        // A replica that is never reached must show as not connected, not as nothing.
+        telemetry?.Set(ReplicaMetrics.Connected, 0, address);
+        try
+        {
+            await RunLoopAsync(address, onConfig, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            // The replica was taken out of the list: there is nothing left to say about it.
+            telemetry?.Forget(address);
+        }
+    }
+
+    private async Task RunLoopAsync(string address, Action<Config> onConfig, CancellationToken ct)
+    {
+        var failures = 0;
+        while (!ct.IsCancellationRequested)
+        {
+            TimeSpan wait;
+            try
+            {
+                SessionResult result;
+                var stream = await connect(address, ct).ConfigureAwait(false);
+                await using (stream.ConfigureAwait(false))
+                {
+                    result = await runSession(address, stream, onConfig, ct).ConfigureAwait(false);
+                }
+
+                if (result.End == SessionEnd.Stopped)
+                {
+                    return;
+                }
+
+                // A session the replica accepted counts as a success even though it ended, and a resync request
+                // is not a failure either, so both are retried after the minimum wait. The wait also keeps a
+                // replica that keeps asking for resyncs from making the agent reconnect in a tight loop.
+                // A refused session is a failure and slows down.
+                if (result.Established || result.End == SessionEnd.ResyncRequested)
+                {
+                    failures = 0;
+                    wait = NextWait(0);
+                }
+                else
+                {
+                    wait = NextWait(failures);
+                    failures++;
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or SocketException or AuthenticationException or TimeoutException)
+            {
+                // A refused certificate is not a debug matter: it will not fix itself, and someone has to look.
+                var level = ex is AuthenticationException ? LogLevel.Warning : LogLevel.Debug;
+                logger.Log(level, "Cannot reach controller replica {Address}: {Reason}", address, ex.InnerException?.Message ?? ex.Message);
+                wait = NextWait(failures);
+                failures++;
+            }
+
+            try
+            {
+                await Task.Delay(wait, time, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                return;
+            }
+        }
+    }
+
+    private TimeSpan NextWait(int failureCount) =>
+        Backoff.Delay(failureCount, options.ReconnectMinDelay, options.ReconnectMaxDelay, random());
+}

@@ -1,0 +1,12 @@
+# The sidecars of the namespace connect here. They only ever dial upward, so this is the one address they need.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "plover-agent.name" . }}
+  labels: {{- include "plover-agent.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "plover-agent.selector" . | nindent 4 }}
+  ports:
+    - name: sidecars
+      port: {{ .Values.service.port }}
+      targetPort: sidecars

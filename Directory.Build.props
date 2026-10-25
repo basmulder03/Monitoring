@@ -16,8 +16,8 @@
     <VersionPrefix>0.1.0</VersionPrefix>
     <Authors>Bas Mulder</Authors>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <PackageProjectUrl>https://basmulder03.github.io/Monitoring/</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/basmulder03/Monitoring</RepositoryUrl>
+    <PackageProjectUrl>https://basmulder03.github.io/Plover/</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/basmulder03/Plover</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>

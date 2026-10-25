@@ -2,14 +2,14 @@
 .SYNOPSIS
   Installs the published agent as a Windows service on this machine and checks what the installation promises, then removes it again.
 .DESCRIPTION
-  Run from an elevated PowerShell with the folder that holds the published Monitoring.Agent.exe. It checks that the service starts, is set to start with
+  Run from an elevated PowerShell with the folder that holds the published Plover.Agent.exe. It checks that the service starts, is set to start with
   the machine, is restarted after its process is killed, stops when asked, and is removed by the uninstall. Exits with 1 and says what failed otherwise.
 .EXAMPLE
   .\test-service.ps1 -Path .\published\Agent
 #>
 param([Parameter(Mandatory)] [string] $Path)
 $ErrorActionPreference = 'Stop'
-$name = 'MonitoringAgent'
+$name = 'PloverAgent'
 $installer = Join-Path $PSScriptRoot 'install-agent.ps1'
 $failures = 0
 
@@ -18,12 +18,12 @@ function Check($what, [bool] $ok, $detail = '') {
 }
 function ProcessIdOf { (Get-CimInstance Win32_Service -Filter "Name='$name'").ProcessId }
 
-$dir = Join-Path ([IO.Path]::GetTempPath()) "monitoring-agent-test-$([Guid]::NewGuid().ToString('N'))"
+$dir = Join-Path ([IO.Path]::GetTempPath()) "plover-agent-test-$([Guid]::NewGuid().ToString('N'))"
 try {
   Copy-Item (Resolve-Path $Path) $dir -Recurse
   # Read from next to the program, as a service has to; a missing file would stop the agent with a configuration error.
   '{ "Agent": { "ScopeName": "server-1", "Token": "t", "Controllers": ["127.0.0.1:1"], "Discovery": { "Kind": "windows", "Windows": { "Services": ["EventLog"] } } } }' |
-    Out-File (Join-Path $dir 'monitoring.json') -Encoding ascii
+    Out-File (Join-Path $dir 'plover.json') -Encoding ascii
 
   & $installer -Path $dir
   Start-Sleep -Seconds 4

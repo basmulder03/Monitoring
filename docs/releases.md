@@ -1,12 +1,12 @@
 # Releases
 
-Nothing has been published yet. There are no packages on NuGet, no images in a registry and no charts in an OCI registry; what exists is the source, and the pipelines that prove it builds, publishes with Native AOT and passes its tests (see [Testing](testing)). Publishing is a deliberate step the owner takes, tracked in [issue 56](https://github.com/basmulder03/Monitoring/issues/56).
+Nothing has been published yet. There are no packages on NuGet, no images in a registry and no charts in an OCI registry; what exists is the source, and the pipelines that prove it builds, publishes with Native AOT and passes its tests (see [Testing](testing)). Publishing is a deliberate step the owner takes, tracked in [issue 56](https://github.com/basmulder03/Plover/issues/56).
 
 ## What a release will contain
 
 | Artifact | Form |
 | --- | --- |
-| Client library and extensions | NuGet packages (`Monitoring.Client`, `Monitoring.Protocol`, `Monitoring.Agent` and the others) |
+| Client library and extensions | NuGet packages (`Plover.Client`, `Plover.Protocol`, `Plover.Agent` and the others) |
 | Sidecar, agent, controller, injector | Container images, Native AOT, one per component |
 | Helm charts | OCI artifacts: controller, agent, sidecar library chart, injector |
 | Windows agent | A zip or an installer for the service |

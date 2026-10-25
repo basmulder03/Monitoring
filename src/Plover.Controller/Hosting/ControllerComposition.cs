@@ -1,0 +1,344 @@
+using System.Net;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Plover.Controller.Features.AgentLink;
+using Plover.Controller.Features.Alerting;
+using Plover.Controller.Features.ChangeMarkers;
+using Plover.Controller.Features.Configuration;
+using Plover.Controller.Features.Dashboard;
+using Plover.Controller.Features.DeadMansSwitch;
+using Plover.Controller.Features.Liveness;
+using Plover.Controller.Features.Health;
+using Plover.Controller.Features.Packages;
+using Plover.Controller.Features.Registry;
+using Plover.Controller.Features.SelfMonitoring;
+using Plover.Controller.Features.Vulnerabilities;
+using Plover.Controller.Features.Notifications;
+using Plover.Controller.Features.Security;
+using Plover.Controller.Features.WebAuth;
+using Plover.Controller.Features.StateStore;
+using Plover.Controller.Features.Topology;
+using Plover.Common.Prometheus;
+using Plover.Hosting;
+
+namespace Plover.Controller.Hosting;
+
+/// <summary>
+/// Composes the controller: reads its settings and registers every slice. This is the only place that knows all slices.
+/// </summary>
+/// <remarks>
+/// Settings live under <c>Controller</c>; docs/configuration.md lists them. Anything not set keeps the slice's own default.
+/// </remarks>
+internal static class ControllerComposition
+{
+    /// <summary>The values of the system view as Prometheus samples; a value that is not known yet is left out.</summary>
+    private static IEnumerable<PrometheusSample> ControllerSamples(SystemStatus status)
+    {
+        IReadOnlyDictionary<string, string> none = new Dictionary<string, string>();
+        yield return new("plover.controller.uptime_seconds", none, status.UptimeSeconds);
+        yield return new("plover.controller.scopes", none, status.Scopes);
+        yield return new("plover.controller.agents_connected", none, status.AgentsConnected);
+        yield return new("plover.controller.event_clients", none, status.EventClients);
+        yield return new("plover.controller.memory_bytes", none, status.MemoryBytes);
+        yield return new("plover.controller.frames_per_second", none, status.FramesPerSecond);
+        yield return new("plover.controller.instances", none, status.Instances);
+        yield return new("plover.controller.series", none, status.Series);
+        yield return new("plover.controller.healthy", none, status.Healthy ? 1 : 0);
+        if (status.AlertEvaluationMilliseconds is { } took)
+        {
+            yield return new("plover.controller.alert_evaluation_ms", none, took);
+        }
+    }
+
+    /// <summary>Registers every controller slice using the settings.</summary>
+    /// <param name="builder">The host builder to add the slices to.</param>
+    /// <param name="settings">The root of the configuration.</param>
+    /// <exception cref="ConfigurationException">A setting is missing or cannot be read.</exception>
+    /// <exception cref="ArgumentException">A setting has a value that a slice rejects.</exception>
+    public static void Compose(IHostApplicationBuilder builder, SettingsReader settings)
+    {
+        var controller = settings.Section("Controller");
+        var accounts = controller.Section("ServiceAccounts");
+        var accountsEnabled = accounts.Text("Enabled", "false").Equals("true", StringComparison.OrdinalIgnoreCase);
+        var certificatesEnabled = controller.Section("Certificates").Text("Enabled", "false").Equals("true", StringComparison.OrdinalIgnoreCase);
+        var tokens = ReadAgentTokens(controller, accountsEnabled || certificatesEnabled);
+
+        builder.Services
+            .AddRegistry(options =>
+            {
+                var registry = controller.Section("Registry");
+                options.GoneRetention = registry.Duration("GoneRetention", options.GoneRetention);
+                options.PurgeInterval = registry.Duration("PurgeInterval", options.PurgeInterval);
+            })
+            .AddLiveness(options =>
+            {
+                var liveness = controller.Section("Liveness");
+                options.HeartbeatInterval = liveness.Duration("HeartbeatInterval", options.HeartbeatInterval);
+                options.MissedHeartbeats = liveness.Int("MissedHeartbeats", options.MissedHeartbeats);
+            })
+            .AddConfiguration(options =>
+            {
+                var configuration = controller.Section("Configuration");
+                options.File = configuration.Optional("File");
+                options.PollInterval = configuration.Duration("PollInterval", options.PollInterval);
+            })
+            .AddHealth()
+            .AddSelfMonitoring()
+            .AddPrometheus(
+                options => PrometheusSettings.Read(controller.Section("Prometheus"), options),
+                provider =>
+                {
+                    var self = provider.GetRequiredService<SystemTelemetry>();
+                    return () => ControllerSamples(self.Read());
+                })
+            .AddWebAuth(options =>
+            {
+                var auth = controller.Section("Web").Section("Auth");
+                options.TrustedProxies = [.. auth.List("TrustedProxies")];
+                options.UserHeader = auth.Text("UserHeader", options.UserHeader);
+                options.GroupsHeader = auth.Text("GroupsHeader", options.GroupsHeader);
+                options.OperatorGroup = auth.Optional("OperatorGroup");
+                options.Tokens = [.. auth.Items("Tokens").Select(item => new WebToken(
+                    item.Required("Name"), item.Required("Hash"), item.Text("Role", "viewer").Equals("operator", StringComparison.OrdinalIgnoreCase) ? WebRole.Operator : WebRole.Viewer))];
+            })
+            .AddStateStore(options => options.SqlitePath = controller.Section("State").Optional("SqlitePath"))
+            .AddChangeMarkers(options =>
+            {
+                var changes = controller.Section("ChangeMarkers");
+                options.SampleInterval = changes.Duration("SampleInterval", options.SampleInterval);
+                options.MaxMarkers = changes.Int("MaxMarkers", options.MaxMarkers);
+            })
+            .AddNotifications(options =>
+            {
+                var notifications = controller.Section("Notifications");
+                options.Interval = notifications.Duration("Interval", options.Interval);
+                options.MinSeverity = notifications.Text("MinSeverity", options.MinSeverity);
+                options.Source = notifications.Optional("Source");
+                options.Webhooks = [.. notifications.Items("Webhooks").Select(item => new WebhookTarget(new Uri(item.Required("Url"), UriKind.RelativeOrAbsolute), item.Optional("Secret")))];
+                options.Chats = [.. notifications.Items("Chats").Select(item => new ChatTarget(new Uri(item.Required("Url"), UriKind.RelativeOrAbsolute), item.Text("Format", "slack")))];
+                var email = notifications.Section("Email");
+                options.Email.Host = email.Optional("Host");
+                options.Email.Port = email.Int("Port", options.Email.Port);
+                options.Email.Ssl = email.Text("Ssl", "true").Equals("true", StringComparison.OrdinalIgnoreCase);
+                options.Email.User = email.Optional("User");
+                options.Email.Password = email.Optional("Password");
+                options.Email.From = email.Optional("From");
+                options.Email.To = [.. email.List("To")];
+                var election = notifications.Section("Leader");
+                options.Leader.Mode = election.Text("Mode", options.Leader.Mode);
+                if (options.Leader.Mode.Equals("peers", StringComparison.OrdinalIgnoreCase) && controller.List("Peers").Count == 0)
+                {
+                    throw new ConfigurationException("Setting 'Controller:Notifications:Leader:Mode' is 'peers', which needs the other replicas under 'Controller:Peers'.");
+                }
+
+                options.Leader.LeaseName = election.Text("LeaseName", options.Leader.LeaseName);
+                options.Leader.LeaseNamespace = election.Optional("LeaseNamespace");
+                options.Leader.LeaseDuration = election.Duration("LeaseDuration", options.Leader.LeaseDuration);
+                options.Leader.ApiServer = election.Optional("ApiServer");
+            })
+            .AddDeadMansSwitch(options =>
+            {
+                var watchdog = controller.Section("DeadMansSwitch");
+                options.Url = watchdog.Optional("Url") is { } url ? new Uri(url, UriKind.RelativeOrAbsolute) : null;
+                options.Interval = watchdog.Duration("Interval", options.Interval);
+            })
+            .AddVulnerabilities(options =>
+            {
+                var vulnerabilities = controller.Section("Vulnerabilities");
+                options.Advisories = vulnerabilities.Optional("Advisories");
+                options.PollInterval = vulnerabilities.Duration("PollInterval", options.PollInterval);
+
+                // Optional: with Fetch:Enabled the public sources are used unless the sources are named.
+                var fetch = vulnerabilities.Section("Fetch");
+                options.FetchInterval = fetch.Duration("Interval", options.FetchInterval);
+                options.FetchTimeout = fetch.Duration("Timeout", options.FetchTimeout);
+                options.Sources =
+                [
+                    .. fetch.Items("Sources").Select(item => new AdvisorySource(item.Required("Kind").ToLowerInvariant(), new Uri(item.Required("Url"), UriKind.RelativeOrAbsolute))),
+                ];
+                if (options.Sources.Count == 0 && fetch.Text("Enabled", "false").Equals("true", StringComparison.OrdinalIgnoreCase))
+                {
+                    options.Sources = [VulnerabilitiesOptions.OsvNuGet, VulnerabilitiesOptions.NuGetFeed];
+                }
+            })
+            .AddPackages(options => options.Aligned = [.. controller.Section("Packages").Items("Aligned").Select(ReadAlignment)])
+            .AddTopology(options =>
+            {
+                var topology = controller.Section("Topology");
+                options.SampleInterval = topology.Duration("SampleInterval", options.SampleInterval);
+                options.EdgeFadeAfter = topology.Duration("EdgeFadeAfter", options.EdgeFadeAfter);
+            })
+            .AddAlerting(options =>
+            {
+                var alerting = controller.Section("Alerting");
+                options.StartupGrace = alerting.Duration("StartupGrace", options.StartupGrace);
+                options.InstanceUnhealthyWait = alerting.Duration("InstanceUnhealthyWait", options.InstanceUnhealthyWait);
+                options.PackageDriftWait = alerting.Duration("PackageDriftWait", options.PackageDriftWait);
+                options.VulnerablePackageWait = alerting.Duration("VulnerablePackageWait", options.VulnerablePackageWait);
+                options.CertificateWarningDays = alerting.Int("CertificateWarningDays", options.CertificateWarningDays);
+                options.CertificateCriticalDays = alerting.Int("CertificateCriticalDays", options.CertificateCriticalDays);
+                options.ConnectionPoolFullWait = alerting.Duration("ConnectionPoolFullWait", options.ConnectionPoolFullWait);
+                options.QueueWithoutConsumersWait = alerting.Duration("QueueWithoutConsumersWait", options.QueueWithoutConsumersWait);
+                options.ReplicaLagThreshold = alerting.Int("ReplicaLagThreshold", options.ReplicaLagThreshold);
+                options.ReplicaBehindWait = alerting.Duration("ReplicaBehindWait", options.ReplicaBehindWait);
+                options.ReplicaUnreachableWait = alerting.Duration("ReplicaUnreachableWait", options.ReplicaUnreachableWait);
+                options.EdgeErrorWindow = alerting.Duration("EdgeErrorWindow", options.EdgeErrorWindow);
+                options.EdgeErrorShare = double.Parse(alerting.Text("EdgeErrorShare", options.EdgeErrorShare.ToString(System.Globalization.CultureInfo.InvariantCulture)), System.Globalization.CultureInfo.InvariantCulture);
+                options.EdgeErrorMinCalls = alerting.Int("EdgeErrorMinCalls", options.EdgeErrorMinCalls);
+                options.ConfigurationDriftWait = alerting.Duration("ConfigurationDriftWait", options.ConfigurationDriftWait);
+                options.DroppedDataWindow = alerting.Duration("DroppedDataWindow", options.DroppedDataWindow);
+                options.DroppedDataSpans = alerting.Int("DroppedDataSpans", options.DroppedDataSpans);
+                options.RestartLoopCount = alerting.Int("RestartLoopCount", options.RestartLoopCount);
+                options.RestartLoopWindow = alerting.Duration("RestartLoopWindow", options.RestartLoopWindow);
+                options.ServiceDownWait = alerting.Duration("ServiceDownWait", options.ServiceDownWait);
+                options.ScopeUnknownWait = alerting.Duration("ScopeUnknownWait", options.ScopeUnknownWait);
+                options.EvaluationInterval = alerting.Duration("EvaluationInterval", options.EvaluationInterval);
+                options.Silences = [.. alerting.Items("Silences").Select(ReadSilence)];
+                options.Peers = [.. controller.List("Peers").Select(address => new Uri(address, UriKind.RelativeOrAbsolute))];
+                options.PeerToken = controller.Optional("PeerToken");
+                options.PeerCaFile = controller.Optional("PeerCaFile");
+                options.ReplicaId = controller.Optional("ReplicaId");
+                options.ReplicaRank = controller.Int("ReplicaRank", 0);
+                options.PeerInterval = controller.Duration("PeerInterval", options.PeerInterval);
+            })
+            .AddDashboard(options =>
+            {
+                var dashboard = controller.Section("Dashboard");
+                options.PushInterval = dashboard.Duration("PushInterval", options.PushInterval);
+                options.KeepAliveInterval = dashboard.Duration("KeepAliveInterval", options.KeepAliveInterval);
+
+                // Unset keeps the default; "none" turns grouping off.
+                var groupBy = dashboard.List("GroupBy");
+                if (groupBy.Count > 0)
+                {
+                    options.GroupBy = groupBy is [var only] && only.Equals("none", StringComparison.OrdinalIgnoreCase) ? [] : [.. groupBy];
+                }
+            })
+            .AddSecurity(options =>
+            {
+                options.AgentTokens.AddRange(tokens);
+                var certificates = controller.Section("Certificates");
+                options.Certificates.Enabled = certificates.Text("Enabled", "false").Equals("true", StringComparison.OrdinalIgnoreCase);
+                options.Certificates.Scopes = new Dictionary<string, string>(certificates.Map("Scopes"), StringComparer.Ordinal);
+                options.ServiceAccounts.Enabled = accountsEnabled;
+                options.ServiceAccounts.Audience = accounts.Text("Audience", options.ServiceAccounts.Audience);
+                options.ServiceAccounts.ApiServer = accounts.Optional("ApiServer");
+                options.ServiceAccounts.TokenFile = accounts.Optional("TokenFile");
+                options.ServiceAccounts.CaFile = accounts.Optional("CaFile");
+                options.ServiceAccounts.Scopes = new Dictionary<string, string>(accounts.Map("Scopes"), StringComparer.Ordinal);
+            })
+            .AddAgentLink(options =>
+            {
+                var listen = controller.Section("Listen");
+                options.ListenAddress = listen.Text("Address", options.ListenAddress);
+                options.Port = listen.Int("Port", options.Port);
+                options.HelloTimeout = controller.Section("AgentLink").Duration("HelloTimeout", options.HelloTimeout);
+                options.ControllerReplicas = [.. controller.List("Replicas")];
+                options.Transport = TransportSettings.Read(controller.Section("Transport"));
+            });
+    }
+
+    /// <summary>Builds the controller: the slices, the web server for the dashboard and the dashboard's endpoints.</summary>
+    /// <param name="args">Command line arguments.</param>
+    /// <param name="overrides">Settings that win over every other source; used by tests.</param>
+    /// <param name="configFile">The configuration file to read instead of the default.</param>
+    /// <returns>The host, not yet started.</returns>
+    /// <exception cref="ConfigurationException">A setting is missing or cannot be read.</exception>
+    public static IHost CreateHost(
+        string[] args, IEnumerable<KeyValuePair<string, string?>>? overrides = null, string? configFile = null)
+    {
+        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { Args = args });
+        PloverHost.Configure(builder, args, overrides, configFile);
+
+        // Every page refresh would otherwise log several lines; the Logging settings can still turn this up.
+        builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
+
+        var settings = new SettingsReader(builder.Configuration);
+        Compose(builder, settings);
+        ListenOn(builder, settings.Section("Controller").Section("Web"));
+
+        var app = builder.Build();
+        app.UseWebAuth();
+        app.MapDashboard();
+        app.MapAlertActions();
+        app.MapSelfMonitoring();
+        app.MapChangeMarkers();
+        app.MapPackages();
+        app.MapVulnerabilities();
+        return app;
+    }
+
+    /// <summary>Makes the web server listen where the settings say: plain HTTP, or https when a certificate is given under <c>Web:Tls</c>.</summary>
+    private static void ListenOn(WebApplicationBuilder builder, SettingsReader web)
+    {
+        var addressText = web.Text("Address", "0.0.0.0");
+        var port = web.Int("Port", 8080);
+
+        if (!IPAddress.TryParse(addressText, out var address))
+        {
+            throw new ConfigurationException($"Setting 'Controller:Web:Address' must be an IP address, but is '{addressText}'.");
+        }
+
+        if (port is < 0 or > 65535)
+        {
+            throw new ConfigurationException($"Setting 'Controller:Web:Port' must be between 0 and 65535, but is {port}.");
+        }
+
+        var tls = web.Section("Tls");
+        var certificate = tls.Optional("Certificate");
+        var key = tls.Optional("Key");
+        if ((certificate is null) != (key is null))
+        {
+            throw new ConfigurationException("Settings 'Controller:Web:Tls:Certificate' and 'Controller:Web:Tls:Key' go together: give both, or neither.");
+        }
+
+        builder.WebHost.ConfigureKestrel(kestrel =>
+        {
+            kestrel.AddServerHeader = false;
+            if (certificate is null || key is null)
+            {
+                kestrel.Listen(address, port);
+                return;
+            }
+
+            // Read again when the files change, which is how a renewed certificate arrives in a pod, so a renewal needs no restart.
+            var current = new ReloadingCertificate(certificate, key);
+            kestrel.Listen(address, port, listen => listen.UseHttps(https => https.ServerCertificateSelector = (_, _) => current.Get()));
+        });
+    }
+
+    /// <summary>Reads one alignment rule: the package (or prefix) and how far apart its versions may be.</summary>
+    private static AlignmentRule ReadAlignment(SettingsReader item) => new(
+        item.Required("Package"),
+        item.Text("Spread", "major").ToLowerInvariant() switch
+        {
+            "exact" => VersionSpread.Exact,
+            "minor" => VersionSpread.Minor,
+            "major" => VersionSpread.Major,
+            var other => throw new ConfigurationException($"Setting '{item.NameOf("Spread")}' must be 'exact', 'minor' or 'major', but is '{other}'."),
+        });
+
+    /// <summary>Reads one silence; the end time is required, so a silence cannot be forgotten.</summary>
+    private static AlertSilence ReadSilence(SettingsReader item)
+    {
+        var until = item.Required("Until");
+        return DateTimeOffset.TryParse(until, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var end)
+            ? new AlertSilence(item.Text("Rule", "*"), item.Text("Subject", ""), end, item.Optional("Reason"))
+            : throw new ConfigurationException($"Setting '{item.NameOf("Until")}' must be a date and time like 2026-11-02T06:00:00Z, but is '{until}'.");
+    }
+
+    private static List<AgentTokenEntry> ReadAgentTokens(SettingsReader controller, bool serviceAccounts)
+    {
+        var tokens = controller.Items("AgentTokens")
+            .Select(item => new AgentTokenEntry(item.Required("Scope"), item.Required("TokenHash")))
+            .ToList();
+
+        // A controller that accepts no agent is a mistake in the configuration, not a mode of operation.
+        return tokens.Count > 0 || serviceAccounts
+            ? tokens
+            : throw new ConfigurationException("Setting 'Controller:AgentTokens' needs at least one entry with a Scope and a TokenHash, or 'Controller:ServiceAccounts:Enabled' must be true.");
+    }
+}

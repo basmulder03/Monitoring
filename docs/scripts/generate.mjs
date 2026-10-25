@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const out = join(root, 'docs', 'reference')
 mkdirSync(out, { recursive: true })
-const GITHUB = 'https://github.com/basmulder03/Monitoring/blob/main/'
+const GITHUB = 'https://github.com/basmulder03/Plover/blob/main/'
 
 const walk = (dir, accept) => readdirSync(dir).flatMap(name => {
   if (['bin', 'obj', 'node_modules', 'dist'].includes(name)) return []
@@ -80,9 +80,9 @@ const recordTable = d => d.params.length
 
 // ---------- Wire protocol ----------
 {
-  const dir = join(root, 'src', 'Monitoring.Protocol')
+  const dir = join(root, 'src', 'Plover.Protocol')
   const sections = [['Messages', 'Messages'], ['Health', 'Health'], ['Instances', 'Instances'], ['Reports', 'Reports carried in `PullResult`'], ['Framing', 'Framing'], ['Versioning', 'Versioning']]
-  let md = `# Wire protocol reference\n\nGenerated from the XML documentation of \`src/Monitoring.Protocol\`. How the messages are used is described in [the design](../design#wire-protocol).\n\n`
+  let md = `# Wire protocol reference\n\nGenerated from the XML documentation of \`src/Plover.Protocol\`. How the messages are used is described in [the design](../design#wire-protocol).\n\n`
   for (const [folder, title] of sections) {
     const decls = walk(join(dir, folder), p => p.endsWith('.cs')).flatMap(p => declarations(p).map(d => ({ ...d, path: p })))
       .filter(d => d.kind !== 'class' || d.params.length || d.summary)
@@ -118,7 +118,7 @@ const recordTable = d => d.params.length
 
 // ---------- UI: components and icons ----------
 {
-  const ui = join(root, 'src', 'Monitoring.Ui', 'ui', 'src')
+  const ui = join(root, 'src', 'Plover.Ui', 'ui', 'src')
   const sprite = read(join(ui, 'components', 'Sprite.tsx'))
   const icons = [...sprite.matchAll(/<symbol id="i-([\w-]+)"[^>]*>([\s\S]*?)<\/symbol>/g)].map(m => ({ name: m[1], body: m[2] }))
   const union = read(join(ui, 'components', 'Icon.tsx')).match(/type IconName =([^;]+);/)?.[1].match(/"[\w-]+"/g)?.map(s => s.slice(1, -1)) ?? []
@@ -139,7 +139,7 @@ const recordTable = d => d.params.length
     }
   }
   const bySection = Map.groupBy(components, c => rel(c.path).includes('/views/') ? 'Views' : 'Shared components')
-  let md = `# Dashboard components and icons\n\nGenerated from \`src/Monitoring.Ui/ui/src\` (Preact, TypeScript). The dashboard is a static app that the controller serves; it has no component library, so what is below is all of it.\n\n`
+  let md = `# Dashboard components and icons\n\nGenerated from \`src/Plover.Ui/ui/src\` (Preact, TypeScript). The dashboard is a static app that the controller serves; it has no component library, so what is below is all of it.\n\n`
   md += `## Icons\n\nThe icons are defined once as an SVG sprite (\`Sprite.tsx\`) and used by reference: \`<Icon name="bell" />\`. There is no font and no network request for them. \`IconName\` lists the valid names, and the build of this page fails when the type and the sprite disagree.\n\n<div class="icon-grid">\n`
   for (const i of icons) md += `<figure><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${i.body}</svg><figcaption><code>${i.name}</code></figcaption></figure>\n`
   md += `</div>\n\n`

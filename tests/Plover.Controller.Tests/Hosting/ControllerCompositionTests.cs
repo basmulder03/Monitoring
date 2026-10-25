@@ -1,0 +1,535 @@
+using System.Net.Sockets;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Plover.Controller.Features.AgentLink;
+using Plover.Controller.Features.Alerting;
+using Plover.Controller.Features.Packages;
+using Plover.Controller.Features.Vulnerabilities;
+using Plover.Controller.Features.Dashboard;
+using Plover.Controller.Features.Health;
+using Plover.Controller.Features.Registry;
+using Plover.Controller.Features.Security;
+using Plover.Controller.Hosting;
+using Plover.Hosting;
+using Plover.Protocol.Framing;
+using Plover.Protocol.Messages;
+using Plover.Protocol.Versioning;
+using Shouldly;
+using Xunit;
+
+namespace Plover.Controller.Tests.Hosting;
+
+public class ControllerCompositionTests
+{
+    [Fact]
+    public void CreateHost_registers_every_controller_slice()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret").Build();
+
+        // Act
+        var services = host.Services;
+
+        // Assert
+        services.GetService<IScopeRegistry>().ShouldNotBeNull();
+        services.GetService<IHealthRollup>().ShouldNotBeNull();
+        services.GetService<IAlertEvaluator>().ShouldNotBeNull();
+        services.GetService<IAlertState>().ShouldNotBeNull();
+        services.GetService<IAgentListener>().ShouldNotBeNull();
+        services.GetService<IAgentAuthenticator>().ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void CreateHost_runs_the_registry_purge_alert_evaluation_listener_and_web_server_in_the_background()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret").Build();
+
+        // Act
+        var hosted = host.Services.GetServices<IHostedService>().Select(s => s.GetType().Name);
+
+        // Assert
+        hosted.ShouldBe(["RegistryPurgeService", "AlertEvaluationService", "AgentListenerService", "GenericWebHostService", "PlainTransportWarning", "EnrollmentTokenWarning", "TopologySampleService", "ChangeSampleService", "ConfigurationReloadService", "AdvisoryReloadService"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task CreateHost_serves_the_dashboard_over_https_when_a_certificate_is_given_and_picks_up_a_renewed_one()
+    {
+        // Arrange
+        var directory = Directory.CreateTempSubdirectory("dashboard-tls");
+        var cert = Path.Combine(directory.FullName, "tls.crt");
+        var key = Path.Combine(directory.FullName, "tls.key");
+        WriteCertificate(cert, key, "first");
+        var probe = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        probe.Start();
+        var port = ((System.Net.IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        using var host = new ControllerSettings().WithToken("shop", "secret")
+            .With("Controller:Web:Address", "127.0.0.1").With("Controller:Web:Port", port.ToString())
+            .With("Controller:Web:Tls:Certificate", cert).With("Controller:Web:Tls:Key", key).Build();
+        await host.StartAsync(TestContext.Current.CancellationToken);
+
+        try
+        {
+            // Act
+            async Task<string> SubjectAsync()
+            {
+                string? subject = null;
+                using var handler = new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, certificate, _, _) => { subject = certificate!.Subject; return true; } };
+                using var http = new HttpClient(handler);
+                (await http.GetAsync($"https://127.0.0.1:{port}/healthz", TestContext.Current.CancellationToken)).EnsureSuccessStatusCode();
+                return subject!;
+            }
+
+            var before = await SubjectAsync();
+            WriteCertificate(cert, key, "second");
+            File.SetLastWriteTimeUtc(cert, DateTime.UtcNow.AddMinutes(1));
+            var after = await SubjectAsync();
+
+            // Assert
+            before.ShouldBe("CN=first");
+            after.ShouldBe("CN=second");
+        }
+        finally
+        {
+            await host.StopAsync(TestContext.Current.CancellationToken);
+            directory.Delete(true);
+        }
+    }
+
+    [Fact]
+    public void CreateHost_refuses_a_certificate_for_the_dashboard_without_its_key()
+    {
+        // Arrange
+        var settings = new ControllerSettings().WithToken("shop", "secret").With("Controller:Web:Tls:Certificate", "/nowhere/tls.crt");
+
+        // Act
+        var build = () => settings.Build();
+
+        // Assert
+        build.ShouldThrow<ConfigurationException>().Message.ShouldContain("go together");
+    }
+
+    private static void WriteCertificate(string certFile, string keyFile, string name)
+    {
+        using var rsa = System.Security.Cryptography.RSA.Create(2048);
+        var request = new System.Security.Cryptography.X509Certificates.CertificateRequest($"CN={name}", rsa, System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pkcs1);
+        using var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddDays(1));
+        File.WriteAllText(certFile, certificate.ExportCertificatePem());
+        File.WriteAllText(keyFile, rsa.ExportPkcs8PrivateKeyPem());
+    }
+
+    [Fact]
+    public async Task CreateHost_serves_the_state_of_the_replica_to_prometheus_when_a_port_is_set()
+    {
+        // Arrange
+        var probe = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        probe.Start();
+        var port = ((System.Net.IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        using var host = new ControllerSettings().WithToken("shop", "secret").With("Controller:Prometheus:Port", port.ToString()).Build();
+        await host.StartAsync(TestContext.Current.CancellationToken);
+
+        // Act
+        using var http = new HttpClient();
+        var text = await http.GetStringAsync($"http://127.0.0.1:{port}/metrics", TestContext.Current.CancellationToken);
+        await host.StopAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        text.ShouldContain("plover_controller_agents_connected 0\n");
+    }
+
+    [Fact]
+    public void CreateHost_refuses_to_start_without_any_agent_token()
+    {
+        // Arrange
+        var settings = new ControllerSettings();
+
+        // Act
+        var build = () => settings.Build();
+
+        // Assert
+        build.ShouldThrow<ConfigurationException>().Message.ShouldContain("'Controller:AgentTokens'");
+    }
+
+    [Theory]
+    [InlineData("Scope")]
+    [InlineData("TokenHash")]
+    public void CreateHost_names_the_missing_part_of_an_agent_token(string missing)
+    {
+        // Arrange
+        var settings = new ControllerSettings().With($"Controller:AgentTokens:0:{(missing == "Scope" ? "TokenHash" : "Scope")}", "x");
+
+        // Act
+        var build = () => settings.Build();
+
+        // Assert
+        build.ShouldThrow<ConfigurationException>().Message.ShouldContain($"'Controller:AgentTokens:0:{missing}'");
+    }
+
+    [Fact]
+    public void CreateHost_rejects_a_token_hash_that_is_not_a_sha256_hash()
+    {
+        // Arrange
+        var settings = new ControllerSettings().With("Controller:AgentTokens:0:Scope", "shop").With("Controller:AgentTokens:0:TokenHash", "secret");
+
+        // Act
+        var build = () => settings.Build();
+
+        // Assert
+        build.ShouldThrow<ArgumentException>();
+    }
+
+    [Fact]
+    public void CreateHost_hands_the_registry_settings_to_the_registry()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret")
+            .With("Controller:Registry:GoneRetention", "00:20:00")
+            .With("Controller:Registry:PurgeInterval", "00:00:10")
+            .Build();
+
+        // Act
+        var options = host.Services.GetRequiredService<RegistryOptions>();
+
+        // Assert
+        options.GoneRetention.ShouldBe(TimeSpan.FromMinutes(20));
+        options.PurgeInterval.ShouldBe(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public void CreateHost_hands_the_alerting_settings_to_alerting()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret")
+            .With("Controller:Alerting:StartupGrace", "00:01:00")
+            .With("Controller:Alerting:InstanceUnhealthyWait", "00:00:45")
+            .With("Controller:Alerting:ServiceDownWait", "00:00:05")
+            .With("Controller:Alerting:ScopeUnknownWait", "00:03:00")
+            .With("Controller:Alerting:EvaluationInterval", "00:00:02")
+            .Build();
+
+        // Act
+        var options = host.Services.GetRequiredService<AlertingOptions>();
+
+        // Assert
+        options.StartupGrace.ShouldBe(TimeSpan.FromMinutes(1));
+        options.InstanceUnhealthyWait.ShouldBe(TimeSpan.FromSeconds(45));
+        options.ServiceDownWait.ShouldBe(TimeSpan.FromSeconds(5));
+        options.ScopeUnknownWait.ShouldBe(TimeSpan.FromMinutes(3));
+        options.EvaluationInterval.ShouldBe(TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public void CreateHost_reads_the_alignment_rules_of_packages()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret")
+            .With("Controller:Packages:Aligned:0:Package", "Microsoft.Extensions.*")
+            .With("Controller:Packages:Aligned:0:Spread", "minor")
+            .With("Controller:Packages:Aligned:1:Package", "Serilog")
+            .Build();
+
+        // Act
+        var rules = host.Services.GetRequiredService<PackagesOptions>().Aligned;
+
+        // Assert
+        rules.ShouldBe([new AlignmentRule("Microsoft.Extensions.*", VersionSpread.Minor), new AlignmentRule("Serilog", VersionSpread.Major)]);
+    }
+
+    [Fact]
+    public void CreateHost_refuses_an_alignment_spread_it_does_not_know()
+    {
+        // Arrange
+        var settings = new ControllerSettings().WithToken("shop", "secret")
+            .With("Controller:Packages:Aligned:0:Package", "Serilog")
+            .With("Controller:Packages:Aligned:0:Spread", "loose");
+
+        // Act
+        var build = () => settings.Build();
+
+        // Assert
+        build.ShouldThrow<ConfigurationException>().Message.ShouldContain("Controller:Packages:Aligned:0:Spread");
+    }
+
+    [Fact]
+    public void CreateHost_reads_the_vulnerability_settings()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret")
+            .With("Controller:Vulnerabilities:Advisories", "/advisories")
+            .With("Controller:Vulnerabilities:PollInterval", "00:05:00")
+            .With("Controller:Alerting:VulnerablePackageWait", "00:10:00")
+            .Build();
+
+        // Act
+        var options = host.Services.GetRequiredService<VulnerabilitiesOptions>();
+
+        // Assert
+        options.Advisories.ShouldBe("/advisories");
+        options.PollInterval.ShouldBe(TimeSpan.FromMinutes(5));
+        host.Services.GetRequiredService<AlertingOptions>().VulnerablePackageWait.ShouldBe(TimeSpan.FromMinutes(10));
+    }
+
+    [Fact]
+    public void CreateHost_reads_the_silences()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret")
+            .With("Controller:Alerting:Silences:0:Rule", "service-down")
+            .With("Controller:Alerting:Silences:0:Subject", "shop/")
+            .With("Controller:Alerting:Silences:0:Until", "2026-11-02T06:00:00Z")
+            .With("Controller:Alerting:Silences:0:Reason", "maintenance")
+            .Build();
+
+        // Act
+        var silence = host.Services.GetRequiredService<AlertingOptions>().Silences.Single();
+
+        // Assert
+        silence.Rule.ShouldBe("service-down");
+        silence.SubjectPrefix.ShouldBe("shop/");
+        silence.Until.ShouldBe(new DateTimeOffset(2026, 11, 2, 6, 0, 0, TimeSpan.Zero));
+        silence.Reason.ShouldBe("maintenance");
+    }
+
+    [Fact]
+    public void CreateHost_refuses_a_silence_without_an_end()
+    {
+        // Arrange
+        var settings = new ControllerSettings().WithToken("shop", "secret").With("Controller:Alerting:Silences:0:Rule", "service-down");
+
+        // Act
+        var build = () => settings.Build();
+
+        // Assert
+        build.ShouldThrow<ConfigurationException>().Message.ShouldContain("Controller:Alerting:Silences:0:Until");
+    }
+
+    [Fact]
+    public void CreateHost_hands_the_listener_settings_to_the_agent_link()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret")
+            .With("Controller:Listen:Address", "127.0.0.1")
+            .With("Controller:Listen:Port", "9555")
+            .With("Controller:AgentLink:HelloTimeout", "00:00:03")
+            .With("Controller:Replicas", "c1:9440, c2:9440")
+            .Build();
+
+        // Act
+        var options = host.Services.GetRequiredService<AgentLinkOptions>();
+
+        // Assert
+        options.ListenAddress.ShouldBe("127.0.0.1");
+        options.Port.ShouldBe(9555);
+        options.HelloTimeout.ShouldBe(TimeSpan.FromSeconds(3));
+        options.ControllerReplicas.ShouldBe(["c1:9440", "c2:9440"]);
+    }
+
+    [Fact]
+    public void CreateHost_hands_the_dashboard_settings_to_the_dashboard()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret")
+            .With("Controller:Dashboard:PushInterval", "00:00:02")
+            .With("Controller:Dashboard:KeepAliveInterval", "00:00:07")
+            .With("Controller:Dashboard:GroupBy", "environment, site")
+            .Build();
+
+        // Act
+        var options = host.Services.GetRequiredService<DashboardOptions>();
+
+        // Assert
+        options.PushInterval.ShouldBe(TimeSpan.FromSeconds(2));
+        options.KeepAliveInterval.ShouldBe(TimeSpan.FromSeconds(7));
+        options.GroupBy.ShouldBe(["environment", "site"]);
+    }
+
+    [Fact]
+    public void CreateHost_groups_by_environment_and_datacenter_when_nothing_is_set()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret").Build();
+
+        // Act
+        var options = host.Services.GetRequiredService<DashboardOptions>();
+
+        // Assert
+        options.GroupBy.ShouldBe(["environment", "datacenter"]);
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("None")]
+    public void CreateHost_turns_grouping_off_when_asked_to(string value)
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret").With("Controller:Dashboard:GroupBy", value).Build();
+
+        // Act
+        var options = host.Services.GetRequiredService<DashboardOptions>();
+
+        // Assert
+        options.GroupBy.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void CreateHost_keeps_the_slice_defaults_for_settings_that_are_not_given()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret").Build();
+
+        // Act
+        var options = host.Services.GetRequiredService<AgentLinkOptions>();
+
+        // Assert
+        options.ListenAddress.ShouldBe("0.0.0.0");
+        options.Port.ShouldBe(9440);
+    }
+
+    [Fact]
+    public void CreateHost_names_a_port_that_is_not_a_number()
+    {
+        // Arrange
+        var settings = new ControllerSettings().WithToken("shop", "secret").With("Controller:Listen:Port", "http");
+
+        // Act
+        var build = () => settings.Build();
+
+        // Assert
+        build.ShouldThrow<ConfigurationException>().Message.ShouldContain("'Controller:Listen:Port'");
+    }
+
+    [Fact]
+    public void CreateHost_rejects_a_port_out_of_range()
+    {
+        // Arrange
+        var settings = new ControllerSettings().WithToken("shop", "secret").With("Controller:Listen:Port", "70000");
+
+        // Act
+        var build = () => settings.Build();
+
+        // Assert
+        build.ShouldThrow<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public async Task A_started_controller_accepts_an_authenticated_agent_and_announces_its_replicas()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret")
+            .With("Controller:Listen:Address", "127.0.0.1")
+            .With("Controller:Listen:Port", "0")
+            .With("Controller:Replicas", "c1:9440,c2:9440")
+            .Build();
+        await host.StartAsync(TestContext.Current.CancellationToken);
+        var endpoint = host.Services.GetRequiredService<IAgentListener>().LocalEndPoint!;
+        using var client = new TcpClient();
+        await client.ConnectAsync(endpoint, TestContext.Current.CancellationToken);
+        var stream = client.GetStream();
+
+        // Act
+        await FrameCodec.WriteAsync(stream, new Hello(ProtocolVersion.Current, "agent-1", "agent", null, new Dictionary<string, string>(), "secret"), ct: TestContext.Current.CancellationToken);
+        var reply = await FrameCodec.ReadAsync(stream, ct: TestContext.Current.CancellationToken);
+
+        // Assert
+        reply.ShouldBeOfType<Config>().ControllerReplicas.ShouldBe(["c1:9440", "c2:9440"]);
+        await host.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task A_started_controller_serves_the_dashboard_api()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret").Build();
+        await host.StartAsync(TestContext.Current.CancellationToken);
+        var address = host.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
+        using var http = new HttpClient(new HttpClientHandler { UseProxy = false });
+
+        // Act
+        using var response = await http.GetAsync($"{address}/api/overview", TestContext.Current.CancellationToken);
+
+        // Assert
+        response.IsSuccessStatusCode.ShouldBeTrue();
+        await host.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Theory]
+    [InlineData("localhost")]
+    [InlineData("not an address")]
+    public void CreateHost_names_a_web_address_that_is_not_an_ip_address(string address)
+    {
+        // Arrange
+        var settings = new ControllerSettings().WithToken("shop", "secret").With("Controller:Web:Address", address);
+
+        // Act
+        var build = () => settings.Build();
+
+        // Assert
+        build.ShouldThrow<ConfigurationException>().Message.ShouldContain("'Controller:Web:Address'");
+    }
+
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("65536")]
+    public void CreateHost_names_a_web_port_out_of_range(string port)
+    {
+        // Arrange
+        var settings = new ControllerSettings().WithToken("shop", "secret").With("Controller:Web:Port", port);
+
+        // Act
+        var build = () => settings.Build();
+
+        // Assert
+        build.ShouldThrow<ConfigurationException>().Message.ShouldContain("'Controller:Web:Port'");
+    }
+
+    [Fact]
+    public async Task A_started_controller_stops_cleanly()
+    {
+        // Arrange
+        using var host = new ControllerSettings().WithToken("shop", "secret")
+            .With("Controller:Listen:Address", "127.0.0.1")
+            .With("Controller:Listen:Port", "0")
+            .Build();
+        await host.StartAsync(TestContext.Current.CancellationToken);
+
+        // Act
+        var stop = async () => await host.StopAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        await stop.ShouldNotThrowAsync();
+    }
+
+    /// <summary>Collects controller settings and builds the host from them, ignoring any configuration file on the machine.</summary>
+    private sealed class ControllerSettings
+    {
+        private readonly Dictionary<string, string?> _settings = new()
+        {
+            ["Controller:Web:Address"] = "127.0.0.1",
+            ["Controller:Web:Port"] = "0",
+        };
+
+        private int _tokens;
+
+        public ControllerSettings With(string key, string value)
+        {
+            _settings[key] = value;
+            return this;
+        }
+
+        /// <summary>Accepts agents that present the token and may report as the scope.</summary>
+        public ControllerSettings WithToken(string scope, string token)
+        {
+            _settings[$"Controller:AgentTokens:{_tokens}:Scope"] = scope;
+            _settings[$"Controller:AgentTokens:{_tokens}:TokenHash"] = AgentTokenHash.Compute(token);
+            _tokens++;
+            return this;
+        }
+
+        public IHost Build() =>
+            ControllerComposition.CreateHost([], _settings, Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}.json"));
+    }
+}

@@ -12,21 +12,21 @@ OpenShift starts each container with an arbitrary user id from a range of the na
 
 ## The socket between the sidecar and the application
 
-The sidecar and the application talk through a Unix socket on a shared in-memory `emptyDir`. The application's client creates the socket with read and write for its user and for its group, and the volume belongs to the group of the pod. Because OpenShift runs the sidecar and the application as different users of the same group 0, both can use it. The `monitoring-sidecar` library chart mounts the same volume in both containers; if you write the pod yourself, do the same.
+The sidecar and the application talk through a Unix socket on a shared in-memory `emptyDir`. The application's client creates the socket with read and write for its user and for its group, and the volume belongs to the group of the pod. Because OpenShift runs the sidecar and the application as different users of the same group 0, both can use it. The `plover-sidecar` library chart mounts the same volume in both containers; if you write the pod yourself, do the same.
 
 ## Native sidecars
 
-The sidecar is a native sidecar (an init container with `restartPolicy: Always`), which needs Kubernetes 1.29, so OpenShift 4.16 or later. On an older cluster set `monitoring.nativeSidecar: false` in the application chart. The sidecar then becomes a second container and retries until the application is up.
+The sidecar is a native sidecar (an init container with `restartPolicy: Always`), which needs Kubernetes 1.29, so OpenShift 4.16 or later. On an older cluster set `plover.nativeSidecar: false` in the application chart. The sidecar then becomes a second container and retries until the application is up.
 
 ## The injector
 
-To add the sidecar to applications whose chart you do not own, install `deploy/helm/monitoring-injector` as a cluster administrator with `--set tls.mode=openshift`, which lets the service CA of OpenShift make the certificate of the webhook and put its authority in the registration. See [the injector](configuration.md#the-injector). The injector runs under the restricted security context like the other components, and needs nothing beyond the registration itself.
+To add the sidecar to applications whose chart you do not own, install `deploy/helm/plover-injector` as a cluster administrator with `--set tls.mode=openshift`, which lets the service CA of OpenShift make the certificate of the webhook and put its authority in the registration. See [the injector](configuration.md#the-injector). The injector runs under the restricted security context like the other components, and needs nothing beyond the registration itself.
 
 ## Getting traffic in
 
 The charts create Services only. Routes carry HTTP and TLS, nothing else, so they fit the two ways in:
 
-**The dashboard.** A normal Route to the `monitoring-controller` Service, port `web`. Limit it to your internal network with the `haproxy.router.openshift.io/ip_whitelist` annotation.
+**The dashboard.** A normal Route to the `plover-controller` Service, port `web`. Limit it to your internal network with the `haproxy.router.openshift.io/ip_whitelist` annotation.
 
 ```yaml
 apiVersion: route.openshift.io/v1
@@ -36,7 +36,7 @@ metadata:
   annotations:
     haproxy.router.openshift.io/ip_whitelist: 10.0.0.0/8
 spec:
-  to: { kind: Service, name: monitoring-controller }
+  to: { kind: Service, name: plover-controller }
   port: { targetPort: web }
   tls: { termination: edge, insecureEdgeTerminationPolicy: Redirect }
 ```
@@ -47,18 +47,18 @@ spec:
 # values of the controller chart
 transport: { mode: mtls, existingSecret: controller-tls }
 replicaAddresses:
-  - monitoring-0.apps.example.com:443
-  - monitoring-1.apps.example.com:443
+  - plover-0.apps.example.com:443
+  - plover-1.apps.example.com:443
 ```
 
 ```yaml
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: monitoring-0
+  name: plover-0
 spec:
-  host: monitoring-0.apps.example.com
-  to: { kind: Service, name: monitoring-controller-0 }   # a Service you create for the pod monitoring-controller-0
+  host: plover-0.apps.example.com
+  to: { kind: Service, name: plover-controller-0 }   # a Service you create for the pod plover-controller-0
   port: { targetPort: agents }
   tls: { termination: passthrough }
 ```
@@ -78,7 +78,7 @@ metadata:
   name: allow-sidecars-to-agent
 spec:
   podSelector:
-    matchLabels: { app.kubernetes.io/name: monitoring-agent }
+    matchLabels: { app.kubernetes.io/name: plover-agent }
   ingress:
     - from: [{ podSelector: {} }]
       ports: [{ port: 9441 }]
@@ -93,7 +93,7 @@ metadata:
   name: allow-agent-egress
 spec:
   podSelector:
-    matchLabels: { app.kubernetes.io/name: monitoring-agent }
+    matchLabels: { app.kubernetes.io/name: plover-agent }
   policyTypes: [Egress]
   egress:
     - to: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } } }]
@@ -112,7 +112,7 @@ metadata:
   name: allow-agents-and-router
 spec:
   podSelector:
-    matchLabels: { app.kubernetes.io/name: monitoring-controller }
+    matchLabels: { app.kubernetes.io/name: plover-controller }
   ingress:
     - ports: [{ port: 9440 }]
     - from: [{ namespaceSelector: { matchLabels: { policy-group.network.openshift.io/ingress: "" } } }]

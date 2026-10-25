@@ -1,0 +1,20 @@
+{
+  "type": "config",
+  "version": "abc123",
+  "controllerReplicas": [
+    "plover-controller-0:9440",
+    "plover-controller-1:9440"
+  ],
+  "heartbeatSeconds": 5,
+  "pullSeconds": 15,
+  "edgeFlushSeconds": 10,
+  "services": {
+    "reports": {
+      "pullSeconds": 60,
+      "edgeFlushSeconds": 30
+    }
+  },
+  "overridable": [
+    "PullSeconds"
+  ]
+}

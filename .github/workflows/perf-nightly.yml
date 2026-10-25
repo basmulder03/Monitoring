@@ -22,10 +22,10 @@ jobs:
         run: dotnet build --configuration Release
       - name: Run the budget tests
         env:
-          MONITORING_PERF_RESULTS: ${{ runner.temp }}/run.tsv
+          PLOVER_PERF_RESULTS: ${{ runner.temp }}/run.tsv
         run: |
           for project in Controller Agent Client; do
-            dotnet test --configuration Release --no-build --project "tests/Monitoring.$project.Tests" --filter-namespace "*.Budgets"
+            dotnet test --configuration Release --no-build --project "tests/Plover.$project.Tests" --filter-namespace "*.Budgets"
           done
       - name: Fetch the history
         run: |

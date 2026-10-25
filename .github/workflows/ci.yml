@@ -35,8 +35,8 @@ jobs:
         options: >-
           --health-cmd "nc -z localhost 5672" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
-      MONITORING_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Username=postgres;Password=ci-only
-      MONITORING_TEST_ARTEMIS: 127.0.0.1:5672:art:ci-only
+      PLOVER_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Username=postgres;Password=ci-only
+      PLOVER_TEST_ARTEMIS: 127.0.0.1:5672:art:ci-only
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
@@ -48,7 +48,7 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release
       - name: Install the browser for the dashboard tests
-        run: pwsh artifacts/Unix/bin/Monitoring.Component.Tests/release/playwright.ps1 install --with-deps chromium
+        run: pwsh artifacts/Unix/bin/Plover.Component.Tests/release/playwright.ps1 install --with-deps chromium
       - name: Test
         # FanOutBudgetTests opens 200 connections and flaked on shared runners (16 s and 42 s instead of 0.3 s); the nightly runs it.
         run: dotnet test --configuration Release --no-build --filter-not-class "*FanOutBudgetTests"
@@ -70,14 +70,14 @@ jobs:
       - name: Publish the controller, the agent, the sidecar and the injector as Native AOT
         run: |
           for project in Controller Agent Sidecar Injector; do
-            dotnet publish "src/Monitoring.$project" -c Release -r linux-x64 -o "published/$project" -warnaserror
+            dotnet publish "src/Plover.$project" -c Release -r linux-x64 -o "published/$project" -warnaserror
           done
       - name: Smoke test the published binaries
         run: scripts/aot-smoke.sh published
       - name: Check the start time and memory budgets
         run: scripts/budgets.sh published
       - name: Sizes
-        run: ls -l published/*/Monitoring.Controller published/*/Monitoring.Agent published/*/Monitoring.Sidecar published/*/Monitoring.Injector | awk '{ print $5, $9 }'
+        run: ls -l published/*/Plover.Controller published/*/Plover.Agent published/*/Plover.Sidecar published/*/Plover.Injector | awk '{ print $5, $9 }'
 
   # The images are built, not pushed: a Dockerfile that no longer builds should fail the change that broke it.
   images:
@@ -90,7 +90,7 @@ jobs:
       - uses: actions/checkout@v7
       - name: Build the image
         run: |
-          name="monitoring-$(echo '${{ matrix.project }}' | tr '[:upper:]' '[:lower:]')"
+          name="plover-$(echo '${{ matrix.project }}' | tr '[:upper:]' '[:lower:]')"
           docker build --build-arg PROJECT=${{ matrix.project }} -t "$name:ci" -f deploy/Dockerfile .
           docker images "$name:ci" --format '{{.Repository}} {{.Size}}'
 

@@ -1,0 +1,30 @@
+# Gives every replica an address of its own, which agents need: a shared address would reach only one replica.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "plover-controller.name" . }}-headless
+  labels: {{- include "plover-controller.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector: {{- include "plover-controller.selector" . | nindent 4 }}
+  ports:
+    - name: agents
+      port: {{ .Values.service.agentPort }}
+      targetPort: agents
+---
+# One address for the dashboard and for the bootstrap of agents. Any replica serves the dashboard.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "plover-controller.name" . }}
+  labels: {{- include "plover-controller.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "plover-controller.selector" . | nindent 4 }}
+  ports:
+    - name: agents
+      port: {{ .Values.service.agentPort }}
+      targetPort: agents
+    - name: web
+      port: {{ .Values.service.webPort }}
+      targetPort: web

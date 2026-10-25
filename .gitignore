@@ -3,10 +3,10 @@ obj/
 artifacts/
 .idea/
 node_modules/
-src/Monitoring.Ui/wwwroot/
+src/Plover.Ui/wwwroot/
 deploy/helm/test/sample-app/charts/
 deploy/helm/test/sample-app/Chart.lock
-tests/Monitoring.Specifications/Features/*.feature.cs
+tests/Plover.Specifications/Features/*.feature.cs
 
 docs/node_modules/
 docs/.vitepress/dist/

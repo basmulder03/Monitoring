@@ -1,5 +1,5 @@
 // Records the dashboard into docs/public/recordings/*.webm while the demo host plays its incident:
-//   DEMO_SIGNED_IN=1 dotnet run --project samples/Monitoring.Demo        (in another terminal; leave it running)
+//   DEMO_SIGNED_IN=1 dotnet run --project samples/Plover.Demo        (in another terminal; leave it running)
 //   cd docs && npm run record
 // Needs a Chromium that Playwright knows (`npx playwright-core install chromium`, or one from the component tests). Not part of the build: the recordings are committed.
 import { chromium } from 'playwright-core'

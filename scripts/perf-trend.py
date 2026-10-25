@@ -80,7 +80,7 @@ def page(history):
     status = f'<p class=bad>Regressions in the last run:</p><ul>{failed}</ul>' if failed else "<p>The last run found no regression.</p>"
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Monitoring speed budgets</title>
+<title>Plover speed budgets</title>
 <style>
 :root {{ --bg:#fff; --fg:#1b1f24; --line:#d0d7de; --bad:#b42318; }}
 @media (prefers-color-scheme: dark) {{ :root {{ --bg:#0d1117; --fg:#e6edf3; --line:#30363d; --bad:#ff7b72; }} }}

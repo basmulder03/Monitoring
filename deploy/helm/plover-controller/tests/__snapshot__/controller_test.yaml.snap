@@ -1,0 +1,164 @@
+matches the snapshot of its default render:
+  1: |
+    apiVersion: v1
+    data:
+      central.json: |
+        {
+          "defaults": { "pullSeconds": 15, "edgeFlushSeconds": 10 }
+        }
+    kind: ConfigMap
+    metadata:
+      labels:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: plover-controller
+        app.kubernetes.io/version: 0.1.0
+        helm.sh/chart: plover-controller-0.1.0
+      name: plover-controller
+  2: |
+    apiVersion: v1
+    kind: Service
+    metadata:
+      labels:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: plover-controller
+        app.kubernetes.io/version: 0.1.0
+        helm.sh/chart: plover-controller-0.1.0
+      name: plover-controller-headless
+    spec:
+      clusterIP: None
+      ports:
+        - name: agents
+          port: 9440
+          targetPort: agents
+      publishNotReadyAddresses: true
+      selector:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/name: plover-controller
+  3: |
+    apiVersion: v1
+    kind: Service
+    metadata:
+      labels:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: plover-controller
+        app.kubernetes.io/version: 0.1.0
+        helm.sh/chart: plover-controller-0.1.0
+      name: plover-controller
+    spec:
+      ports:
+        - name: agents
+          port: 9440
+          targetPort: agents
+        - name: web
+          port: 8080
+          targetPort: web
+      selector:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/name: plover-controller
+  4: |
+    apiVersion: apps/v1
+    kind: StatefulSet
+    metadata:
+      labels:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: plover-controller
+        app.kubernetes.io/version: 0.1.0
+        helm.sh/chart: plover-controller-0.1.0
+      name: plover-controller
+    spec:
+      podManagementPolicy: Parallel
+      replicas: 2
+      selector:
+        matchLabels:
+          app.kubernetes.io/instance: RELEASE-NAME
+          app.kubernetes.io/name: plover-controller
+      serviceName: plover-controller-headless
+      template:
+        metadata:
+          annotations:
+            checksum/settings: 8f22b664a3316265427ae085c8ad8b590d24518beebef2b8396c6b8902292d51
+          labels:
+            app.kubernetes.io/instance: RELEASE-NAME
+            app.kubernetes.io/name: plover-controller
+        spec:
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - podAffinityTerm:
+                    labelSelector:
+                      matchLabels:
+                        app.kubernetes.io/instance: RELEASE-NAME
+                        app.kubernetes.io/name: plover-controller
+                    topologyKey: kubernetes.io/hostname
+                  weight: 100
+          containers:
+            - env:
+                - name: PLOVER_Controller__AgentTokens__0__Scope
+                  value: '*'
+                - name: PLOVER_Controller__AgentTokens__0__TokenHash
+                  value: abc
+                - name: PLOVER_Controller__Replicas__0
+                  value: plover-controller-0.plover-controller-headless.NAMESPACE.svc:9440
+                - name: PLOVER_Controller__Replicas__1
+                  value: plover-controller-1.plover-controller-headless.NAMESPACE.svc:9440
+                - name: PLOVER_Controller__Peers__0
+                  value: http://plover-controller-0.plover-controller-headless.NAMESPACE.svc:8080
+                - name: PLOVER_Controller__Peers__1
+                  value: http://plover-controller-1.plover-controller-headless.NAMESPACE.svc:8080
+                - name: PLOVER_Controller__Configuration__File
+                  value: /etc/plover/central/central.json
+                - name: PLOVER_Controller__Dashboard__GroupBy__0
+                  value: environment
+                - name: PLOVER_Controller__Dashboard__GroupBy__1
+                  value: datacenter
+                - name: PLOVER_Controller__Transport__Mode
+                  value: none
+                - name: PLOVER_Controller__Notifications__MinSeverity
+                  value: warning
+              image: plover-controller:0.1.0
+              imagePullPolicy: IfNotPresent
+              livenessProbe:
+                httpGet:
+                  path: /healthz
+                  port: web
+                initialDelaySeconds: 10
+                periodSeconds: 30
+              name: controller
+              ports:
+                - containerPort: 9440
+                  name: agents
+                - containerPort: 8080
+                  name: web
+              readinessProbe:
+                httpGet:
+                  path: /healthz
+                  port: web
+                periodSeconds: 10
+              resources:
+                limits:
+                  memory: 512Mi
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - mountPath: /etc/plover/central
+                  name: central
+                  readOnly: true
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          volumes:
+            - configMap:
+                name: plover-controller
+              name: central

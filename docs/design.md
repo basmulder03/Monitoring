@@ -267,7 +267,7 @@ Each controller replica holds one in-memory tree: label groups (for example envi
 | Scope | Display name, kind (namespace or server), labels, agent connection state, last seen | Agent `Hello` and agent configuration |
 | Service | Name, version, owner label, health roll-up | Sidecar or library `Hello` |
 | Instance | Id, pod or host name, node, image, start time, restarts, IP, health checks, last heartbeat | Sidecar, plus Kubernetes API or Service Control Manager |
-| Container | Name, role (app, monitoring sidecar, other sidecar, init), image and digest, state and reason, ready, restarts, last termination reason and exit code, requests and limits, usage | Kubernetes pod watch (container statuses); usage from the pod metrics API (opt-in) |
+| Container | Name, role (app, Plover sidecar, other sidecar, init), image and digest, state and reason, ready, restarts, last termination reason and exit code, requests and limits, usage | Kubernetes pod watch (container statuses); usage from the pod metrics API (opt-in) |
 | Metric series | Name, labels, latest value | Library meters and collectors |
 | Edge | Caller service, callee service or resource, type (HTTP, MQ, DB), calls, errors, latency histogram | Library edge counters |
 | Alert state | Rule, subject, since, acknowledged | Controller |
@@ -279,12 +279,12 @@ Each controller replica holds one in-memory tree: label groups (for example envi
 
 ### Container level
 
-Every pod is shown down to its containers, so it is clear whether the application, the monitoring sidecar or another sidecar is the problem.
+Every pod is shown down to its containers, so it is clear whether the application, the Plover sidecar or another sidecar is the problem.
 
 - The agent reads container statuses from the pod watch it already has, so this needs no extra permission or traffic. Init containers are shown while they run, then folded away.
 - Each container gets its own health: Waiting with a reason (for example image pull error or crash loop) is Unhealthy, Running but not ready is Degraded, Terminated after a restart shows the last exit code and reason (for example out of memory).
 - The app container is linked to the library's data (health checks, metrics, spans). Other containers have Kubernetes data only, unless they also use the library.
-- A failing monitoring sidecar is shown as "monitoring degraded" on the instance, not as an application failure, so a broken sidecar never reports the application as down.
+- A failing Plover sidecar is shown as "monitoring degraded" on the instance, not as an application failure, so a broken sidecar never reports the application as down.
 - Usage against requests and limits per container (opt-in, needs read access to the pod metrics API) shows throttling and out-of-memory risk.
 - On Windows the level below the instance is the process (threads, handles, memory), shown in the same place.
 
@@ -313,7 +313,7 @@ Tracing is done in the application process with W3C Trace Context, and only aggr
 | ActiveMQ | Library helper around producer and consumer, registered once at startup | `traceparent` message property | Queue or topic as its own node |
 | Database | Provider diagnostics (for example SqlClient) read by the same listener | Not applicable | Database server and name as a resource node |
 
-AOT rules out patching third-party code at runtime, so ActiveMQ needs one registration line (for example `AddMonitoring(o => o.UseActiveMq())`). HTTP and database capture need no code.
+AOT rules out patching third-party code at runtime, so ActiveMQ needs one registration line (for example `AddPlover(o => o.UseActiveMq())`). HTTP and database capture need no code.
 
 ### How edges are built
 
@@ -442,7 +442,7 @@ The controller evaluates alert rules against its in-memory state and shows activ
 
 ![Animation: an instance turns unhealthy, the rule waits, the alert fires in the panel and the channels, and resolves when the instance recovers](./public/animations/alert.svg)
 
-These are the first rules. The controller has more (certificate expiry, connection pool, queue without consumers, replica lag, configuration drift, dropped data, vulnerable packages and package drift); the full list with what each one alerts on is generated from the code in [Code structure](https://basmulder03.github.io/Monitoring/reference/structure#alert-rules).
+These are the first rules. The controller has more (certificate expiry, connection pool, queue without consumers, replica lag, configuration drift, dropped data, vulnerable packages and package drift); the full list with what each one alerts on is generated from the code in [Code structure](https://basmulder03.github.io/Plover/reference/structure#alert-rules).
 
 ### Stateless consequences
 
@@ -467,7 +467,7 @@ The sidecars, agents and controllers report their own health, metrics and traces
 
 ### How it is modeled
 
-- The monitoring system is a reserved scope (for example "Monitoring system") with the controller replicas and agents as its services. Sidecars stay on their own pods, as the monitoring sidecar container.
+- The monitoring system is a reserved scope (for example "Plover system") with the controller replicas and agents as its services. Sidecars stay on their own pods, as the Plover sidecar container.
 - The components use the same library internally, so their internal steps (pull, apply, push) are traced with the same `ActivityListener` model. Their edges (sidecar to agent to controller) form the system's own dependency graph.
 - Each agent reports which replicas acknowledge it and how far behind they are. Because every replica receives this from every agent, each replica can show the state of all replicas, without replicas talking to each other.
 - Self-telemetry uses the same memory bounds and pull intervals, configurable centrally, so monitoring the monitor does not become the biggest consumer.
@@ -560,13 +560,13 @@ Every runtime component is a Native AOT executable on .NET 10, and one shared pr
 
 | Project | Type |
 | --- | --- |
-| `Monitoring.Protocol` | Shared messages, frame codec, health and status model |
-| `Monitoring.Client` | NuGet library: meters, activity listener, health, local server |
-| `Monitoring.Sidecar` | AOT executable, Linux container |
-| `Monitoring.Agent` | AOT executable; Linux container and Windows service |
-| `Monitoring.Controller` | AOT executable with embedded web UI |
-| `Monitoring.Ui` | Static assets embedded in the controller |
-| `Monitoring.AppHost`, `Monitoring.Tests.*`, `TestApi`, `TestWorker`, `TestData` | Aspire host, tests and test applications |
+| `Plover.Protocol` | Shared messages, frame codec, health and status model |
+| `Plover.Client` | NuGet library: meters, activity listener, health, local server |
+| `Plover.Sidecar` | AOT executable, Linux container |
+| `Plover.Agent` | AOT executable; Linux container and Windows service |
+| `Plover.Controller` | AOT executable with embedded web UI |
+| `Plover.Ui` | Static assets embedded in the controller |
+| `Plover.AppHost`, `Plover.Tests.*`, `TestApi`, `TestWorker`, `TestData` | Aspire host, tests and test applications |
 
 ### AOT rules
 
@@ -578,8 +578,8 @@ Every runtime component is a Native AOT executable on .NET 10, and one shared pr
 
 ### Helm
 
-- A named template (for example `monitoring.sidecar`) that application charts include once. It adds the sidecar as a native sidecar container, a shared `emptyDir` for the socket, and the Downward API variables (pod name, pod IP, node, namespace).
-- Values: `monitoring.enabled` and free-form `monitoring.labels`; nothing else per application.
+- A named template (for example `plover.sidecar`) that application charts include once. It adds the sidecar as a native sidecar container, a shared `emptyDir` for the socket, and the Downward API variables (pod name, pod IP, node, namespace).
+- Values: `plover.enabled` and free-form `plover.labels`; nothing else per application.
 - A separate agent chart per namespace: Deployment, Service, ServiceAccount, and a Role limited to reading pods (and services).
 - A controller chart with the certificate secret, the central configuration ConfigMap, one Route per replica, and a shared Route for the UI.
 - Small resource requests and limits by default, tightened once the budgets from the testing section are known.
@@ -590,7 +590,7 @@ Two ways are supported: the Helm template, and a label-based admission webhook (
 
 |  | Helm template | Admission webhook (label) |
 | --- | --- | --- |
-| Opt-in | Include the template in each chart | A label on the pod or namespace, for example `monitoring/inject=true` |
+| Opt-in | Include the template in each chart | A label on the pod or namespace, for example `plover/inject=true` |
 | Cluster privileges | None | A cluster-scoped webhook registration, installed by a cluster admin |
 | Updates | Bump every chart | Change once, then roll the pods |
 | Failure mode | None at runtime | Webhook down: with failure policy Ignore, pods start unmonitored |
@@ -632,7 +632,7 @@ Nothing in the design is specific to one organization: everything is named by la
 - License: Apache-2.0 (patent grant, widely accepted in industry).
 - Packages: NuGet for the library and extensions; container images for sidecar, agent, controller and injector; Helm charts as OCI artifacts; the Windows agent as a zip or MSI.
 - Repository: README with a five-minute quickstart (an Aspire sample), this design as architecture docs, contributing guide, security policy, semantic versioning, changelog, and CI that runs the AOT and end-to-end tests.
-- The name is plain on purpose: the code and the repository are called Monitoring. Check trademarks and package-name availability once more before the first publish.
+- The name is plain on purpose: the code and the repository are called Plover. Check trademarks and package-name availability once more before the first publish.
 - Before publishing, confirm who owns the code and that open-sourcing it is allowed.
 
 ## Code structure
@@ -651,7 +651,7 @@ The code is organized in vertical (functional) slices: each feature owns everyth
 Example layout of one slice:
 
 ```text
-Monitoring.Controller/
+Plover.Controller/
   Features/
     Alerting/
       AlertingSlice.cs          // AddAlerting() and MapAlerting()
@@ -665,7 +665,7 @@ Monitoring.Controller/
   Shared/                       // only true cross-cutting code: clock, logging, frame transport
   Program.cs                    // composes the slices
 
-Monitoring.Controller.Tests/
+Plover.Controller.Tests/
   Features/
     Alerting/                   // mirrors the slice
 ```
@@ -674,7 +674,7 @@ Monitoring.Controller.Tests/
 
 - Each slice exposes one registration method (`AddAlerting`) and, when it has endpoints, one mapping method (`MapAlerting`). `Program.cs` only composes slices.
 - Slices do not reach into each other's internals. They talk through small public contracts or in-process domain events (for example `InstanceHealthChanged`, raised by Health and consumed by Alerting and Dashboard).
-- The shared kernel is small: `Monitoring.Protocol` (messages and serialization contexts) plus abstractions such as `TimeProvider`, `IStateStore` and the extension interfaces. Anything feature-specific stays in its slice.
+- The shared kernel is small: `Plover.Protocol` (messages and serialization contexts) plus abstractions such as `TimeProvider`, `IStateStore` and the extension interfaces. Anything feature-specific stays in its slice.
 - Native AOT friendly: explicit registration instead of assembly scanning, minimal API endpoints with the request delegate generator, source-generated JSON contexts per slice, and no reflection-based mediator libraries. In-process events use a small hand-written dispatcher.
 - One type per file, named after the type (`AlertRule.cs` holds `AlertRule`), so each file has a single responsibility and is easy to find and review. Small private helper types may sit next to the one type that uses them; anything used by more than one type gets its own file. Test classes follow the same rule: one test class per file, named `<Type>Tests`.
 - Classes are `internal` and `sealed` by default; only a slice's contract is public. Options are validated at startup.

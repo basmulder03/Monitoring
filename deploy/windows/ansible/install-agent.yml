@@ -1,17 +1,17 @@
-# Installs the monitoring agent as a Windows service on the hosts of the group "windows_servers".
+# Installs the Plover agent as a Windows service on the hosts of the group "windows_servers".
 #
 #   ansible-playbook -i inventory.ini deploy/windows/ansible/install-agent.yml \
-#     -e agent_build=published/Agent -e controller_address=monitoring.example.com:443 -e @secrets.yml
+#     -e agent_build=published/Agent -e controller_address=plover.example.com:443 -e @secrets.yml
 #
 # secrets.yml (keep it in a vault) holds agent_token. Variables you will want to set per environment are in vars below.
 # A controller that is not on a network you trust needs agent_transport_mode: tls (or mtls) with the authority that signed its certificate, as agent_ca_src.
 # Without it the token and everything the agent reports travel in clear text, and the playbook says so.
-- name: Install the monitoring agent
+- name: Install the Plover agent
   hosts: windows_servers
   gather_facts: false
   vars:
-    agent_dir: 'C:\MonitoringAgent'
-    agent_build: published/Agent            # the folder with the published Monitoring.Agent.exe, on the machine that runs Ansible
+    agent_dir: 'C:\PloverAgent'
+    agent_build: published/Agent            # the folder with the published Plover.Agent.exe, on the machine that runs Ansible
     controller_address: ""                  # host:port of the controller; give one address per replica if they are reached separately
     agent_scope_name: "{{ inventory_hostname_short }}"
     agent_labels: {}                        # for example { environment: prod, datacenter: a }
@@ -22,7 +22,7 @@
     agent_server_name: ""                   # the name in the certificate of the controller when it is not the host of controller_address
     agent_cert_src: ""                      # mtls: the certificate of this agent (PEM) and its key, files on the machine that runs Ansible
     agent_key_src: ""
-    agent_account: ""                       # the account the service runs as; empty is SYSTEM; 'NT SERVICE\MonitoringAgent' needs no password
+    agent_account: ""                       # the account the service runs as; empty is SYSTEM; 'NT SERVICE\PloverAgent' needs no password
   tasks:
     - name: Check what is needed
       ansible.builtin.assert:
@@ -77,7 +77,7 @@
     # The agent reads this file from the folder of the program, because a service starts in the system folder.
     - name: Write the configuration
       ansible.windows.win_copy:
-        dest: "{{ agent_dir }}\\monitoring.json"
+        dest: "{{ agent_dir }}\\plover.json"
         content: "{{ config | to_nice_json }}"
       vars:
         transport: >-
