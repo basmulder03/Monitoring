@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Plover.Agent.Features.ControllerLink;
 using Plover.Agent.Features.Discovery;
+using Plover.Agent.Features.Discovery.Windows;
+using Plover.Agent.Features.SelfMonitoring;
 using Plover.Agent.Features.ScopeState;
 using Plover.Agent.Features.SidecarConnections;
 using Plover.Agent.Hosting;
@@ -234,6 +236,28 @@ public class AgentCompositionTests
         options.ResyncInterval.ShouldBe(TimeSpan.FromMinutes(2));
         options.RetryMinDelay.ShouldBe(TimeSpan.FromSeconds(2));
         options.RetryMaxDelay.ShouldBe(TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public void CreateHost_on_windows_keeps_the_agent_apart_from_the_host_instance_that_is_named_after_the_machine()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Skip("Discovery of Windows services only works on Windows.");
+            return;
+        }
+
+        // Arrange
+        using var host = new AgentSettings().Valid().With("Agent:Discovery:Kind", "windows").With("Agent:Discovery:Windows:Services", "Spooler").Build();
+
+        // Act
+        var self = host.Services.GetRequiredService<SelfMonitoringOptions>();
+        var windows = host.Services.GetRequiredService<WindowsDiscoveryOptions>();
+
+        // Assert
+        self.PodName.ShouldNotBe(Environment.MachineName);
+        self.PodName.ShouldBe(AgentComposition.WindowsServiceName);
+        windows.Services.ShouldBe(["Spooler", AgentComposition.WindowsServiceName]);
     }
 
     [Fact]

@@ -13,14 +13,14 @@ internal sealed class WindowsHostProbe : IHostProbe
     /// <inheritdoc />
     public HostSample ReadHost()
     {
-        var memory = GC.GetGCMemoryInfo();
+        var memory = ReadMemory();
         return new HostSample(
             Environment.MachineName,
             RuntimeInformation.OSDescription,
             Environment.TickCount64 / 1000,
             ReadCpu(),
-            memory.TotalAvailableMemoryBytes,
-            Math.Max(0, memory.TotalAvailableMemoryBytes - memory.MemoryLoadBytes),
+            memory.Total,
+            memory.Available,
             [.. DriveInfo.GetDrives()
                 .Where(drive => drive.DriveType == DriveType.Fixed && drive.IsReady)
                 .Select(drive => new DiskSample(drive.Name.TrimEnd('\\'), drive.TotalSize, drive.AvailableFreeSpace))],
@@ -76,6 +76,36 @@ internal sealed class WindowsHostProbe : IHostProbe
         using var key = root.OpenSubKey(path);
         return key is not null;
     }
+
+    // What Windows says now; the memory load of the garbage collector only changes when a collection runs, so on an idle agent it stays at its first value.
+    private static (long Total, long Available) ReadMemory()
+    {
+        var status = new MemoryStatus { Length = (uint)Marshal.SizeOf<MemoryStatus>() };
+        if (!GlobalMemoryStatusEx(ref status))
+        {
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        }
+
+        return ((long)status.TotalPhys, (long)status.AvailPhys);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MemoryStatus
+    {
+        public uint Length;
+        public uint MemoryLoad;
+        public ulong TotalPhys;
+        public ulong AvailPhys;
+        public ulong TotalPageFile;
+        public ulong AvailPageFile;
+        public ulong TotalVirtual;
+        public ulong AvailVirtual;
+        public ulong AvailExtendedVirtual;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GlobalMemoryStatusEx(ref MemoryStatus buffer);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

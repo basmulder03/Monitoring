@@ -29,7 +29,7 @@ public class WindowsHostProbeTests
         second.OperatingSystem.ShouldContain("Windows");
         second.UptimeSeconds.ShouldBeGreaterThan(0);
         second.MemoryTotalBytes.ShouldBeGreaterThan(1L << 28);
-        second.MemoryAvailableBytes.ShouldBeInRange(1, second.MemoryTotalBytes);
+        second.MemoryAvailableBytes.ShouldBeInRange(1, second.MemoryTotalBytes - 1); // a running machine always uses some of it
         second.Disks.ShouldContain(disk => disk.Name == "C:" && disk.TotalBytes > disk.FreeBytes && disk.FreeBytes > 0);
         first.CpuPercent.ShouldBeNull();
         second.CpuPercent.ShouldNotBeNull().ShouldBeInRange(0, 100);

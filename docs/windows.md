@@ -75,7 +75,7 @@ The application needs the Plover client in its code, like on Kubernetes, and not
 
 `deploy/windows/test-service.ps1 -Path <folder with the published agent>` installs the agent from a copy of the folder, checks that it runs, starts with the machine and is restarted after its process is killed, stops when asked, and removes it again. It is a good smoke test after a change of the program or the installation, and runs every night in CI.
 
-In the dashboard the server shows up as a scope with the service `windows-host` and one instance for each listed service. The agent writes to the Windows event log too (Application, source `PloverAgent`).
+In the dashboard the server shows up as a scope with the service `windows-host` (the machine itself), one instance for each listed service, and the agent as the service `plover-agent` with the instance `PloverAgent`, which is always listed. The agent writes to the Windows event log too (Application, source `PloverAgent`).
 
 ## When something is wrong
 

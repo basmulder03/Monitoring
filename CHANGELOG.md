@@ -2,6 +2,13 @@
 
 Versions follow semantic versioning. The protocol has its own version, and a change that old and new components cannot serve side by side is called out here. The text under a version is what its GitHub release shows.
 
+## [1.0.1]
+
+Two fixes to the Windows agent, found by running 1.0.0 end to end on a fresh Windows 11.
+
+- The machine was merged into the agent's own instance, so the service `windows-host` never showed and the host figures appeared under `plover-agent`. The agent now shows as the service instance `PloverAgent` (always listed, whatever you put under `Discovery:Windows:Services`), and the machine as the instance named after it in `windows-host`.
+- Available memory was reported as the total memory. It now comes from Windows (`GlobalMemoryStatusEx`) and follows what is really free.
+
 ## [1.0.0]
 
 The first release, at 1.0.0.

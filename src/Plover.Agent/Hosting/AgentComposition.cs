@@ -45,6 +45,7 @@ internal static class AgentComposition
         // Does nothing unless the agent was started by the Service Control Manager, and then lets it be stopped and logs to the event log.
         builder.Services.AddWindowsService(options => options.ServiceName = WindowsServiceName);
 
+        var windowsHost = agent.Section("Discovery").Text("Kind", "none").Equals("windows", StringComparison.OrdinalIgnoreCase);
         builder.Services
             .AddScopeState(options =>
             {
@@ -62,7 +63,8 @@ internal static class AgentComposition
             {
                 var self = agent.Section("SelfMonitoring");
                 options.Interval = self.Duration("Interval", options.Interval);
-                options.PodName = self.Text("PodName", options.PodName);
+                // On a Windows server the agent is its own service instance; the machine name is the id of the host instance and would merge the two.
+                options.PodName = self.Text("PodName", windowsHost ? WindowsServiceName : options.PodName);
             })
             .AddMetricsHistory(options =>
             {
@@ -132,7 +134,8 @@ internal static class AgentComposition
         };
 
         var windows = discovery.Section("Windows");
-        options.Windows.Services = [.. windows.List("Services")];
+        // The agent's own service is always listed, so that what it says about itself has an instance to be shown on.
+        options.Windows.Services = [.. windows.List("Services"), WindowsServiceName];
         options.Windows.PollInterval = windows.Duration("PollInterval", options.Windows.PollInterval);
         options.Windows.MeasureInterval = windows.Duration("MeasureInterval", options.Windows.MeasureInterval);
 
