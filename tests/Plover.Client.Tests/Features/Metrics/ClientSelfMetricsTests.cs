@@ -56,6 +56,8 @@ public class ClientSelfMetricsTests
         }
 
         // Assert
+        // The first read records the series; the count of series is observed before that, so only the second read says how many there are.
+        _ = Metrics(host);
         var metrics = Metrics(host);
         metrics["plover.client.spans_buffered"].ShouldBe(4);
         metrics["plover.client.spans_dropped"].ShouldBe(6);
