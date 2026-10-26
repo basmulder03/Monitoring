@@ -1,6 +1,6 @@
 import { act } from "preact/test-utils";
 import type { TopologyGraph } from "../src/api/contracts";
-import { layoutGraph } from "../src/views/dependencies/graphLayout";
+import { ARROW_LENGTH, NODE_HEIGHT, NODE_WIDTH, edgeKey, layoutGraph } from "../src/views/dependencies/graphLayout";
 import { all, mount, overview, scope } from "./harness";
 
 const evil = "<img src=x onerror=window.__pwned=1>";
@@ -121,5 +121,32 @@ describe("the layout of the graph", () => {
   it("stays where it is when only the numbers change", () => {
     const changed: TopologyGraph = { ...graph, edges: graph.edges.map((edge) => ({ ...edge, calls: edge.calls + 10 })) };
     expect([...layoutGraph(changed).positions]).toEqual([...layoutGraph(graph).positions]);
+  });
+
+  const call = (from: string, to: string) => ({ from, to, type: "HTTP", calls: 1, errors: 0, durationSumMs: 1 });
+  const node = (id: string) => ({ id, name: id, kind: "Service" as const, scope: "s", health: "Healthy" as const });
+
+  it("ends each line a head's length before the node, so the tip touches it", () => {
+    const { positions, routes } = layoutGraph(graph);
+    const edge = graph.edges[0]!;
+    const end = routes.get(edgeKey(edge))!.at(-1)!;
+    expect(end.x + ARROW_LENGTH).toBe(positions.get(edge.to)!.x);
+  });
+
+  it("takes a line that skips a column around the nodes in between", () => {
+    // a calls b and c, b calls c: a to c would run straight through b.
+    const skip: TopologyGraph = { nodes: [node("a"), node("b"), node("c")], edges: [call("a", "b"), call("b", "c"), call("a", "c")] };
+    const { positions, routes } = layoutGraph(skip);
+    const b = positions.get("b")!;
+    const through = routes.get(edgeKey(call("a", "c")))!.filter((point) => point.x > b.x && point.x < b.x + NODE_WIDTH + 1);
+    expect(through.length).toBeGreaterThan(0);
+    for (const point of through) expect(Math.abs(point.y - (b.y + NODE_HEIGHT / 2))).toBeGreaterThan(NODE_HEIGHT);
+  });
+
+  it("keeps lines that enter one node apart", () => {
+    const merge: TopologyGraph = { nodes: [node("a"), node("b"), node("c")], edges: [call("a", "c"), call("b", "c")] };
+    const { routes } = layoutGraph(merge);
+    const ends = merge.edges.map((edge) => routes.get(edgeKey(edge))!.at(-1)!.y);
+    expect(new Set(ends).size).toBe(2);
   });
 });

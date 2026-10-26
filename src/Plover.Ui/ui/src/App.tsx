@@ -12,6 +12,7 @@ import { DependenciesView } from "./views/dependencies/DependenciesView";
 import { PackagesView } from "./views/packages/PackagesView";
 import { OverviewView } from "./views/overview/OverviewView";
 import { ScopeView } from "./views/scope/ScopeView";
+import { RulesView } from "./views/rules/RulesView";
 import { SystemView } from "./views/system/SystemView";
 
 /** The whole page: header, warnings about old data, and the view the address asks for. */
@@ -45,6 +46,7 @@ export function App() {
         {route.name === "scope" && <ScopeView name={route.scope} refresh={overview} now={halfMinutes} />}
         {route.name === "dependencies" && <DependenciesView refresh={overview} />}
         {route.name === "packages" && <PackagesView refresh={overview} />}
+        {route.name === "rules" && <RulesView refresh={overview} />}
         {route.name === "system" && <SystemView refresh={overview} />}
       </main>
     </OpenStateProvider>

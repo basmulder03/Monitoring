@@ -15,6 +15,7 @@ export function Header({ route, onSwitchTheme }: { route: Route; onSwitchTheme()
         <a href="#/" aria-current={route.name === "overview" || route.name === "scope" ? "page" : undefined}>Scopes</a>
         <a href="#/dependencies" aria-current={current("dependencies")}>Dependencies</a>
         <a href="#/packages" aria-current={current("packages")}>Packages</a>
+        <a href="#/rules" aria-current={current("rules")}>Rules</a>
         <a href="#/system" aria-current={current("system")}>System</a>
       </nav>
       <SignedIn />

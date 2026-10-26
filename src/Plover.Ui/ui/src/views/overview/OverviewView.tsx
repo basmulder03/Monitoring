@@ -13,15 +13,15 @@ export function OverviewView({ overview, now }: { overview: Overview | null; now
   return (
     <div>
       <h2>Scopes</h2>
-      {overview === null || visible.length === 0 ? (
+      {overview !== null && visible.length > 0 && <FilterControl overview={overview} filters={filters} onChange={set} />}
+      {(overview === null || visible.length === 0) && (
         <p class="muted">{overview !== null && overview.scopes.length > 0 ? "No scope matches the filter." : "No scope has reported yet."}</p>
-      ) : (
-        <>
-          <FilterControl overview={overview} filters={filters} onChange={set} />
-          <Groups scopes={visible} keys={overview.groupBy} depth={1} now={now} />
-        </>
       )}
-      <SystemTile refresh={overview} />
+      {/* The blocks of the scopes and the block of the system share one grid, so the page fills its width whatever the number of environments. */}
+      <div class="blocks-grid">
+        {overview !== null && visible.length > 0 && <Groups scopes={visible} keys={overview.groupBy} depth={1} now={now} />}
+        <SystemTile refresh={overview} />
+      </div>
       <Alerts alerts={overview?.alerts ?? []} now={now} />
     </div>
   );

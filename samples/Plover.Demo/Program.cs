@@ -30,6 +30,9 @@ var settings = new Dictionary<string, string?>
     // Removed pods go away soon, so the list stays short while the incident is played again and again.
     ["Controller:Registry:GoneRetention"] = "00:00:08",
     ["Controller:Registry:PurgeInterval"] = "00:00:02",
+    ["Controller:Packages:Aligned:0:Package"] = "Polly.*",
+    ["Controller:Packages:Aligned:0:Spread"] = "minor",
+    ["Controller:Packages:Aligned:0:Description"] = "Retry behaviour changes between minor versions of Polly.",
 };
 // With DEMO_SIGNED_IN=1 the dashboard believes the headers X-Forwarded-User and X-Forwarded-Groups from this machine, as it would behind a proxy that signs people in; a group named ops
 // makes an operator. That is what the recording of silencing an alert uses (docs/scripts/record-dashboard.mjs). Without it the dashboard is open and shows no buttons to change anything.

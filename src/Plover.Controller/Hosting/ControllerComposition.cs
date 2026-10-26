@@ -267,6 +267,7 @@ internal static class ControllerComposition
         app.MapSelfMonitoring();
         app.MapChangeMarkers();
         app.MapPackages();
+        app.MapRules();
         app.MapVulnerabilities();
         return app;
     }
@@ -319,7 +320,9 @@ internal static class ControllerComposition
             "minor" => VersionSpread.Minor,
             "major" => VersionSpread.Major,
             var other => throw new ConfigurationException($"Setting '{item.NameOf("Spread")}' must be 'exact', 'minor' or 'major', but is '{other}'."),
-        });
+        },
+        // Line breaks and runs of spaces from a folded YAML value become single spaces; a blank value is no description.
+        item.Optional("Description") is { } text && string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)) is { Length: > 0 } words ? words : null);
 
     /// <summary>Reads one silence; the end time is required, so a silence cannot be forgotten.</summary>
     private static AlertSilence ReadSilence(SettingsReader item)

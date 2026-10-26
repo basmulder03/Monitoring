@@ -41,4 +41,21 @@ async Task<string> CallAsync(string to)
     return response.StatusCode.ToString();
 }
 
+// For a live demo: CALLS=http://payments:8080/,http://catalog:8080/ makes the service call those every few seconds, so there are calls between services without a queue or a database.
+var targets = (builder.Configuration["CALLS"] ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+if (targets.Length > 0)
+{
+    _ = Task.Run(async () =>
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+        while (await timer.WaitForNextTickAsync(app.Lifetime.ApplicationStopping))
+        {
+            foreach (var target in targets)
+            {
+                try { await CallAsync(target); } catch (HttpRequestException) { /* the other service is down; that is what the demo shows */ }
+            }
+        }
+    });
+}
+
 app.Run();

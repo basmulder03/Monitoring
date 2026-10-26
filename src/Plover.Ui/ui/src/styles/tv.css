@@ -1,6 +1,7 @@
-/* Wall display: the page rotates and is read from across a room, so type scales with the screen and the cursor is hidden. */
-body.tv { cursor: none; font-size: clamp(1.25rem, 2.2vw, 3rem); }
-body.tv .tiles { grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr)); }
+/* Wall display: read from across a room, so type scales with the screen and the cursor is hidden. Everything is sized in rem, so one font size on the page scales all of it;
+   useFitToScreen lowers --tv-fit until nothing is cut off, and nothing may ever scroll or overflow. */
+html:has(body.tv) { font-size: calc(clamp(14px, 1.3vw, 32px) * var(--tv-fit, 1)); }
+body.tv { cursor: none; overflow: hidden; height: 100vh; }
 body.tv #theme-toggle { display: none; }
 
 /* Against burn-in on a screen that is on all day: the whole page moves a few pixels over ten minutes and back. */

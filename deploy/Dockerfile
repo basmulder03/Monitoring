@@ -6,6 +6,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG PROJECT
 ARG PROJECT_PATH=src/Plover.${PROJECT}
 ARG TARGETARCH
+ARG PUBLISH_ARGS=""
 RUN apt-get update && apt-get install -y --no-install-recommends clang zlib1g-dev && rm -rf /var/lib/apt/lists/*
 
 # The dashboard of the controller is built with Node, which the build of Plover.Ui calls. The image of Node is only used as a source for it.
@@ -18,7 +19,7 @@ COPY Directory.Build.props global.json Plover.slnx ./
 COPY src ./src
 COPY samples ./samples
 RUN case "${TARGETARCH:-amd64}" in arm64) rid=linux-arm64 ;; *) rid=linux-x64 ;; esac \
-    && dotnet publish "${PROJECT_PATH}" -c Release -r "$rid" -o /out \
+    && dotnet publish "${PROJECT_PATH}" -c Release -r "$rid" -o /out ${PUBLISH_ARGS} \
     && rm -f /out/*.dbg /out/*.pdb /out/*.xml \
     && mkdir /native && (cp /out/*.so /native/ 2>/dev/null || true)
 

@@ -99,7 +99,13 @@ export interface PackageCatalog {
 export interface PackageEntry {
   name: string;
   versions: PackageVersion[];
-  violation: string | null;
+  /** Left out by the controller when there is none. */
+  violation?: string | null;
+}
+
+export interface RulesReport {
+  alerts: { name: string; severity: string; waitSeconds: number }[];
+  aligned: { package: string; rule: string; description?: string | null }[];
 }
 
 export interface PackageUsage {

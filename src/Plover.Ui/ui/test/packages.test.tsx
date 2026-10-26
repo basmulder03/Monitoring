@@ -57,6 +57,13 @@ describe("the packages view", () => {
     expect(all(page.main, "details.package .violation")).toHaveLength(1);
   });
 
+  it("does not say a package is not aligned when the controller leaves the violation out", async () => {
+    const { violation: _omitted, ...bare } = catalog.packages[0]!;
+    const page = await openPackages({ ...catalog, packages: [bare] });
+    expect(page.main.textContent).not.toContain("not aligned");
+    expect(all(page.main, "details.package .violation")).toHaveLength(0);
+  });
+
   it("shows who uses each version, marking what comes in indirectly", async () => {
     const page = await openPackages();
     const text = all(page.main, "details.package").find((d) => d.textContent!.includes("Serilog"))!.textContent!;

@@ -110,7 +110,10 @@ public static class PloverEnvironment
             .WithEnvironment("PLOVER_Controller__Configuration__PollInterval", "00:00:01")
             .WithHttpEndpoint(name: "metrics", env: "PLOVER_Controller__Prometheus__Port")
             .WithEnvironment("PLOVER_Controller__Prometheus__Address", "127.0.0.1")
-            .WithEnvironment("PLOVER_Controller__Dashboard__PushInterval", "00:00:00.5");
+            .WithEnvironment("PLOVER_Controller__Dashboard__PushInterval", "00:00:00.5")
+            .WithEnvironment("PLOVER_Controller__Packages__Aligned__0__Package", "Polly.*")
+            .WithEnvironment("PLOVER_Controller__Packages__Aligned__0__Spread", "minor")
+            .WithEnvironment("PLOVER_Controller__Packages__Aligned__0__Description", "Retry behaviour changes between minor versions of Polly.");
 
         var agentsEndpoint = controller.GetEndpoint("agents");
         var agent = builder.AddProject<Projects.Plover_Agent>(Agent)
@@ -129,6 +132,7 @@ public static class PloverEnvironment
             .WaitFor(cluster);
 
         var sidecarsEndpoint = agent.GetEndpoint("sidecars");
+        var projects = new Dictionary<string, IResourceBuilder<ProjectResource>>();
         foreach (var application in Applications)
         {
             var socket = Path.Combine(state, $"{application}.sock");
@@ -137,6 +141,7 @@ public static class PloverEnvironment
                 .WithEnvironment("SERVICE_NAME", application)
                 .WithEnvironment("PLOVER_SOCKET", socket)
                 .WithEnvironment("BROKEN_FILE", BrokenSwitch(runId, application));
+            projects[application] = app;
 
             builder.AddProject<Projects.Plover_Sidecar>($"{application}-sidecar")
                 .WithEnvironment("PLOVER_Sidecar__Agent", ReferenceExpression.Create($"{sidecarsEndpoint.Property(EndpointProperty.IPV4Host)}:{sidecarsEndpoint.Property(EndpointProperty.Port)}"))
@@ -145,6 +150,9 @@ public static class PloverEnvironment
                 .WaitFor(agent)
                 .WaitFor(app);
         }
+
+        // Plain calls between the applications, so the dependency graph has an edge without a queue or a database.
+        projects["orders"].WithEnvironment("CALLS", ReferenceExpression.Create($"{projects["payments"].GetEndpoint("http").Property(EndpointProperty.Url)}/"));
 
         IResourceBuilder<ProjectResource>? data = null;
         foreach (var (name, role) in Chain.OrderByDescending(entry => entry.Value == "data"))

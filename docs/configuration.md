@@ -161,6 +161,7 @@ Different services may use different versions of a library, and often that is fi
 | --- | --- | --- |
 | `Controller:Packages:Aligned:<n>:Package` | required | A package id, or a prefix ending in `*`, such as `Microsoft.Extensions.*`. The first rule that covers a package decides |
 | `Controller:Packages:Aligned:<n>:Spread` | `major` | `exact`: the same version everywhere; `minor`: the same major and minor version; `major`: the same major version |
+| `Controller:Packages:Aligned:<n>:Description` | none | Why the rule exists, shown next to it on the Rules page. Optional; line breaks and extra spaces are folded into single spaces, and a blank value counts as none |
 | `Controller:Alerting:PackageDriftWait` | `01:00:00` | How long a package must stay out of alignment before its alert fires |
 
 Pre-release labels do not count: `10.0.0-rc.1` and `10.0.0` are the same version for `minor` and `major`, but not for `exact`.

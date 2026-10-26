@@ -94,6 +94,10 @@ spec:
               value: {{ $rule.package | quote }}
             - name: PLOVER_Controller__Packages__Aligned__{{ $i }}__Spread
               value: {{ default "major" $rule.spread | quote }}
+            {{- if $rule.description }}
+            - name: PLOVER_Controller__Packages__Aligned__{{ $i }}__Description
+              value: {{ $rule.description | quote }}
+            {{- end }}
             {{- end }}
             {{- if .Values.advisories.existingConfigMap }}
             - name: PLOVER_Controller__Vulnerabilities__Advisories

@@ -3,7 +3,8 @@ namespace Plover.Controller.Features.Packages;
 /// <summary>A package, or a family of packages, that the services of the landscape are expected to use in the same version.</summary>
 /// <param name="Package">A package id, or a prefix ending in <c>*</c> such as <c>Microsoft.Extensions.*</c>; case does not matter.</param>
 /// <param name="Spread">How far apart the versions may be.</param>
-public sealed record AlignmentRule(string Package, VersionSpread Spread)
+/// <param name="Description">Why the rule exists, in the words of whoever wrote the configuration; <see langword="null"/> when there is none. Shown on the rules page only.</param>
+public sealed record AlignmentRule(string Package, VersionSpread Spread, string? Description = null)
 {
     /// <summary>Tells whether the rule applies to a package.</summary>
     /// <param name="name">The package id.</param>

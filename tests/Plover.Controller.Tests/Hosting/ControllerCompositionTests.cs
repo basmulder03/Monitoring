@@ -229,14 +229,16 @@ public class ControllerCompositionTests
         using var host = new ControllerSettings().WithToken("shop", "secret")
             .With("Controller:Packages:Aligned:0:Package", "Microsoft.Extensions.*")
             .With("Controller:Packages:Aligned:0:Spread", "minor")
+            .With("Controller:Packages:Aligned:0:Description", "  One framework\n   release.  ")
             .With("Controller:Packages:Aligned:1:Package", "Serilog")
+            .With("Controller:Packages:Aligned:1:Description", "   ")
             .Build();
 
         // Act
         var rules = host.Services.GetRequiredService<PackagesOptions>().Aligned;
 
         // Assert
-        rules.ShouldBe([new AlignmentRule("Microsoft.Extensions.*", VersionSpread.Minor), new AlignmentRule("Serilog", VersionSpread.Major)]);
+        rules.ShouldBe([new AlignmentRule("Microsoft.Extensions.*", VersionSpread.Minor, "One framework release."), new AlignmentRule("Serilog", VersionSpread.Major)]);
     }
 
     [Fact]

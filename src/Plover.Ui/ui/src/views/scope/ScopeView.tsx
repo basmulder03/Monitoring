@@ -50,9 +50,11 @@ export function ScopeView({ name, refresh, now }: ScopeViewProps) {
       )}
       {labels && <p class="muted">{labels}</p>}
       {scope.services.length === 0 && <p class="muted">This scope has no services.</p>}
-      {scope.services.map((service) => (
-        <ServiceCard key={service.name} scope={scope.name} service={service} />
-      ))}
+      <div class="cards">
+        {scope.services.map((service) => (
+          <ServiceCard key={service.name} scope={scope.name} service={service} />
+        ))}
+      </div>
     </div>
   );
 }

@@ -95,7 +95,7 @@ sequenceDiagram
 
 A sidecar registers once and then sends heartbeats. The agent pulls data on a timer and pushes changes to the controller, which pushes events to dashboards.
 
-![Animation: a sidecar says hello, the agent answers and pulls its health, heartbeats follow, and a change travels to the controller and the dashboard](./public/animations/registration.svg)
+![Animation: a sidecar says hello, the agent answers and pulls its health, heartbeats follow, and a change travels to the controller and the dashboard](/animations/registration.svg)
 
 ```mermaid
 stateDiagram-v2
@@ -144,7 +144,7 @@ sequenceDiagram
 
 Each agent feeds all controller replicas, so a restarted replica only has to reconnect and receive a snapshot.
 
-![Animation: replica 1 restarts and loses its state, the agent reconnects and sends a snapshot, and the replica is complete again](./public/animations/recovery.svg)
+![Animation: replica 1 restarts and loses its state, the agent reconnects and sends a snapshot, and the replica is complete again](/animations/recovery.svg)
 
 ```mermaid
 flowchart LR
@@ -159,7 +159,7 @@ flowchart LR
 
 The controller resolves where each call went using its registry; an unknown address is shown as an external node.
 
-![Animation: call counters travel from the library through the sidecar and agent to the controller, which resolves each callee into an edge](./public/animations/edges.svg)
+![Animation: call counters travel from the library through the sidecar and agent to the controller, which resolves each callee into an edge](/animations/edges.svg)
 
 ## Discovery and liveness
 
@@ -440,7 +440,7 @@ The controller evaluates alert rules against its in-memory state and shows activ
 | Restart loop | An instance restarted 3 times in 10 minutes | 0 s |
 | Edge error rate | Errors on one dependency edge above a threshold | 5 min |
 
-![Animation: an instance turns unhealthy, the rule waits, the alert fires in the panel and the channels, and resolves when the instance recovers](./public/animations/alert.svg)
+![Animation: an instance turns unhealthy, the rule waits, the alert fires in the panel and the channels, and resolves when the instance recovers](/animations/alert.svg)
 
 These are the first rules. The controller has more (certificate expiry, connection pool, queue without consumers, replica lag, configuration drift, dropped data, vulnerable packages and package drift); the full list with what each one alerts on is generated from the code in [Code structure](https://basmulder03.github.io/Plover/reference/structure#alert-rules).
 

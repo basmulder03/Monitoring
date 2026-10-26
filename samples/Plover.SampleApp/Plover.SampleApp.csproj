@@ -5,9 +5,13 @@
     <Nullable>enable</Nullable>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
+  <PropertyGroup>
+    <!-- The live demo builds one service with an older version (-p:PollyVersion=...), so the packages page has versions to compare. -->
+    <PollyVersion Condition="'$(PollyVersion)' == ''">8.8.0</PollyVersion>
+  </PropertyGroup>
   <ItemGroup>
     <!-- A package of its own, so there is something to list; the shared framework is not a package. -->
-    <PackageReference Include="Polly.Core" Version="8.5.0" />
+    <PackageReference Include="Polly.Core" Version="$(PollyVersion)" />
   </ItemGroup>
   <ItemGroup>
     <!-- In your own application this is a package reference to Plover.Client; the targets come with the package. -->

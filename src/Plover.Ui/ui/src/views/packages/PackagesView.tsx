@@ -9,7 +9,7 @@ function PackageRow({ entry }: { entry: PackageEntry }) {
   const differs = entry.versions.length > 1;
   // A package used in several versions is the thing to look at, so it starts open.
   const disclosure = useDisclosure(`package:${entry.name}`, differs);
-  const violates = entry.violation !== null;
+  const violates = entry.violation != null;
 
   return (
     <details class="package" {...disclosure}>
@@ -53,7 +53,7 @@ export function PackagesView({ refresh }: { refresh: unknown }) {
   const catalog = loaded.value;
   const needle = search.trim().toLowerCase();
   const shown = catalog.packages.filter((entry) => entry.name.toLowerCase().includes(needle));
-  const violations = catalog.packages.filter((entry) => entry.violation !== null).length;
+  const violations = catalog.packages.filter((entry) => entry.violation != null).length;
 
   return (
     <div>
@@ -74,9 +74,11 @@ export function PackagesView({ refresh }: { refresh: unknown }) {
             <input id="package-search" type="search" value={search} onInput={(event) => setSearch(event.currentTarget.value)} />
           </div>
           {shown.length === 0 && <p class="muted">No package matches the search.</p>}
-          {shown.map((entry) => (
-            <PackageRow key={entry.name} entry={entry} />
-          ))}
+          <div class="cards">
+            {shown.map((entry) => (
+              <PackageRow key={entry.name} entry={entry} />
+            ))}
+          </div>
         </>
       )}
     </div>

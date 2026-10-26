@@ -142,10 +142,15 @@ describe("a wall display", () => {
     expect(document.body.classList.contains("drift")).toBe(true);
   });
 
-  it("does not drift by default", () => {
+  it("sends /tv to the same page with its default settings in the address", () => {
     mount("/tv");
-    document.body.classList.remove("drift");
-    mount("/tv");
+    expect(window.location.pathname + window.location.search).toBe("/tv?rotate=60&views=overview,dependencies&focus=300&drift=1");
+    expect(document.body.classList.contains("drift")).toBe(true);
+  });
+
+  it("leaves an address that has settings as it is", () => {
+    mount("/tv?rotate=15");
+    expect(window.location.search).toBe("?rotate=15");
     expect(document.body.classList.contains("drift")).toBe(false);
   });
 });

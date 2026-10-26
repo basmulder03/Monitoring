@@ -35,7 +35,7 @@ export function Groups({ scopes, keys, depth, now }: GroupsProps) {
   });
 
   return (
-    <div>
+    <div class={`groups depth-${depth}`}>
       {ordered.map(([value, members]) => (
         <section class="group" key={value ?? "\u0000not set"}>
           {createElement(

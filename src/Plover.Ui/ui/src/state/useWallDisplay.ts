@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import type { Overview } from "../api/contracts";
 import { useServices } from "../services/ServicesContext";
+import { useFitToScreen } from "./useFitToScreen";
 import { hashOf, readWallConfig } from "./wallConfig";
 
 /**
@@ -11,6 +12,7 @@ import { hashOf, readWallConfig } from "./wallConfig";
 export function useWallDisplay(overview: Overview | null): void {
   const services = useServices();
   const config = useMemo(() => readWallConfig(window.location.pathname, window.location.search), []);
+  useFitToScreen(config !== null);
   const state = useRef({ index: 0, focused: null as string | null, focusSince: 0, lastRotation: services.now(), dismissed: new Set<string>() });
 
   useEffect(() => {

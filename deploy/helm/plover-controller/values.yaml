@@ -93,7 +93,7 @@ dashboard:
 
 # Libraries that must be used in the same version everywhere, and how strictly: exact, minor or major.
 alignedPackages: []
-# - { package: "Microsoft.Extensions.*", spread: major }
+# - { package: "Microsoft.Extensions.*", spread: major, description: "One framework release, or the host breaks at startup." }  # description is optional
 
 # Advisories in the OSV format, so vulnerable package versions are found. Without it nothing is checked.
 advisories:

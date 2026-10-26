@@ -11,6 +11,9 @@ export interface WallConfig {
   drift: boolean;
 }
 
+/** What /tv becomes when it is opened without settings, so the address on the screen says what the screen does and can be changed. */
+export const DEFAULT_WALL_SEARCH = "rotate=60&views=overview,dependencies&focus=300&drift=1";
+
 const VIEWS: readonly WallView[] = ["overview", "dependencies", "packages"];
 
 const seconds = (value: string | null, fallback: number): number => {

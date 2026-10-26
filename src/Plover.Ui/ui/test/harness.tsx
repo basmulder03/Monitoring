@@ -10,6 +10,7 @@ export class FakeServices implements Services {
   topology: TopologyGraph = { nodes: [], edges: [] };
   packages: PackageCatalog = { packages: [], services: 0, servicesWithoutList: 0 };
   vulnerabilities: VulnerabilityReport = { findings: [], advisories: 0, loadedAt: null };
+  rules: import("../src/api/contracts").RulesReport = { alerts: [], aligned: [] };
   streams = 0;
   histories: Record<string, MetricHistory> = {};
   system: SystemStatus | null = null;
@@ -27,6 +28,7 @@ export class FakeServices implements Services {
     if (path === "/api/silences") return { status: 200, body: this.silences as T };
     if (path === "/api/topology") return { status: 200, body: this.topology as T };
     if (path === "/api/packages") return { status: 200, body: this.packages as T };
+    if (path === "/api/rules") return { status: 200, body: this.rules as T };
     if (path === "/api/vulnerabilities") return { status: 200, body: this.vulnerabilities as T };
     if (path.endsWith("/history")) {
       this.historyRequests.push(path);

@@ -20,6 +20,8 @@ export function SystemView({ refresh }: { refresh: unknown }) {
             ? "Every scope has an agent connected to this controller, and every agent to every replica."
             : "Some agents are not connected to every controller replica."}
       </p>
+      <div class="blocks">
+      <section>
       <table class="instances">
         <tbody>
           <tr><th scope="row">Replica</th><td>{status.replica}</td></tr>
@@ -32,7 +34,9 @@ export function SystemView({ refresh }: { refresh: unknown }) {
           <tr><th scope="row">Memory</th><td>{(status.memoryBytes / 1048576).toFixed(0)} MB</td></tr>
         </tbody>
       </table>
+      </section>
 
+      <section>
       <h3>Controller replicas</h3>
       {status.replicas.length === 0 ? (
         <p class="muted">No agent has said which replicas it connects to yet.</p>
@@ -61,7 +65,9 @@ export function SystemView({ refresh }: { refresh: unknown }) {
           </tbody>
         </table>
       )}
+      </section>
 
+      <section>
       <h3>Pods without a Plover sidecar</h3>
       {status.unmonitored.length === 0 ? (
         <p class="muted">Every pod has one.</p>
@@ -85,6 +91,8 @@ export function SystemView({ refresh }: { refresh: unknown }) {
           </tbody>
         </table>
       )}
+      </section>
+      </div>
     </div>
   );
 }
