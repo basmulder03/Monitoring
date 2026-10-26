@@ -22,9 +22,9 @@ public static class WindowsEnvironment
     /// <param name="cluster">The cluster resource, which the VM waits for.</param>
     public static void AddWindowsEnvironment(this IDistributedApplicationBuilder builder, string root, IResourceBuilder<ExecutableResource> cluster)
     {
-        if (!File.Exists("/dev/kvm"))
+        if (!OperatingSystem.IsLinux() || !File.Exists("/dev/kvm"))
         {
-            throw new InvalidOperationException("The Windows VM needs KVM (/dev/kvm), which this machine does not have.");
+            throw new InvalidOperationException("The Windows VM needs Linux with KVM (/dev/kvm), which this machine does not have; on Windows itself, run the agent as a service with deploy/windows/install-agent.ps1.");
         }
 
         var output = Path.Combine(root, "artifacts", "demo", "windows");
@@ -32,7 +32,7 @@ public static class WindowsEnvironment
         var storage = Environment.GetEnvironmentVariable("PLOVER_DEMO_WINDOWS_STORAGE") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".plover-demo", "windows");
         Directory.CreateDirectory(storage);
 
-        var prepare = builder.AddExecutable("windows-prepare", "bash", root, "deploy/demo/windows-prepare.sh").WithEnvironment("WINDOWS_TOKEN", Token).WaitFor(cluster);
+        var prepare = builder.AddExecutable("windows-prepare", KindEnvironment.Bash, root, "deploy/demo/windows-prepare.sh").WithEnvironment("WINDOWS_TOKEN", Token).WaitFor(cluster);
 
         // On the docker network of kind, where the node of the cluster is. Published on this machine only: the viewer of the VM has no password, and ssh is by key.
         var windows = builder.AddContainer("windows", "dockurr/windows", "latest")

@@ -1,0 +1,2 @@
+# The demo scripts are run by bash, which stops at a carriage return, so a checkout on Windows must keep line feeds.
+*.sh text eol=lf

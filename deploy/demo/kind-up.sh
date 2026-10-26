@@ -15,11 +15,18 @@ step() { echo; echo "== $*"; }
 
 if [ "${SKIP_BUILD:-0}" != 1 ]; then
   step "Images (the first build takes several minutes)"
-  build() { docker build -q --build-arg PROJECT="$1" ${3:+--build-arg PROJECT_PATH="$3"} -t "$2:dev" -f "$root/deploy/Dockerfile" "$root" >/dev/null; }
+  # What docker says is shown, indented, so a long build is seen to be working; layers that are cached say so.
+  build() {
+    local started=$SECONDS
+    echo "-- $2:dev ($1)"
+    docker build --progress=plain --build-arg PROJECT="$1" ${3:+--build-arg PROJECT_PATH="$3"} ${4:+--build-arg PUBLISH_ARGS="$4"} \
+      -t "$2:dev" -f "$root/deploy/Dockerfile" "$root" 2>&1 | sed -u '/^$/d; s/^/   /'
+    echo "   built in $((SECONDS - started)) s"
+  }
   build Controller plover-controller; build Agent plover-agent; build Sidecar plover-sidecar; build Injector plover-injector
   build SampleApp plover-sampleapp samples/Plover.SampleApp
   # catalog is built with an older Polly, so the packages page has two versions to show.
-  docker build -q --build-arg PROJECT=SampleApp --build-arg PROJECT_PATH=samples/Plover.SampleApp --build-arg PUBLISH_ARGS=-p:PollyVersion=8.4.2 -t plover-sampleapp-old:dev -f "$root/deploy/Dockerfile" "$root" >/dev/null
+  build SampleApp plover-sampleapp-old samples/Plover.SampleApp -p:PollyVersion=8.4.2
 fi
 
 step "Cluster"
@@ -28,7 +35,10 @@ restart=0
 if [ "${SKIP_BUILD:-0}" != 1 ] && kind get clusters | grep -qx "$cluster"; then restart=1; fi
 kind get clusters | grep -qx "$cluster" || kind create cluster --name "$cluster" --kubeconfig "$KUBECONFIG" --wait 120s
 kind export kubeconfig --name "$cluster" --kubeconfig "$KUBECONFIG" >/dev/null
-for image in plover-controller plover-agent plover-sidecar plover-injector plover-sampleapp plover-sampleapp-old; do kind load docker-image "$image:dev" --name "$cluster" >/dev/null; done
+for image in plover-controller plover-agent plover-sidecar plover-injector plover-sampleapp plover-sampleapp-old; do
+  echo "-- loading $image:dev into the cluster"
+  kind load docker-image "$image:dev" --name "$cluster" >/dev/null
+done
 
 step "Controller, agent and injector"
 token_args=()

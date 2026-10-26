@@ -13,6 +13,24 @@ public static class KindEnvironment
     private const int DashboardPort = 18080;
     private static readonly string Kubeconfig = Environment.GetEnvironmentVariable("KUBECONFIG_DEMO") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".kube", "plover-demo.config");
 
+    /// <summary>
+    /// The shell that runs the scripts. On Windows it has to be Git Bash: the <c>bash.exe</c> in System32 starts WSL, a Linux of its own,
+    /// where kubectl, kind and the kubeconfig are not the ones of this machine, so the buttons would talk to a different cluster than the script made.
+    /// </summary>
+    internal static string Bash
+    {
+        get
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                return "bash";
+            }
+
+            var git = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Git", "bin", "bash.exe");
+            return File.Exists(git) ? git : throw new InvalidOperationException("The kind demo runs bash scripts and needs Git for Windows (Git Bash); the bash of WSL does not share kubectl, kind and the kubeconfig with Windows.");
+        }
+    }
+
     /// <summary>The applications of the cluster, in the namespace <c>shop</c>.</summary>
     public static readonly IReadOnlyList<string> Applications = ["orders", "payments", "catalog"];
 
@@ -24,7 +42,7 @@ public static class KindEnvironment
     public static IResourceBuilder<ExecutableResource> AddKindEnvironment(this IDistributedApplicationBuilder builder, string root, bool windows = false)
     {
         // Healthy when the dashboard answers, which is when everything before it is up; the resources below wait for that.
-        var cluster = builder.AddExecutable("cluster", "bash", root, "deploy/demo/kind-up.sh")
+        var cluster = builder.AddExecutable("cluster", Bash, root, "deploy/demo/kind-up.sh")
             .WithEnvironment("SKIP_BUILD", builder.Configuration["SkipBuild"] ?? "0")
             .WithEnvironment("WINDOWS", windows ? "1" : "0")
             .WithEnvironment("WINDOWS_TOKEN", WindowsEnvironment.Token)
@@ -67,7 +85,7 @@ public static class KindEnvironment
 
     // A log follower that starts again when the pod it follows was replaced, and waits for the cluster first.
     private static IResourceBuilder<ExecutableResource> Follow(IDistributedApplicationBuilder builder, string name, string root, string kubectlArguments, IResourceBuilder<ExecutableResource> cluster) =>
-        builder.AddExecutable(name, "bash", root, "-c", $"while true; do kubectl {kubectlArguments} || true; sleep 2; done")
+        builder.AddExecutable(name, Bash, root, "-c", $"while true; do kubectl {kubectlArguments} || true; sleep 2; done")
             .WithEnvironment("KUBECONFIG", Kubeconfig)
             .WaitFor(cluster);
 
