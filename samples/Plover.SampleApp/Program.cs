@@ -14,8 +14,9 @@ builder.Services.AddPlover(options =>
 
 // Breaks when the file named by BROKEN_FILE exists, so a test can make the application unhealthy without restarting it.
 var brokenFile = builder.Configuration["BROKEN_FILE"] ?? "/tmp/broken";
+var brokenByDemo = false;
 builder.Services.AddHealthChecks().AddCheck("switch", () =>
-    File.Exists(brokenFile) ? HealthCheckResult.Unhealthy("switched off") : HealthCheckResult.Healthy());
+    brokenByDemo || File.Exists(brokenFile) ? HealthCheckResult.Unhealthy("switched off") : HealthCheckResult.Healthy());
 
 var app = builder.Build();
 // A package of its own, used for a retry around the call to the other service.
@@ -23,6 +24,13 @@ var retry = new ResiliencePipelineBuilder().AddRetry(new RetryStrategyOptions { 
 using var client = new HttpClient();
 
 app.MapGet("/", () => "ok");
+
+// For a live demo in a cluster, where the image has no shell to create the file in: DEMO_CONTROLS=1 lets the demo flip the same switch through the API server's pod proxy.
+if (builder.Configuration["DEMO_CONTROLS"] == "1")
+{
+    app.MapGet("/demo/unhealthy", () => { brokenByDemo = true; return "unhealthy"; });
+    app.MapGet("/demo/healthy", () => { brokenByDemo = false; return "healthy"; });
+}
 
 // Calls another service, which shows up as a dependency: /call?to=http://other:8080/
 app.MapGet("/call", (string to) => CallAsync(to));
