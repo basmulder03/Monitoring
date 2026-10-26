@@ -1,6 +1,7 @@
+import type { RulesReport } from "../src/api/contracts";
 import { all, mount, overview, scope } from "./harness";
 
-async function open(rules: { alerts: { name: string; severity: string; waitSeconds: number }[]; aligned: { package: string; rule: string; description?: string | null }[] }) {
+async function open(rules: RulesReport) {
   const page = mount("/#/rules", (services) => {
     services.rules = rules;
   });
@@ -25,6 +26,10 @@ describe("the rules view", () => {
     expect(text).toContain("Retries behave differently between minors.");
     expect(all(page.main, ".rule-why")).toHaveLength(1);
     expect(all(page.main, "tbody tr")).toHaveLength(4);
+    const links = all(page.main, "tbody a").map((a) => [a.textContent, a.getAttribute("href")]);
+    expect(links).toContainEqual(["package-drift", "https://basmulder03.github.io/Plover/configuration#aligned-packages"]);
+    expect(links).toContainEqual(["service-down", "https://basmulder03.github.io/Plover/design#alerting"]);
+    expect(links).toContainEqual(["Polly.*", "https://basmulder03.github.io/Plover/configuration#aligned-packages"]);
   });
 
   it("says when no alignment rule is configured", async () => {

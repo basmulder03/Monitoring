@@ -8,6 +8,13 @@ namespace Plover.Controller.Features.Packages;
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     WriteIndented = true)]
 [JsonSerializable(typeof(CycloneDxBom))]
+internal sealed partial class PackagesJsonContext : JsonSerializerContext;
+
+/// <summary>
+/// Source-generated JSON for the packages API of the dashboard. Unlike the bill of materials it keeps properties that have no value, because the TypeScript
+/// contract (generated from these types) says a package without a violation has <c>violation: null</c>, not no property at all.
+/// </summary>
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, WriteIndented = true)]
 [JsonSerializable(typeof(PackageCatalog))]
 [JsonSerializable(typeof(PackageEntry))]
-internal sealed partial class PackagesJsonContext : JsonSerializerContext;
+internal sealed partial class PackagesApiJsonContext : JsonSerializerContext;

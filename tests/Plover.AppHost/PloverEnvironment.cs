@@ -84,7 +84,7 @@ public static class PloverEnvironment
             .WithEnvironment("ARTEMIS_USER", "art")
             .WithEnvironment("ARTEMIS_PASSWORD", "e2e-broker")
             .WithEndpoint(name: "amqp", targetPort: 5672, scheme: "tcp");
-        var database = builder.AddContainer("database", "postgres", "17-alpine")
+        var database = builder.AddContainer("database", "postgres", "18-alpine")
             .WithEnvironment("POSTGRES_PASSWORD", "e2e-database")
             .WithEndpoint(name: "sql", targetPort: 5432, scheme: "tcp");
         var brokerEndpoint = broker.GetEndpoint("amqp");

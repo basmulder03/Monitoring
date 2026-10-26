@@ -21,77 +21,78 @@ export function SystemView({ refresh }: { refresh: unknown }) {
             : "Some agents are not connected to every controller replica."}
       </p>
       <div class="blocks">
-      <section>
-      <table class="instances">
-        <tbody>
-          <tr><th scope="row">Replica</th><td>{status.replica}</td></tr>
-          <tr><th scope="row">Running for</th><td>{plural(Math.floor(status.uptimeSeconds / 60), "minute", "minutes")}</td></tr>
-          <tr><th scope="row">Agents connected</th><td>{status.agentsConnected} of {status.scopes}</td></tr>
-          <tr><th scope="row">Open dashboards</th><td>{status.eventClients}</td></tr>
-          <tr><th scope="row">Alert evaluation</th><td>{status.alertEvaluationMilliseconds === null ? "not yet" : `${status.alertEvaluationMilliseconds.toFixed(1)} ms`}</td></tr>
-          <tr><th scope="row">Frames from agents</th><td>{status.framesPerSecond.toFixed(1)} per second</td></tr>
-          <tr><th scope="row">Held</th><td>{plural(status.instances, "instance", "instances")}, {plural(status.series, "metric series", "metric series")}</td></tr>
-          <tr><th scope="row">Memory</th><td>{(status.memoryBytes / 1048576).toFixed(0)} MB</td></tr>
-        </tbody>
-      </table>
-      </section>
+        <section>
+          <h3>This replica</h3>
+          <table class="instances">
+            <tbody>
+              <tr><th scope="row">Replica</th><td>{status.replica}</td></tr>
+              <tr><th scope="row">Running for</th><td>{plural(Math.floor(status.uptimeSeconds / 60), "minute", "minutes")}</td></tr>
+              <tr><th scope="row">Agents connected</th><td>{status.agentsConnected} of {status.scopes}</td></tr>
+              <tr><th scope="row">Open dashboards</th><td>{status.eventClients}</td></tr>
+              <tr><th scope="row">Alert evaluation</th><td>{status.alertEvaluationMilliseconds === null ? "not yet" : `${status.alertEvaluationMilliseconds.toFixed(1)} ms`}</td></tr>
+              <tr><th scope="row">Frames from agents</th><td>{status.framesPerSecond.toFixed(1)} per second</td></tr>
+              <tr><th scope="row">Held</th><td>{plural(status.instances, "instance", "instances")}, {plural(status.series, "metric series", "metric series")}</td></tr>
+              <tr><th scope="row">Memory</th><td>{(status.memoryBytes / 1048576).toFixed(0)} MB</td></tr>
+            </tbody>
+          </table>
+        </section>
 
-      <section>
-      <h3>Controller replicas</h3>
-      {status.replicas.length === 0 ? (
-        <p class="muted">No agent has said which replicas it connects to yet.</p>
-      ) : (
-        <table class="instances">
-          <thead>
-            <tr>
-              <th>Replica</th>
-              <th>Agents connected</th>
-              <th>Behind by</th>
-            </tr>
-          </thead>
-          <tbody>
-            {status.replicas.map((replica) => (
-              <tr key={replica.address}>
-                <td>
-                  {replica.address}
-                  {replica.thisReplica && <span class="muted"> (this one)</span>}
-                </td>
-                <td class={replica.agentsConnected < replica.agentsReporting ? "violation" : undefined}>
-                  {replica.agentsConnected} of {replica.agentsReporting}
-                </td>
-                <td>{plural(replica.maxLag, "change", "changes")}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      </section>
+        <section>
+          <h3>Controller replicas</h3>
+          {status.replicas.length === 0 ? (
+            <p class="muted">No agent has said which replicas it connects to yet.</p>
+          ) : (
+            <table class="instances">
+              <thead>
+                <tr>
+                  <th>Replica</th>
+                  <th>Agents connected</th>
+                  <th>Behind by</th>
+                </tr>
+              </thead>
+              <tbody>
+                {status.replicas.map((replica) => (
+                  <tr key={replica.address}>
+                    <td>
+                      {replica.address}
+                      {replica.thisReplica && <span class="muted"> (this one)</span>}
+                    </td>
+                    <td class={replica.agentsConnected < replica.agentsReporting ? "violation" : undefined}>
+                      {replica.agentsConnected} of {replica.agentsReporting}
+                    </td>
+                    <td>{plural(replica.maxLag, "change", "changes")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
 
-      <section>
-      <h3>Pods without a Plover sidecar</h3>
-      {status.unmonitored.length === 0 ? (
-        <p class="muted">Every pod has one.</p>
-      ) : (
-        <table class="instances">
-          <thead>
-            <tr>
-              <th>Scope</th>
-              <th>Service</th>
-              <th>Pod</th>
-            </tr>
-          </thead>
-          <tbody>
-            {status.unmonitored.map((pod) => (
-              <tr key={`${pod.scope}/${pod.instance}`}>
-                <td><a href={`#/scopes/${encodeURIComponent(pod.scope)}`}>{pod.scope}</a></td>
-                <td>{pod.service}</td>
-                <td>{pod.instance}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      </section>
+        <section>
+          <h3>Pods without a Plover sidecar</h3>
+          {status.unmonitored.length === 0 ? (
+            <p class="muted">Every pod has one.</p>
+          ) : (
+            <table class="instances">
+              <thead>
+                <tr>
+                  <th>Scope</th>
+                  <th>Service</th>
+                  <th>Pod</th>
+                </tr>
+              </thead>
+              <tbody>
+                {status.unmonitored.map((pod) => (
+                  <tr key={`${pod.scope}/${pod.instance}`}>
+                    <td><a href={`#/scopes/${encodeURIComponent(pod.scope)}`}>{pod.scope}</a></td>
+                    <td>{pod.service}</td>
+                    <td>{pod.instance}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
       </div>
     </div>
   );

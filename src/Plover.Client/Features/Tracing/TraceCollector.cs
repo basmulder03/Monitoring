@@ -83,7 +83,8 @@ internal sealed class TraceCollector(PloverOptions options, EdgeCounters edges, 
             || StatusCodeOf(activity) >= 500;
         var duration = activity.Duration.TotalMilliseconds;
 
-        if (EdgeClassifier.TryClassify(activity, out var type, out var target))
+        // Npgsql 10 also publishes the opening of a physical connection; that is not a call, and the queries made over it are counted already.
+        if (!activity.DisplayName.StartsWith("CONNECT ", StringComparison.Ordinal) && EdgeClassifier.TryClassify(activity, out var type, out var target))
         {
             edges.Record(type, target, duration, error);
         }
@@ -107,8 +108,9 @@ internal sealed class TraceCollector(PloverOptions options, EdgeCounters edges, 
     /// <summary>Names a span without anything a person typed: an HTTP operation is named by method and route, never by address.</summary>
     private static string Name(Activity activity)
     {
-        // Some providers do not name their operations at all (Npgsql says UNKNOWN); the kind of database and what it was asked to do is more use.
-        if (activity.DisplayName is "" or "UNKNOWN" && (activity.GetTagItem("db.system.name") ?? activity.GetTagItem("db.system"))?.ToString() is { } database)
+        // Some providers do not name their operations at all (Npgsql 9 says UNKNOWN, Npgsql 10 only the kind of database); the kind of database and what it was asked to do is more use.
+        if ((activity.GetTagItem("db.system.name") ?? activity.GetTagItem("db.system"))?.ToString() is { } database
+            && (activity.DisplayName is "" or "UNKNOWN" || activity.DisplayName == database))
         {
             var statement = (activity.GetTagItem("db.query.text") ?? activity.GetTagItem("db.statement"))?.ToString();
             var verb = statement?.TrimStart().Split([' ', '\n', '\t', '('], 2)[0].ToLowerInvariant();

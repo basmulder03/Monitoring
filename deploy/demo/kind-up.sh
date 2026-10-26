@@ -23,6 +23,9 @@ if [ "${SKIP_BUILD:-0}" != 1 ]; then
 fi
 
 step "Cluster"
+# The images keep their tag (dev) and are never pulled, so a pod that is already running does not notice a new image: when the cluster was there before and the images were built again, everything is restarted below.
+restart=0
+if [ "${SKIP_BUILD:-0}" != 1 ] && kind get clusters | grep -qx "$cluster"; then restart=1; fi
 kind get clusters | grep -qx "$cluster" || kind create cluster --name "$cluster" --kubeconfig "$KUBECONFIG" --wait 120s
 kind export kubeconfig --name "$cluster" --kubeconfig "$KUBECONFIG" >/dev/null
 for image in plover-controller plover-agent plover-sidecar plover-injector plover-sampleapp plover-sampleapp-old; do kind load docker-image "$image:dev" --name "$cluster" >/dev/null; done
@@ -43,7 +46,8 @@ local_image() { echo --set image.repository="$1" --set image.tag=dev --set image
 # shellcheck disable=SC2046
 helm upgrade --install plover-controller "$root/deploy/helm/plover-controller" -n plover $(local_image plover-controller) \
   --set serviceAccountAuth.enabled=true --set notifications.oneSender=true --set 'notifications.webhooks[0].url=http://127.0.0.1:9/nobody-listens' \
-  --set state.sqlite.enabled=true --set 'alignedPackages[0].package=Polly.*' --set 'alignedPackages[0].spread=minor' --set 'alignedPackages[0].description=Retry behaviour changes between minor versions of Polly.' "${token_args[@]}" >/dev/null
+  --set state.sqlite.enabled=true --set 'alignedPackages[0].package=Polly.*' --set 'alignedPackages[0].spread=minor' --set 'alignedPackages[0].description=Retry behaviour changes between minor versions of Polly.' --set 'alignedPackages[1].package=*' "${token_args[@]}" >/dev/null
+[ "$restart" = 1 ] && kubectl rollout restart statefulset/plover-controller -n plover >/dev/null
 kubectl rollout status statefulset/plover-controller -n plover --timeout=180s >/dev/null
 # shellcheck disable=SC2046
 for entry in "${scopes[@]}"; do
@@ -52,9 +56,11 @@ for entry in "${scopes[@]}"; do
   helm upgrade --install plover-agent "$root/deploy/helm/plover-agent" -n "$namespace" $(local_image plover-agent) \
     --set 'controller.addresses={plover-controller.plover.svc:9440}' --set auth.mode=serviceAccount \
     --set scope.labels.environment="$environment" --set scope.labels.datacenter="$datacenter" >/dev/null
+  [ "$restart" = 1 ] && kubectl rollout restart deployment/plover-agent -n "$namespace" >/dev/null
 done
 helm upgrade --install plover-injector "$root/deploy/helm/plover-injector" -n plover $(local_image plover-injector) \
   --set sidecar.image.repository=plover-sidecar --set sidecar.image.tag=dev --set sidecar.imagePullPolicy=Never --set sidecar.agentAddress=plover-agent:9441 >/dev/null
+[ "$restart" = 1 ] && kubectl rollout restart deployment/plover-injector -n plover >/dev/null
 kubectl rollout status deployment/plover-injector -n plover --timeout=120s >/dev/null
 for entry in "${scopes[@]}"; do kubectl label namespace "${entry%%:*}" plover/inject=true --overwrite >/dev/null; done
 
@@ -94,6 +100,7 @@ spec:
   selector: { app: $app }
   ports: [{ port: 8080, targetPort: 8080 }]
 YAML
+  [ "$restart" = 1 ] && kubectl rollout restart deployment/$app -n "$namespace" >/dev/null
   kubectl rollout status deployment/$app -n "$namespace" --timeout=180s >/dev/null
   # The webhook may not be trusted yet when the first pod starts; a pod without its sidecar is replaced until it has one.
   for _ in $(seq 1 20); do

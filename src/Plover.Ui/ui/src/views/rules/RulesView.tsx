@@ -1,5 +1,6 @@
 import type { RulesReport } from "../../api/contracts";
 import { useJson } from "../../state/useJson";
+import { alertRuleDocs, alignmentRuleDocs } from "./docs";
 
 function wait(seconds: number): string {
   if (seconds === 0) return "at once";
@@ -8,7 +9,7 @@ function wait(seconds: number): string {
   return `after ${seconds} s`;
 }
 
-/** What the controller checks: the alert rules, and the packages that must be used in the same version. */
+/** What the controller checks, each rule linking to its place in the documentation: the alert rules, and the packages that must be used in the same version. */
 export function RulesView({ refresh }: { refresh: unknown }) {
   const loaded = useJson<RulesReport>("/api/rules", refresh);
 
@@ -35,7 +36,9 @@ export function RulesView({ refresh }: { refresh: unknown }) {
               <tbody>
                 {aligned.map((rule) => (
                   <tr key={rule.package}>
-                    <td>{rule.package}</td>
+                    <td>
+                      <a href={alignmentRuleDocs} target="_blank" rel="noopener">{rule.package}</a>
+                    </td>
                     <td>
                       {rule.rule}
                       {rule.description && <span class="muted rule-why">{rule.description}</span>}
@@ -59,7 +62,9 @@ export function RulesView({ refresh }: { refresh: unknown }) {
             <tbody>
               {alerts.map((rule) => (
                 <tr key={rule.name}>
-                  <td>{rule.name}</td>
+                  <td>
+                    <a href={alertRuleDocs(rule.name)} target="_blank" rel="noopener">{rule.name}</a>
+                  </td>
                   <td>{rule.severity}</td>
                   <td>{wait(rule.waitSeconds)}</td>
                 </tr>

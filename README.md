@@ -8,7 +8,7 @@ Documentation: <https://basmulder03.github.io/Plover/>
 
 ## Try it
 
-You need the .NET 10 SDK and Node.js 22 (the dashboard is built with it).
+You need the .NET 10 SDK and Node.js 24 (the dashboard is built with it).
 
 ```sh
 dotnet run --project samples/Plover.Demo

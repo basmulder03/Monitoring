@@ -27,6 +27,19 @@ public class ConnectionPoolRuleTests
     }
 
     [Fact]
+    public void A_pool_that_is_reported_under_the_newer_names_counts_too()
+    {
+        var newer = new InstanceInfo("a", "orders", InstanceLifecycle.Running, HealthState.Healthy, new Dictionary<string, string>(), Metrics:
+        [
+            new MetricSeries("db.client.connection.max", new Dictionary<string, string> { ["db.client.connection.pool.name"] = "db1" }, 10),
+            new MetricSeries("db.client.connection.count", new Dictionary<string, string> { ["db.client.connection.pool.name"] = "db1", ["db.client.connection.state"] = "used" }, 10),
+        ]);
+        var registry = new FakeScopeRegistry().WithInstance("shop", newer);
+
+        new ConnectionPoolRule(TimeSpan.Zero, registry).FindFailingSubjects().ShouldBe(["shop/orders/db1"]);
+    }
+
+    [Fact]
     public void Several_full_replicas_of_one_pool_are_named_once()
     {
         var registry = new FakeScopeRegistry().WithInstance("shop", Pod("a", "db1", 5, 5)).WithInstance("shop", Pod("b", "db1", 5, 5));

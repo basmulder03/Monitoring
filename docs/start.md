@@ -4,7 +4,7 @@ Plover shows, on one live page, whether the services in your Kubernetes namespac
 
 ## See it first
 
-You need the .NET 10 SDK and Node.js 22, because the build of the dashboard uses Node.
+You need the .NET 10 SDK and Node.js 24, because the build of the dashboard uses Node.
 
 ```sh
 git clone https://github.com/basmulder03/Plover

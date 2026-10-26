@@ -53,8 +53,9 @@ public class NpgsqlEdgesTests
         edge.Errors.ShouldBe(1);
         var details = spans.ReadAfter(0).Spans.Select(span => string.Join(", ", span.Details.Select(d => $"{d.Key}={d.Value}"))).ToList();
         details.ShouldContain(text => text.Contains("db.statement=select ?", StringComparison.Ordinal));
-        spans.ReadAfter(0).Spans.Select(span => span.Name).ShouldBe(["postgresql select", "postgresql select"]);
-        spans.ReadAfter(0).Spans.Select(span => span.Error).ShouldBe([false, true]);
+        // Npgsql 10 also publishes the opening of the connection, as a span but not as a call.
+        spans.ReadAfter(0).Spans.Select(span => span.Name).ShouldBe(["CONNECT postgres", "postgresql select", "postgresql select"]);
+        spans.ReadAfter(0).Spans.Select(span => span.Error).ShouldBe([false, false, true]);
     }
 
     [Fact]
@@ -72,9 +73,9 @@ public class NpgsqlEdgesTests
         var series = collector.Read().Series;
 
         // Assert: the numbers the controller judges a saturated pool by, with the pool told apart by its connection string (without the password)
-        var pool = series.Where(m => m.Name is "db.client.connections.max" or "db.client.connections.usage").ToList();
-        pool.Single(m => m.Name == "db.client.connections.max").Value.ShouldBe(7);
-        pool.Single(m => m.Labels.GetValueOrDefault("state") == "used").Value.ShouldBe(1);
-        pool.ShouldAllBe(m => !m.Labels["pool.name"].Contains("Password", StringComparison.OrdinalIgnoreCase));
+        var pool = series.Where(m => m.Name is "db.client.connection.max" or "db.client.connection.count").ToList();
+        pool.Single(m => m.Name == "db.client.connection.max").Value.ShouldBe(7);
+        pool.Single(m => m.Labels.GetValueOrDefault("db.client.connection.state") == "used").Value.ShouldBe(1);
+        pool.ShouldAllBe(m => !m.Labels["db.client.connection.pool.name"].Contains("Password", StringComparison.OrdinalIgnoreCase));
     }
 }

@@ -27,19 +27,19 @@ public static class RulesEndpoints
 /// <summary>The rules in force.</summary>
 /// <param name="Alerts">The alert rules.</param>
 /// <param name="Aligned">The packages that must be used in the same version.</param>
-internal sealed record RulesReport(IReadOnlyList<AlertRuleInfo> Alerts, IReadOnlyList<AlignmentRuleInfo> Aligned);
+public sealed record RulesReport(IReadOnlyList<AlertRuleInfo> Alerts, IReadOnlyList<AlignmentRuleInfo> Aligned);
 
 /// <summary>One alert rule.</summary>
 /// <param name="Name">The name of the rule, as in the alerts it raises.</param>
 /// <param name="Severity">The severity of its alerts.</param>
 /// <param name="WaitSeconds">How long a condition must hold before the alert fires.</param>
-internal sealed record AlertRuleInfo(string Name, string Severity, double WaitSeconds);
+public sealed record AlertRuleInfo(string Name, string Severity, double WaitSeconds);
 
 /// <summary>One alignment rule.</summary>
 /// <param name="Package">The package id, or a prefix ending in <c>*</c>.</param>
 /// <param name="Rule">The rule in words.</param>
 /// <param name="Description">Why the rule exists, when the configuration says.</param>
-internal sealed record AlignmentRuleInfo(string Package, string Rule, string? Description);
+public sealed record AlignmentRuleInfo(string Package, string Rule, string? Description);
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(RulesReport))]

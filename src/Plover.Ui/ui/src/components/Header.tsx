@@ -1,10 +1,11 @@
 import type { Route } from "../state/useRoute";
-import type { WhoAmI } from "../api/contracts";
+import type { SystemStatus, WhoAmI } from "../api/contracts";
 import { useJson } from "../state/useJson";
 import { Icon } from "./Icon";
+import { SystemIndicator } from "./SystemIndicator";
 
 /** The top bar: where the dashboard is, the links to its views and the switch between light and dark. */
-export function Header({ route, onSwitchTheme }: { route: Route; onSwitchTheme(): void }) {
+export function Header({ route, system, onSwitchTheme }: { route: Route; system: SystemStatus | null; onSwitchTheme(): void }) {
   const current = (name: Route["name"]) => (route.name === name ? "page" : undefined);
   return (
     <header class="bar">
@@ -18,6 +19,7 @@ export function Header({ route, onSwitchTheme }: { route: Route; onSwitchTheme()
         <a href="#/rules" aria-current={current("rules")}>Rules</a>
         <a href="#/system" aria-current={current("system")}>System</a>
       </nav>
+      <SystemIndicator status={system} />
       <SignedIn />
       <button type="button" id="theme-toggle" class="icon-button" aria-label="Switch between light and dark theme" onClick={onSwitchTheme}>
         <Icon name="theme" />

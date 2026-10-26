@@ -8,8 +8,8 @@
     <PackageReference Include="xunit.v3" Version="4.0.2" />
     <PackageReference Include="Shouldly" Version="4.3.0" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.11.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.13" />
-    <PackageReference Include="Npgsql" Version="9.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.14" />
+    <PackageReference Include="Npgsql" Version="10.0.3" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Plover.Client/Plover.Client.csproj" />

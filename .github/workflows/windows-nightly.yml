@@ -17,9 +17,9 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
       # The tests that read the real Service Control Manager, the real host and real named pipes skip themselves everywhere else.
       - name: Test what talks to Windows
         run: |

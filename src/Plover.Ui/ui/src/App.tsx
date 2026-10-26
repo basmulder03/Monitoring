@@ -2,6 +2,8 @@ import { useEffect, useRef } from "preact/hooks";
 import { Header } from "./components/Header";
 import { Sprite } from "./components/Sprite";
 import { StaleBanner } from "./components/StaleBanner";
+import type { SystemStatus } from "./api/contracts";
+import { useJson } from "./state/useJson";
 import { OpenStateProvider } from "./state/OpenState";
 import { useClock } from "./state/useClock";
 import { useOverview } from "./state/useOverview";
@@ -32,11 +34,12 @@ export function App() {
     document.getElementById("app")?.focus();
   }, [view]);
   const halfMinutes = useClock(30000);
+  const system = useJson<SystemStatus>("/api/system", overview);
 
   return (
     <OpenStateProvider>
       <Sprite />
-      <Header route={route} onSwitchTheme={switchTheme} />
+      <Header route={route} system={system.state === "found" ? system.value : null} onSwitchTheme={switchTheme} />
       <StaleBanner lastHeard={lastHeard} now={seconds} />
       <div id="announcer" class="visually-hidden" role="status" aria-live="polite">
         {announcement}

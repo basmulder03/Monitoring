@@ -1,5 +1,5 @@
 import { act } from "preact/test-utils";
-import type { PackageCatalog, VulnerabilityReport } from "../src/api/contracts";
+import type { PackageCatalog, PackageEntry, VulnerabilityReport } from "../src/api/contracts";
 import { all, mount, overview, scope } from "./harness";
 
 const catalog: PackageCatalog = {
@@ -58,8 +58,8 @@ describe("the packages view", () => {
   });
 
   it("does not say a package is not aligned when the controller leaves the violation out", async () => {
-    const { violation: _omitted, ...bare } = catalog.packages[0]!;
-    const page = await openPackages({ ...catalog, packages: [bare] });
+    const { violation: _omitted, ...bare } = catalog.packages[0]! as Partial<PackageEntry>;
+    const page = await openPackages({ ...catalog, packages: [bare as PackageEntry] });
     expect(page.main.textContent).not.toContain("not aligned");
     expect(all(page.main, "details.package .violation")).toHaveLength(0);
   });

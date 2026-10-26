@@ -91,7 +91,8 @@ transport:
 dashboard:
   groupBy: [environment, datacenter]
 
-# Libraries that must be used in the same version everywhere, and how strictly: exact, minor or major.
+# Libraries that must be used in the same version everywhere, and how strictly: exact, minor or major. Left empty, every package is compared by major version.
+# Rules you list replace that default; add { package: "*" } as the last one to keep comparing the rest. The first rule that covers a package decides.
 alignedPackages: []
 # - { package: "Microsoft.Extensions.*", spread: major, description: "One framework release, or the host breaks at startup." }  # description is optional
 

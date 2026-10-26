@@ -135,6 +135,18 @@ describe("alerts", () => {
     for (const expected of ["shop/orders", "Critical", "service-down", "for 1 min"]) expect(text).toContain(expected);
   });
 
+  it("puts alerts that fire above the scopes, and quiet alerts below them", () => {
+    const { services, main } = mount();
+    const since = new Date(services.time - 90000).toISOString();
+    services.send(overview([scope("alpha", "Healthy")], [], [{ key: "k", rule: "service-down", subject: "shop/orders", severity: "Critical", since, acknowledged: null }]));
+    const headings = [...main.querySelectorAll("h2")].map((h) => h.textContent!.trim());
+    expect(headings[0]).toBe("Alerts");
+    expect(main.querySelector("li.alert")!.classList.contains("critical")).toBe(true);
+
+    services.send(overview([scope("alpha", "Healthy")], []));
+    expect([...main.querySelectorAll("h2")].map((h) => h.textContent!.trim())).toEqual(["Scopes", "Alerts"]);
+  });
+
   it("says when no alert is firing", () => {
     const { services, main } = mount();
     services.send(overview([scope("alpha", "Healthy")], []));

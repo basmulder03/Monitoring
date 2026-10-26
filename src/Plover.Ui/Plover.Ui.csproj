@@ -17,7 +17,7 @@
       <Output TaskParameter="ExitCode" PropertyName="NpmCheck" />
     </Exec>
     <Error Condition="'$(NpmCheck)' != '0'"
-           Text="Node.js and npm are needed to build the dashboard (src/Plover.Ui/ui). Install Node 22 or later; see docs/testing.md." />
+           Text="Node.js and npm are needed to build the dashboard (src/Plover.Ui/ui). Install Node 24 or later; see docs/testing.md." />
     <Exec Command="npm ci" WorkingDirectory="$(UiDirectory)" Condition="!Exists('$(UiDirectory)/node_modules')" />
     <Exec Command="npm run build" WorkingDirectory="$(UiDirectory)" />
   </Target>

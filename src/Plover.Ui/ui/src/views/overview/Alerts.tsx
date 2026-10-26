@@ -38,7 +38,7 @@ export function Alerts({ alerts, now }: { alerts: readonly AlertSummary[]; now: 
       ) : (
         <ul class="alerts">
           {alerts.map((alert) => (
-            <li class="alert" key={alert.key}>
+            <li class={`alert ${alert.severity.toLowerCase()}`} key={alert.key}>
               <span class={`severity ${alert.severity.toLowerCase()}`}>{alert.severity}</span>
               <span>{alert.subject}</span>
               <span class="muted">

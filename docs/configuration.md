@@ -155,11 +155,11 @@ Almost everything the controller shows is rebuilt from what the agents send with
 
 ### Aligned packages
 
-Different services may use different versions of a library, and often that is fine. For libraries that should match, such as a family of framework packages or your own shared libraries, list them. The packages view then marks a package whose versions are further apart than allowed, and the warning `package-drift` fires after `PackageDriftWait`, which is long by default because a rollout of a library passes through this state.
+Different services may use different versions of a library, and often that is fine. Without any rule, every package is compared by major version, so a library that two services use in different major versions is marked. For libraries that should match more closely, such as a family of framework packages or your own shared libraries, list them; rules you list replace that default, so end the list with `*` to keep comparing the rest. The packages view then marks a package whose versions are further apart than allowed, and the warning `package-drift` fires after `PackageDriftWait`, which is long by default because a rollout of a library passes through this state.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `Controller:Packages:Aligned:<n>:Package` | required | A package id, or a prefix ending in `*`, such as `Microsoft.Extensions.*`. The first rule that covers a package decides |
+| `Controller:Packages:Aligned:<n>:Package` | required, and when no rule is given at all, `*` (every package) with `major` | A package id, or a prefix ending in `*`, such as `Microsoft.Extensions.*`. The first rule that covers a package decides |
 | `Controller:Packages:Aligned:<n>:Spread` | `major` | `exact`: the same version everywhere; `minor`: the same major and minor version; `major`: the same major version |
 | `Controller:Packages:Aligned:<n>:Description` | none | Why the rule exists, shown next to it on the Rules page. Optional; line breaks and extra spaces are folded into single spaces, and a blank value counts as none |
 | `Controller:Alerting:PackageDriftWait` | `01:00:00` | How long a package must stay out of alignment before its alert fires |
@@ -636,7 +636,7 @@ The function is called each time the metrics are read, every few seconds, so ans
 
 ### Database connection pools
 
-Nothing needs to be set up for Npgsql: it publishes the pool as `db.client.connections.usage` (`state=used` and `idle`) and `db.client.connections.max`, tagged with the pool, which is the connection string without the password. They are collected like any other metric, and the controller raises `connection-pool-full` when a pool has no free connection for `ConnectionPoolFullWait`.
+Nothing needs to be set up for Npgsql: it publishes the pool as `db.client.connection.count` (`db.client.connection.state=used` and `idle`) and `db.client.connection.max`, tagged with the pool in `db.client.connection.pool.name` (Npgsql 9 used `db.client.connections.usage`, `db.client.connections.max`, `state` and `pool.name`; the controller reads both), which is the connection string without the password. They are collected like any other metric, and the controller raises `connection-pool-full` when a pool has no free connection for `ConnectionPoolFullWait`.
 
 ### Databases
 

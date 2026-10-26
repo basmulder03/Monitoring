@@ -62,26 +62,36 @@ describe("the system view", () => {
     expect(page.main.textContent).toContain("1 scope has no agent connected to this controller.");
   });
 
-  it("shows a tile on the overview that says how the monitoring system is and leads to the details", async () => {
+  it("shows the system as a light in the header whose details come on hover or focus, which opens by itself when something is wrong", async () => {
     const page = mount("/", (services) => {
       services.system = status({ healthy: false, scopes: 3, agentsConnected: 2, replicas: [{ address: "c0:9440", thisReplica: true, agentsReporting: 3, agentsConnected: 2, maxLag: 0 }], unmonitored: [{ scope: "shop", service: "orders", instance: "orders-1" }] });
     });
     page.services.send(overview([scope("shop", "Healthy")], []));
     await page.settle();
-    const tile = page.main.querySelector("a.system-tile") as HTMLAnchorElement;
-    expect(tile.getAttribute("href")).toBe("#/system");
-    expect(tile.classList.contains("degraded")).toBe(true);
-    expect(all(page.main, "a.tile")).toHaveLength(1);
-    expect(tile.textContent).toContain("1 scope has no agent connected to this controller");
-    expect(tile.textContent).toContain("1 replica is not reached by every agent");
-    expect(tile.textContent).toContain("1 pod runs without a sidecar");
+    const indicator = document.getElementById("system-indicator")!;
+    expect(indicator.classList.contains("degraded")).toBe(true);
+    expect(indicator.querySelector("a")!.getAttribute("href")).toBe("#/system");
+    expect(indicator.textContent).toContain("1 scope has no agent connected to this controller");
+    expect(indicator.textContent).toContain("1 replica is not reached by every agent");
+    expect(indicator.textContent).toContain("1 pod runs without a sidecar");
+    expect(page.main.querySelector(".system-tile")).toBeNull();
   });
 
-  it("shows no tile when the controller cannot say how the system is", async () => {
+  it("shows a quiet light when the system is healthy", async () => {
+    const page = mount("/", (services) => {
+      services.system = status();
+    });
+    page.services.send(overview([scope("shop", "Healthy")], []));
+    await page.settle();
+    expect(document.getElementById("system-indicator")!.classList.contains("healthy")).toBe(true);
+    expect(document.getElementById("system-indicator")!.textContent).not.toContain("without a sidecar");
+  });
+
+  it("shows no light when the controller cannot say how the system is", async () => {
     const page = mount("/");
     page.services.send(overview([scope("shop", "Healthy")], []));
     await page.settle();
-    expect(page.main.textContent).not.toContain("Plover system");
+    expect(document.getElementById("system-indicator")).toBeNull();
   });
 
   it("moves focus to the main content when another view is opened, and leaves it alone otherwise", async () => {

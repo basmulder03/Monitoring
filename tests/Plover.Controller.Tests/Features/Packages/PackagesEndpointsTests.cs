@@ -35,6 +35,8 @@ public class PackagesEndpointsTests
         serilog.GetProperty("versions")[0].GetProperty("version").GetString().ShouldBe("4.0.0");
         serilog.GetProperty("versions")[0].GetProperty("usedBy")[0].GetProperty("service").GetString().ShouldBe("orders");
         json.RootElement.GetProperty("servicesWithoutList").GetInt32().ShouldBe(0);
+        // The contract of the dashboard says null, so the property is there when no rule is broken.
+        serilog.GetProperty("violation").ValueKind.ShouldBe(JsonValueKind.Null);
     }
 
     [Fact]

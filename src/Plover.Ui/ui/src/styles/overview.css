@@ -41,3 +41,9 @@
 .blocks-grid > .group, .groups.depth-1 > .group { break-inside: avoid; margin: 0 0 1rem; padding: 0.25rem 1rem 1rem; border: 1px solid var(--border); border-radius: var(--radius); }
 .group .tiles { grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); }
 .system-block .tiles { grid-template-columns: 1fr; }
+
+/* Alerts that fire are the first thing on the page and cannot be missed: a thick bar in the colour of the severity, a tinted card and larger type. */
+.alert { border-left-width: 0.5rem; font-size: 1.1em; padding: 0.75rem 1rem; }
+.alert.critical { border-left-color: var(--unhealthy); background: color-mix(in srgb, var(--unhealthy) 10%, var(--surface)); }
+.alert.warning { border-left-color: var(--degraded); background: color-mix(in srgb, var(--degraded) 10%, var(--surface)); }
+.alert .severity { text-transform: uppercase; letter-spacing: 0.04em; }

@@ -227,7 +227,7 @@ public class BrowserDashboardTests(BrowserFixture browser)
         await ExpectAsync(Tiles(page.Page), "Healthy");
 
         // Act
-        for (var presses = 0; presses < 8 && !await page.Page.EvaluateAsync<bool>("document.activeElement.classList.contains('tile')"); presses++)
+        for (var presses = 0; presses < 12 && !await page.Page.EvaluateAsync<bool>("document.activeElement.classList.contains('tile')"); presses++)
         {
             await page.Page.Keyboard.PressAsync("Tab");
         }

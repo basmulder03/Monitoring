@@ -42,9 +42,9 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
       - name: Build
         run: dotnet build --configuration Release
       - name: Install the browser for the dashboard tests
@@ -62,9 +62,9 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
       - name: Native build tools
         run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
       - name: Publish the controller, the agent, the sidecar and the injector as Native AOT
@@ -89,9 +89,9 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
       - name: Test what talks to Windows
         run: |
           dotnet test --project tests/Plover.Agent.Tests --configuration Release

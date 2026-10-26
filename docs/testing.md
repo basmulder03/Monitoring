@@ -25,7 +25,7 @@ which are installed for you the first time they are needed, and are skipped with
 
 ## Dashboard (TypeScript)
 
-The dashboard in `src/Plover.Ui/ui` is built with Node, which the build of `Plover.Ui` needs (Node 22 or later); it runs `npm ci` and `npm run build` itself and stops with a message when npm is missing.
+The dashboard in `src/Plover.Ui/ui` is built with Node, which the build of `Plover.Ui` needs (Node 24 or later); it runs `npm ci` and `npm run build` itself and stops with a message when npm is missing.
 `dotnet test` runs the Vitest tests as one test (`DashboardTests`); to work on them directly, run `npm test` in that folder. The tests mount the real app against fakes for the browser (clock, timers, the live stream, storage),
 and use the generated contract types, so a fixture that no longer matches what the controller sends does not compile.
 

@@ -54,3 +54,16 @@ h3, h4 { margin: 1rem 0 0.5rem; font-size: 1rem; }
   .silence-form input { min-width: 0; width: 100%; }
 }
 body { overflow-wrap: break-word; }
+
+/* The system as a light in the header: only a word when it is not healthy, the details on hover or focus. */
+.system-indicator { position: relative; margin-right: 0.75rem; }
+.system-indicator > a { display: inline-flex; align-items: center; gap: 0.35rem; text-decoration: none; padding: 0.25rem 0.5rem; border-radius: var(--radius); }
+.system-indicator.healthy > a { color: var(--healthy); }
+.system-indicator.degraded > a { color: var(--degraded); font-weight: 700; border: 1px solid var(--degraded); }
+.system-indicator.healthy > a span { color: var(--muted); font-weight: 400; }
+.system-detail {
+  display: none; position: absolute; right: 0; top: 100%; z-index: 10; min-width: 18rem; margin-top: 0.25rem; padding: 0.75rem 1rem;
+  flex-direction: column; gap: 0.25rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
+}
+/* The same panel opens by itself while something is wrong, so a screen nobody touches shows it too. */
+.system-indicator:hover .system-detail, .system-indicator:focus-within .system-detail, .system-indicator.degraded .system-detail { display: flex; }

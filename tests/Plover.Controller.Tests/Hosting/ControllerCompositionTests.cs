@@ -223,6 +223,17 @@ public class ControllerCompositionTests
     }
 
     [Fact]
+    public void CreateHost_compares_every_package_by_major_version_when_no_alignment_rule_is_configured()
+    {
+        using var host = new ControllerSettings().WithToken("shop", "secret").Build();
+
+        var rules = host.Services.GetRequiredService<PackagesOptions>().Aligned;
+
+        rules.Select(rule => (rule.Package, rule.Spread)).ShouldBe([("*", VersionSpread.Major)]);
+        rules[0].Covers("Any.Package.At.All").ShouldBeTrue();
+    }
+
+    [Fact]
     public void CreateHost_reads_the_alignment_rules_of_packages()
     {
         // Arrange

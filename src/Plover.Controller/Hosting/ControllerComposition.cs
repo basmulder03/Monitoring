@@ -164,7 +164,7 @@ internal static class ControllerComposition
                     options.Sources = [VulnerabilitiesOptions.OsvNuGet, VulnerabilitiesOptions.NuGetFeed];
                 }
             })
-            .AddPackages(options => options.Aligned = [.. controller.Section("Packages").Items("Aligned").Select(ReadAlignment)])
+            .AddPackages(options => options.Aligned = AlignmentRules(controller.Section("Packages").Items("Aligned").Select(ReadAlignment)))
             .AddTopology(options =>
             {
                 var topology = controller.Section("Topology");
@@ -310,6 +310,12 @@ internal static class ControllerComposition
             kestrel.Listen(address, port, listen => listen.UseHttps(https => https.ServerCertificateSelector = (_, _) => current.Get()));
         });
     }
+
+    /// <summary>The rules that are configured, or when there are none one that compares every package, so alignment is watched without anyone having to ask for it.</summary>
+    private static List<AlignmentRule> AlignmentRules(IEnumerable<AlignmentRule> configured) =>
+        configured.ToList() is { Count: > 0 } rules
+            ? rules
+            : [new AlignmentRule("*", VersionSpread.Major, "The default: every package should be in the same major version everywhere. Configure rules to change this.")];
 
     /// <summary>Reads one alignment rule: the package (or prefix) and how far apart its versions may be.</summary>
     private static AlignmentRule ReadAlignment(SettingsReader item) => new(

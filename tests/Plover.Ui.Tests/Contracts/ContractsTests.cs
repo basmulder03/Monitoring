@@ -20,7 +20,7 @@ public class ContractsTests
     {
         // Arrange
         var path = ContractsPath();
-        var expected = new ContractWriter().Add(typeof(Overview)).Add(typeof(ScopeDetail)).Add(typeof(TopologyGraph)).Add(typeof(PackageCatalog)).Add(typeof(VulnerabilityReport)).Add(typeof(SystemStatus)).Add(typeof(MetricHistory)).Add(typeof(WhoAmI)).Add(typeof(RuntimeSilence)).Add(typeof(AlertOccurrence)).Write();
+        var expected = new ContractWriter().Add(typeof(Overview)).Add(typeof(ScopeDetail)).Add(typeof(TopologyGraph)).Add(typeof(PackageCatalog)).Add(typeof(VulnerabilityReport)).Add(typeof(SystemStatus)).Add(typeof(MetricHistory)).Add(typeof(WhoAmI)).Add(typeof(RuntimeSilence)).Add(typeof(AlertOccurrence)).Add(typeof(RulesReport)).Write();
 
         if (Environment.GetEnvironmentVariable("UPDATE_CONTRACTS") == "1")
         {

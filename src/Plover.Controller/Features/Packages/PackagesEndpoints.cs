@@ -18,10 +18,10 @@ public static class PackagesEndpoints
     public static IEndpointRouteBuilder MapPackages(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/packages", (IPackageInventory inventory) =>
-            Results.Json(inventory.GetCatalog(), PackagesJsonContext.Default.PackageCatalog));
+            Results.Json(inventory.GetCatalog(), PackagesApiJsonContext.Default.PackageCatalog));
 
         endpoints.MapGet("/api/packages/{name}", (string name, IPackageInventory inventory) =>
-            inventory.Find(name) is { } entry ? Results.Json(entry, PackagesJsonContext.Default.PackageEntry) : Results.NotFound());
+            inventory.Find(name) is { } entry ? Results.Json(entry, PackagesApiJsonContext.Default.PackageEntry) : Results.NotFound());
 
         endpoints.MapGet("/api/sbom", (IPackageInventory inventory, TimeProvider time) =>
             Results.Json(BillOfMaterials.ForLandscape(inventory.GetAll(), time.GetUtcNow()), PackagesJsonContext.Default.CycloneDxBom, CycloneDxMediaType));

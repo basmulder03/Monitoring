@@ -22,9 +22,9 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
       - name: Run
         run: scripts/soak.sh "${{ inputs.minutes || 120 }}" 30
       - uses: actions/upload-artifact@v7

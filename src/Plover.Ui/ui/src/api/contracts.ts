@@ -19,6 +19,12 @@ export interface AlertOccurrence {
   endedBy: string | null;
 }
 
+export interface AlertRuleInfo {
+  name: string;
+  severity: string;
+  waitSeconds: number;
+}
+
 export type AlertSeverity = "Warning" | "Critical";
 
 export interface AlertSummary {
@@ -28,6 +34,12 @@ export interface AlertSummary {
   severity: AlertSeverity;
   since: string;
   acknowledged: Acknowledgement | null;
+}
+
+export interface AlignmentRuleInfo {
+  package: string;
+  rule: string;
+  description: string | null;
 }
 
 export interface ContainerInfo {
@@ -99,13 +111,7 @@ export interface PackageCatalog {
 export interface PackageEntry {
   name: string;
   versions: PackageVersion[];
-  /** Left out by the controller when there is none. */
-  violation?: string | null;
-}
-
-export interface RulesReport {
-  alerts: { name: string; severity: string; waitSeconds: number }[];
-  aligned: { package: string; rule: string; description?: string | null }[];
+  violation: string | null;
 }
 
 export interface PackageUsage {
@@ -126,6 +132,11 @@ export interface ReplicaState {
   agentsReporting: number;
   agentsConnected: number;
   maxLag: number;
+}
+
+export interface RulesReport {
+  alerts: AlertRuleInfo[];
+  aligned: AlignmentRuleInfo[];
 }
 
 export interface RuntimeSilence {
