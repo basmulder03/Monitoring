@@ -10,7 +10,7 @@ details.package > summary { cursor: pointer; padding: 0.6rem 1rem; display: flex
 details.service { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin: 0 0 0.5rem; }
 details.service > summary { cursor: pointer; padding: 0.6rem 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
 table.instances, table.containers { width: 100%; border-collapse: collapse; }
-table.instances th, table.instances td, table.containers th, table.containers td { text-align: left; padding: 0.4rem 1rem; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
+table.instances th, table.instances td, table.containers th, table.containers td { text-align: left; padding: 0.4rem 1rem; border-top: 1px solid var(--border); overflow-wrap: break-word; vertical-align: top; }
 
 details.instance > summary { cursor: pointer; }
 ul.checks { list-style: none; padding: 0; margin: 0.25rem 0; }
@@ -26,3 +26,12 @@ ul.checks { list-style: none; padding: 0; margin: 0.25rem 0; }
 }
 .blocks > section > h3 { margin-top: 0; }
 .blocks > section > table { margin: 0; }
+/* Words stay whole: the short columns never wrap, and the cards are wide enough for the name of an instance and its labels. */
+table.service-instances td:nth-child(2), table.service-instances td:nth-child(3), table.service-instances th { white-space: nowrap; }
+table.service-instances td:first-child { width: 70%; font-family: var(--font-text); font-size: 1em; }
+table.service-instances summary { font-family: var(--font-mono); font-size: 0.95em; }
+/* A label is one piece, key and value together; several of them wrap between labels, never inside one. */
+.labels { color: var(--muted); }
+.label { display: inline-block; white-space: nowrap; margin-right: 0.75rem; }
+.cards { grid-template-columns: repeat(auto-fill, minmax(min(36rem, 100%), 1fr)); }
+ul.checks li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 0.5rem; margin: 0.25rem 0; }

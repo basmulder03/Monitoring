@@ -1,7 +1,7 @@
 import type { ServiceDetail } from "../../api/contracts";
 import { Icon } from "../../components/Icon";
 import { Status } from "../../components/Status";
-import { labelText, plural } from "../../format";
+import { plural } from "../../format";
 import { useDisclosure } from "../../state/OpenState";
 import { InstanceDetails } from "./InstanceDetails";
 
@@ -18,10 +18,10 @@ export function ServiceCard({ scope, service }: { scope: string; service: Servic
           {service.healthyInstances} of {plural(service.liveInstances, "instance", "instances")} healthy
         </span>
       </summary>
-      <table class="instances">
+      <table class="instances service-instances">
         <thead>
           <tr>
-            {["Instance", "State", "Health", "Labels"].map((title) => (
+            {["Instance", "State", "Health"].map((title) => (
               <th key={title}>{title}</th>
             ))}
           </tr>
@@ -31,12 +31,16 @@ export function ServiceCard({ scope, service }: { scope: string; service: Servic
             <tr key={instance.id}>
               <td>
                 <InstanceDetails scope={scope} instance={instance} />
+                <div class="labels">
+                  {Object.entries(instance.labels).map(([key, value]) => (
+                    <span class="label" key={key}>{`${key}=${value}`}</span>
+                  ))}
+                </div>
               </td>
               <td>{instance.lifecycle}</td>
               <td>
                 <Status health={instance.health} />
               </td>
-              <td class="muted">{labelText(instance.labels)}</td>
             </tr>
           ))}
         </tbody>
