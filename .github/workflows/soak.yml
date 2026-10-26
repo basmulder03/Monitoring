@@ -27,7 +27,7 @@ jobs:
           node-version: 22
       - name: Run
         run: scripts/soak.sh "${{ inputs.minutes || 120 }}" 30
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: soak
