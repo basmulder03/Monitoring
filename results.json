@@ -362,6 +362,65 @@
     }
    },
    "regressions": []
+  },
+  {
+   "sha": "a33418e67f536d596cb85a2929f5679073b6e694",
+   "date": "2026-10-29 09:57",
+   "values": {
+    "controller.apply.5000x50": {
+     "value": 7.7569,
+     "unit": "ms"
+    },
+    "controller.alerts.first": {
+     "value": 56.8396,
+     "unit": "ms"
+    },
+    "controller.alerts.later": {
+     "value": 195.5583,
+     "unit": "ms"
+    },
+    "controller.fanout.first": {
+     "value": 440.2849,
+     "unit": "ms"
+    },
+    "controller.fanout.change": {
+     "value": 238.2675,
+     "unit": "ms"
+    },
+    "controller.memory.5000x50": {
+     "value": 89.57563018798828,
+     "unit": "MB"
+    },
+    "protocol.snapshot.1000x50": {
+     "value": 4573.115234375,
+     "unit": "KB"
+    },
+    "controller.recovery": {
+     "value": 1163.0068,
+     "unit": "ms"
+    },
+    "agent.sidecars.register": {
+     "value": 76.8986,
+     "unit": "ms"
+    },
+    "agent.sidecars.change": {
+     "value": 97.6904,
+     "unit": "ms"
+    },
+    "client.library.memory": {
+     "value": 0.6511306762695312,
+     "unit": "MB"
+    },
+    "client.count.time": {
+     "value": 0.08415049999999999,
+     "unit": "us"
+    },
+    "client.count.allocated": {
+     "value": 0.0,
+     "unit": "B"
+    }
+   },
+   "regressions": []
   }
  ]
 }
