@@ -480,6 +480,67 @@
     }
    },
    "regressions": []
+  },
+  {
+   "sha": "a33418e67f536d596cb85a2929f5679073b6e694",
+   "date": "2026-10-31 09:37",
+   "values": {
+    "controller.apply.5000x50": {
+     "value": 31.506,
+     "unit": "ms"
+    },
+    "controller.alerts.first": {
+     "value": 45.0249,
+     "unit": "ms"
+    },
+    "controller.alerts.later": {
+     "value": 164.9755,
+     "unit": "ms"
+    },
+    "controller.fanout.first": {
+     "value": 327.8988,
+     "unit": "ms"
+    },
+    "controller.fanout.change": {
+     "value": 242.7569,
+     "unit": "ms"
+    },
+    "controller.memory.5000x50": {
+     "value": 89.55496215820312,
+     "unit": "MB"
+    },
+    "protocol.snapshot.1000x50": {
+     "value": 4573.115234375,
+     "unit": "KB"
+    },
+    "controller.recovery": {
+     "value": 716.7336,
+     "unit": "ms"
+    },
+    "agent.sidecars.register": {
+     "value": 112.4886,
+     "unit": "ms"
+    },
+    "agent.sidecars.change": {
+     "value": 74.4761,
+     "unit": "ms"
+    },
+    "client.library.memory": {
+     "value": 0.6511306762695312,
+     "unit": "MB"
+    },
+    "client.count.time": {
+     "value": 0.067681,
+     "unit": "us"
+    },
+    "client.count.allocated": {
+     "value": 0.0,
+     "unit": "B"
+    }
+   },
+   "regressions": [
+    "controller.apply.5000x50 is 31.506 ms, the median of the last runs is 6.503"
+   ]
   }
  ]
 }
