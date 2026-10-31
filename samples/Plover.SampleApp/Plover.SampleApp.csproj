@@ -7,7 +7,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <!-- The live demo builds one service with an older version (-p:PollyVersion=...), so the packages page has versions to compare. -->
-    <PollyVersion Condition="'$(PollyVersion)' == ''">8.8.1</PollyVersion>
+    <PollyVersion Condition="'$(PollyVersion)' == ''">8.9.0</PollyVersion>
   </PropertyGroup>
   <ItemGroup>
     <!-- A package of its own, so there is something to list; the shared framework is not a package. -->
